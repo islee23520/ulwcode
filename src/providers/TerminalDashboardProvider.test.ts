@@ -408,8 +408,11 @@ describe("TerminalDashboardProvider", () => {
       ]),
     });
     const selectPane = vi.mocked(tmuxSessionManager.selectPane);
-    const { messageHandler } = resolveProvider(provider);
-    await flushPromises();
+    const messageHandler = (
+      provider as unknown as {
+        handleWebviewMessage: (message: unknown) => Promise<void>;
+      }
+    ).handleWebviewMessage.bind(provider);
 
     await messageHandler({
       action: "switchPane",
@@ -1259,5 +1262,862 @@ describe("TerminalDashboardProvider", () => {
     expect(panel.reveal).toHaveBeenCalledTimes(1);
 
     vi.useRealTimers();
+  });
+
+  it("stops polling when hidden and clears the resolved view on dispose", async () => {
+    vi.useFakeTimers();
+    const { provider, discoverSessions } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+    });
+    const { view } = resolveProvider(provider);
+    await flushPromises();
+
+    const visibilityHandler = vi.mocked(view.onDidChangeVisibility).mock
+      .calls[0]?.[0] as () => void;
+    view.visible = false;
+    visibilityHandler();
+    vi.advanceTimersByTime(3000);
+    await flushPromises();
+
+    const disposeHandler = vi.mocked(view.onDidDispose).mock.calls[0]?.[0] as
+      | (() => void)
+      | undefined;
+    disposeHandler?.();
+    await provider.showAiToolSelector("repo-a", "Repo A");
+
+    expect(discoverSessions).toHaveBeenCalledTimes(1);
+    expect(view.webview.postMessage).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("clears the panel reference when a dashboard panel is disposed", async () => {
+    const { provider } = createProvider();
+
+    const { panel } = showProvider(provider);
+    const disposeCalls = panel.onDidDispose.mock.calls as unknown as Array<
+      [() => void]
+    >;
+    const disposeHandler = disposeCalls[0]?.[0] as
+      | (() => void)
+      | undefined;
+    disposeHandler?.();
+    provider.show();
+
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(2);
+  });
+
+  it("continues posting sessions when pane or zellij discovery fails", async () => {
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const { provider } = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      listWindows: vi.fn().mockResolvedValue([{ windowId: "@1", index: 1, name: "main", isActive: true }]),
+      listWindowPaneGeometry: vi.fn().mockRejectedValue(new Error("pane down")),
+      zellijDiscoverSessions: vi.fn().mockRejectedValue(new Error("zellij down")),
+    });
+
+    const { view } = resolveProvider(provider);
+    await flushPromises();
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to discover zellij sessions: zellij down"),
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to load tmux panes for repo-a: pane down"),
+    );
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessions: [expect.objectContaining({ id: "repo-a", paneCount: 0 })],
+        panes: { "repo-a": [] },
+        windows: { "repo-a": [] },
+      }),
+    );
+  });
+
+  it("uses fallback zellij window data when there are panes but no tabs", async () => {
+    const { provider } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      zellijDiscoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      zellijListTabs: vi.fn().mockResolvedValue([]),
+      zellijListPanes: vi.fn().mockResolvedValue([
+        { id: "terminal_9", title: "lonely", isFocused: false },
+      ]),
+    });
+
+    const { view } = resolveProvider(provider);
+    await flushPromises();
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        windows: {
+          "repo-a": [
+            expect.objectContaining({
+              windowId: "zellij-tab-1",
+              name: "Tab 1",
+              isActive: true,
+              panes: [expect.objectContaining({ paneId: "terminal_9" })],
+            }),
+          ],
+        },
+      }),
+    );
+  });
+
+  it("handles zellij backend lookup failures by falling back to tmux actions", async () => {
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const { provider, tmuxSessionManager } = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      zellijDiscoverSessions: vi.fn().mockRejectedValue(new Error("lookup down")),
+    });
+
+    const { messageHandler } = resolveProvider(provider);
+    await flushPromises();
+
+    await messageHandler({
+      action: "selectWindow",
+      sessionId: "repo-a",
+      windowId: "@7",
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to resolve zellij session backend: lookup down"),
+    );
+    expect(vi.mocked(tmuxSessionManager.selectWindow)).toHaveBeenCalledWith("@7");
+  });
+
+  it("handles zellij split, swap no-op, and active-session replacement after zellij kill", async () => {
+    const terminalProvider = {
+      showAiToolSelector: vi.fn(),
+      launchAiTool: vi.fn(),
+      switchToZellijSession: vi.fn().mockResolvedValue(undefined),
+      killTmuxSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const discoverSessions = vi.fn().mockResolvedValue([]);
+    const zellijDiscoverSessions = vi
+      .fn()
+      .mockResolvedValueOnce([
+        { id: "repo-a-1", name: "repo-a-1", workspace: "repo-a", isActive: true },
+        { id: "repo-a-2", name: "repo-a-2", workspace: "repo-a", isActive: false },
+      ])
+      .mockResolvedValueOnce([
+        { id: "repo-a-1", name: "repo-a-1", workspace: "repo-a", isActive: true },
+        { id: "repo-a-2", name: "repo-a-2", workspace: "repo-a", isActive: false },
+      ])
+      .mockResolvedValueOnce([
+        { id: "repo-a-1", name: "repo-a-1", workspace: "repo-a", isActive: true },
+        { id: "repo-a-2", name: "repo-a-2", workspace: "repo-a", isActive: false },
+      ])
+      .mockResolvedValue([
+        { id: "repo-a-2", name: "repo-a-2", workspace: "repo-a", isActive: true },
+      ]);
+    const { provider, zellijSessionManager } = createProvider({
+      discoverSessions,
+      zellijDiscoverSessions,
+      zellijListPanes: vi.fn().mockResolvedValue([]),
+      zellijListTabs: vi.fn().mockResolvedValue([{ index: 1, name: "main", isActive: true }]),
+      terminalProvider,
+    });
+
+    const { messageHandler } = resolveProvider(provider);
+    await flushPromises();
+
+    await messageHandler({
+      action: "splitPane",
+      sessionId: "repo-a-1",
+      paneId: "terminal_1",
+      direction: "v",
+    });
+    await messageHandler({
+      action: "swapPane",
+      sessionId: "repo-a-1",
+      sourcePaneId: "terminal_1",
+      targetPaneId: "terminal_2",
+    });
+    zellijDiscoverSessions
+      .mockReset()
+      .mockResolvedValueOnce([
+        { id: "repo-a-1", name: "repo-a-1", workspace: "repo-a", isActive: true },
+        { id: "repo-a-2", name: "repo-a-2", workspace: "repo-a", isActive: false },
+      ])
+      .mockResolvedValueOnce([
+        { id: "repo-a-1", name: "repo-a-1", workspace: "repo-a", isActive: true },
+        { id: "repo-a-2", name: "repo-a-2", workspace: "repo-a", isActive: false },
+      ])
+      .mockResolvedValueOnce([
+        { id: "repo-a-2", name: "repo-a-2", workspace: "repo-a", isActive: true },
+      ])
+      .mockResolvedValue([
+        { id: "repo-a-2", name: "repo-a-2", workspace: "repo-a", isActive: true },
+      ]);
+    await messageHandler({ action: "killSession", sessionId: "repo-a-1" });
+
+    expect(zellijSessionManager?.selectPane).toHaveBeenCalledWith("terminal_1");
+    expect(zellijSessionManager?.splitPane).toHaveBeenCalledWith("v");
+    expect(terminalProvider.killTmuxSession).toHaveBeenCalledWith("repo-a-1");
+    expect(terminalProvider.switchToZellijSession).toHaveBeenCalledWith("repo-a-2");
+  });
+
+  it("builds native shell lists without workspace filtering and tolerates store failures", async () => {
+    const instanceStore = {
+      getActive: vi.fn().mockReturnValue({ config: { id: "shell-2" } }),
+      getAll: vi
+        .fn()
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce([
+          { config: { id: "shell-1", label: "Shell 1" }, runtime: {}, state: "connected" },
+          { config: { id: "shell-2", label: "Shell 2", workspaceUri: "file:///other" }, runtime: {}, state: "disconnected" },
+        ])
+        .mockImplementationOnce(() => {
+          throw new Error("store failed");
+        }),
+      get: vi.fn(),
+      upsert: vi.fn(),
+      setActive: vi.fn(),
+    };
+    const { provider } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      instanceStore,
+    });
+
+    const { view, messageHandler } = resolveProvider(provider);
+    await flushPromises();
+    vi.mocked(view.webview.postMessage).mockClear();
+
+    await messageHandler({ action: "toggleScope" });
+    await messageHandler({ action: "refresh" });
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nativeShells: [
+          { id: "shell-1", label: "Shell 1", state: "connected", isActive: false },
+          { id: "shell-2", label: "Shell 2", state: "disconnected", isActive: true },
+        ],
+        showingAll: true,
+      }),
+    );
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ nativeShells: [] }),
+    );
+  });
+
+  it("queues invisible post failures and flushes them when the view becomes visible", async () => {
+    const { provider } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+    });
+
+    const { view } = resolveProvider(provider);
+    vi.mocked(view.webview.postMessage)
+      .mockResolvedValueOnce(false as never)
+      .mockResolvedValue(true as never);
+    await flushPromises();
+    vi.mocked(view.webview.postMessage).mockClear();
+
+    await (
+      provider as unknown as {
+        handleWebviewMessage: (message: unknown) => Promise<void>;
+      }
+    ).handleWebviewMessage({ action: "refresh" });
+
+    const visibilityHandler = vi.mocked(view.onDidChangeVisibility).mock
+      .calls[0]?.[0] as () => void;
+    view.visible = true;
+    visibilityHandler();
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "updateTmuxSessions" }),
+    );
+  });
+
+  it("covers no-workspace session posting, tmux window pane fallbacks, and string errors", async () => {
+    vscode.workspace.workspaceFolders = undefined;
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const { provider } = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "global", name: "global", workspace: "", isActive: true },
+      ]),
+      listWindows: vi.fn().mockResolvedValue([
+        { windowId: "@1", index: 1, name: "main", isActive: true },
+      ]),
+      listWindowPaneGeometry: vi.fn().mockResolvedValue([]),
+      instanceStore: {
+        getActive: vi.fn().mockReturnValue(undefined),
+        getAll: vi.fn().mockReturnValue([]),
+      },
+    });
+
+    const { view, messageHandler } = resolveProvider(provider);
+    await flushPromises();
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: "No workspace",
+        sessions: [expect.objectContaining({ id: "global", paneCount: 0 })],
+        windows: {
+          global: [expect.objectContaining({ panes: [] })],
+        },
+      }),
+    );
+
+    vi.mocked(view.webview.postMessage).mockClear();
+    await messageHandler({ action: "unknown-action" });
+    expect(view.webview.postMessage).not.toHaveBeenCalled();
+
+    const failing = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockRejectedValue("tmux unavailable"),
+    });
+    const { view: failingView } = resolveProvider(failing.provider);
+    await flushPromises();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to discover tmux sessions: tmux unavailable"),
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to load tmux sessions: tmux unavailable"),
+    );
+    expect(failingView.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ tmuxAvailable: false, sessions: [] }),
+    );
+  });
+
+  it("uses zellij focused pane targets and handles missing terminal providers", async () => {
+    const terminalProvider = {
+      showAiToolSelector: vi.fn(),
+      launchAiTool: vi.fn().mockResolvedValue(undefined),
+    };
+    const { provider } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      zellijDiscoverSessions: vi.fn().mockResolvedValue([
+        { id: "zellij-a", name: "zellij-a", workspace: "repo-a", isActive: true },
+      ]),
+      zellijListPanes: vi.fn().mockResolvedValue([
+        { id: "terminal_1", title: "one", isFocused: false },
+        { id: "terminal_2", title: "two", isFocused: true },
+      ]),
+      zellijListTabs: vi.fn().mockResolvedValue([
+        { index: 1, name: "main", isActive: true },
+      ]),
+      terminalProvider,
+    });
+
+    const { messageHandler } = resolveProvider(provider);
+    await flushPromises();
+    await messageHandler({
+      action: "showAiToolSelector",
+      sessionId: "zellij-a",
+      sessionName: "Zellij A",
+    });
+    await messageHandler({
+      action: "launchAiTool",
+      sessionId: "zellij-a",
+      tool: "claude",
+      savePreference: true,
+      targetPaneId: "terminal_2",
+    });
+
+    expect(terminalProvider.showAiToolSelector).toHaveBeenCalledWith(
+      "zellij-a",
+      "Zellij A",
+      true,
+      "terminal_2",
+    );
+    expect(terminalProvider.launchAiTool).toHaveBeenCalledWith(
+      "zellij-a",
+      "claude",
+      true,
+      undefined,
+    );
+
+    const noTerminalProvider = createProvider();
+    const { messageHandler: noTerminalHandler } = resolveProvider(
+      noTerminalProvider.provider,
+    );
+    await flushPromises();
+    await expect(
+      noTerminalHandler({
+        action: "launchAiTool",
+        sessionId: "repo-a",
+        tool: "claude",
+        savePreference: false,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("covers tmux pane fallback targets and zellij optional pane branches", async () => {
+    const { provider, tmuxSessionManager } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      listPanes: vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            paneId: "%active",
+            index: 0,
+            title: "active",
+            isActive: true,
+            currentPath: "/active",
+          },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([]),
+    });
+    const { messageHandler } = resolveProvider(provider);
+    await flushPromises();
+
+    await messageHandler({ action: "createWindow", sessionId: "repo-a" });
+    await messageHandler({
+      action: "splitPane",
+      sessionId: "repo-a",
+      direction: "h",
+    });
+    await messageHandler({
+      action: "splitPaneWithCommand",
+      sessionId: "repo-a",
+      paneId: "%missing",
+      direction: "v",
+      command: "pwd",
+    });
+
+    expect(vi.mocked(tmuxSessionManager.createWindow)).toHaveBeenCalledWith(
+      "repo-a",
+      "/workspaces/repo-a",
+    );
+    expect(vi.mocked(tmuxSessionManager.splitPane)).toHaveBeenCalledWith(
+      "%active",
+      "h",
+      { workingDirectory: "/active" },
+    );
+    expect(vi.mocked(tmuxSessionManager.splitPane)).toHaveBeenCalledWith(
+      "%missing",
+      "v",
+      { command: "pwd", workingDirectory: undefined },
+    );
+
+    const zellij = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      zellijDiscoverSessions: vi.fn().mockResolvedValue([
+        { id: "zellij-a", name: "zellij-a", workspace: "repo-a", isActive: false },
+      ]),
+      zellijListPanes: vi.fn().mockResolvedValue([]),
+      zellijListTabs: vi.fn().mockResolvedValue([{ index: 1, name: "main", isActive: true }]),
+    });
+    const { messageHandler: zellijHandler } = resolveProvider(zellij.provider);
+    await flushPromises();
+
+    await zellijHandler({ action: "splitPane", sessionId: "zellij-a", direction: "h" });
+    await zellijHandler({ action: "killPane", sessionId: "zellij-a" });
+    await zellijHandler({
+      action: "resizePane",
+      sessionId: "zellij-a",
+      direction: "R",
+      amount: 3,
+    });
+
+    expect(zellij.zellijSessionManager?.selectPane).not.toHaveBeenCalled();
+    expect(zellij.zellijSessionManager?.splitPane).toHaveBeenCalledWith("h");
+    expect(zellij.zellijSessionManager?.killPane).toHaveBeenCalled();
+    expect(zellij.zellijSessionManager?.resizePane).toHaveBeenCalledWith(
+      "right",
+      3,
+    );
+  });
+
+  it("handles create and activate native shells without an instance store", async () => {
+    const { provider } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+    });
+    const { messageHandler } = resolveProvider(provider);
+    await flushPromises();
+
+    await messageHandler({ action: "createNativeShell" });
+    await messageHandler({ action: "activateNativeShell", instanceId: "missing" });
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "opencodeTui.switchNativeShell",
+    );
+  });
+
+  it("logs action errors with stringified non-Error values and refreshes", async () => {
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const { provider } = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+    });
+    const { view, messageHandler } = resolveProvider(provider);
+    await flushPromises();
+    vi.mocked(vscode.commands.executeCommand).mockRejectedValueOnce("boom");
+    vi.mocked(view.webview.postMessage).mockClear();
+
+    await messageHandler({ action: "activate", sessionId: "repo-a" });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Error handling "activate" action: boom'),
+    );
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "updateTmuxSessions" }),
+    );
+  });
+
+  it("does not attach subscriptions when there is no active webview", () => {
+    const { provider } = createProvider();
+
+    (
+      provider as unknown as {
+        attachCommonSubscriptions: (
+          onDispose: () => void,
+          registerDispose: (listener: () => void) => { dispose: () => void },
+        ) => void;
+      }
+    ).attachCommonSubscriptions(
+      vi.fn(),
+      vi.fn(() => ({ dispose: vi.fn() })),
+    );
+
+    expect(vscode.window.createWebviewPanel).not.toHaveBeenCalled();
+  });
+
+  it("covers direct private fallbacks for missing zellij manager and zellij swap no-op", async () => {
+    const { provider } = createProvider();
+
+    await expect(
+      (
+        provider as unknown as {
+          buildZellijWindowData: () => Promise<{
+            panes: unknown[];
+            windows: unknown[];
+          }>;
+        }
+      ).buildZellijWindowData(),
+    ).resolves.toEqual({ panes: [], windows: [] });
+
+    const zellij = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      zellijDiscoverSessions: vi.fn().mockResolvedValue([
+        { id: "zellij-a", name: "zellij-a", workspace: "repo-a", isActive: true },
+      ]),
+      zellijListPanes: vi.fn().mockResolvedValue([]),
+      zellijListTabs: vi.fn().mockResolvedValue([{ index: 1, name: "main", isActive: true }]),
+    });
+    const { view, messageHandler } = resolveProvider(zellij.provider);
+    await flushPromises();
+    vi.mocked(view.webview.postMessage).mockClear();
+
+    await messageHandler({
+      action: "swapPane",
+      sessionId: "zellij-a",
+      sourcePaneId: "terminal_1",
+      targetPaneId: "terminal_2",
+    });
+
+    expect(zellij.zellijSessionManager?.discoverSessions).toHaveBeenCalled();
+    expect(zellij.tmuxSessionManager.swapPanes).not.toHaveBeenCalled();
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "updateTmuxSessions" }),
+    );
+  });
+
+  it("covers defensive branch variants without changing provider behavior", async () => {
+    const logger = { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+    const viewProvider = createProvider({ discoverSessions: vi.fn().mockResolvedValue([]) });
+    const firstView = resolveProvider(viewProvider.provider).view;
+    const secondView = resolveProvider(viewProvider.provider).view;
+    const firstDispose = vi.mocked(firstView.onDidDispose).mock.calls[0]?.[0] as () => void;
+    firstDispose();
+    await viewProvider.provider.showAiToolSelector("repo-a", "Repo A");
+    expect(secondView.webview.postMessage).toHaveBeenCalled();
+
+    const panelProvider = createProvider();
+    const firstPanel = showProvider(panelProvider.provider).panel;
+    (
+      panelProvider.provider as unknown as {
+        panel: { webview: unknown; reveal: () => void };
+      }
+    ).panel = { webview: {}, reveal: vi.fn() };
+    const panelDisposeCalls = firstPanel.onDidDispose.mock
+      .calls as unknown as Array<[() => void]>;
+    const panelDispose = panelDisposeCalls[0][0];
+    panelDispose();
+    panelProvider.provider.show();
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+
+    vscode.workspace.workspaceFolders = undefined;
+    const nativeProvider = createProvider({ discoverSessions: vi.fn().mockResolvedValue([]) });
+    const { messageHandler: nativeHandler } = resolveProvider(nativeProvider.provider);
+    await flushPromises();
+    await nativeHandler({ action: "createNativeShell" });
+
+    const noZellij = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockRejectedValue("tmux down"),
+    });
+    const { view: noZellijView } = resolveProvider(noZellij.provider);
+    await flushPromises();
+    expect(noZellijView.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ tmuxAvailable: false }),
+    );
+
+    const zellijStringFailure = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      zellijDiscoverSessions: vi.fn().mockRejectedValue("zellij down"),
+    });
+    resolveProvider(zellijStringFailure.provider);
+    await flushPromises();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to discover zellij sessions: zellij down"),
+    );
+
+    const tmuxFailsButZellijExists = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockRejectedValue("tmux down with zellij"),
+      zellijDiscoverSessions: vi.fn().mockResolvedValue([]),
+    });
+    resolveProvider(tmuxFailsButZellijExists.provider);
+    await flushPromises();
+
+    const paneStringFailure = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      listWindows: vi.fn().mockResolvedValue([{ windowId: "@1", index: 1, name: "main", isActive: true }]),
+      listWindowPaneGeometry: vi.fn().mockRejectedValue("pane string down"),
+    });
+    resolveProvider(paneStringFailure.provider);
+    await flushPromises();
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("pane string down"));
+
+    const selectorProvider = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      listPanes: vi.fn().mockResolvedValue([
+        { paneId: "%1", index: 0, title: "inactive", isActive: false },
+      ]),
+    });
+    const { messageHandler: selectorHandler } = resolveProvider(selectorProvider.provider);
+    await flushPromises();
+    await selectorHandler({ action: "showAiToolSelector", sessionId: "repo-a", sessionName: "Repo A" });
+
+    const selectorErrorProvider = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      listPanes: vi.fn().mockRejectedValue("pane lookup down"),
+    });
+    const { messageHandler: selectorErrorHandler } = resolveProvider(selectorErrorProvider.provider);
+    await flushPromises();
+    await selectorErrorHandler({ action: "showAiToolSelector", sessionId: "repo-a", sessionName: "Repo A" });
+    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining("pane lookup down"));
+
+    const splitFallbackProvider = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      listPanes: vi.fn().mockResolvedValue([]),
+    });
+    const { messageHandler: splitFallbackHandler } = resolveProvider(splitFallbackProvider.provider);
+    await flushPromises();
+    await splitFallbackHandler({ action: "splitPane", sessionId: "repo-a", direction: "h" });
+    await splitFallbackHandler({ action: "splitPaneWithCommand", sessionId: "repo-a", direction: "v", command: "pwd" });
+    expect(splitFallbackProvider.tmuxSessionManager.splitPane).toHaveBeenCalledWith(
+      "repo-a",
+      "h",
+      { workingDirectory: undefined },
+    );
+    expect(splitFallbackProvider.tmuxSessionManager.splitPane).toHaveBeenCalledWith(
+      "repo-a",
+      "v",
+      { command: "pwd", workingDirectory: undefined },
+    );
+
+    const zellijNoPaneProvider = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      zellijDiscoverSessions: vi.fn().mockResolvedValue([
+        { id: "zellij-a", name: "zellij-a", workspace: "repo-a", isActive: true },
+      ]),
+      zellijListPanes: vi.fn().mockResolvedValue([]),
+      zellijListTabs: vi.fn().mockResolvedValue([{ index: 1, name: "main", isActive: true }]),
+    });
+    const { messageHandler: zellijNoPaneHandler } = resolveProvider(zellijNoPaneProvider.provider);
+    await flushPromises();
+    await zellijNoPaneHandler({ action: "splitPaneWithCommand", sessionId: "zellij-a", direction: "h", command: "pwd" });
+
+    const killProvider = createProvider({
+      discoverSessions: vi
+        .fn()
+        .mockResolvedValueOnce([{ id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: false }])
+        .mockResolvedValueOnce([{ id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true }])
+        .mockResolvedValueOnce([{ id: "repo-b", name: "repo-b", workspace: "repo-b", isActive: true }])
+        .mockResolvedValue([]),
+    });
+    const { messageHandler: killHandler } = resolveProvider(killProvider.provider);
+    await flushPromises();
+    await killHandler({ action: "killSession", sessionId: "repo-a" });
+    await killHandler({ action: "killSession", sessionId: "repo-a" });
+
+    const actionErrorProvider = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+    });
+    const { messageHandler: actionErrorHandler } = resolveProvider(actionErrorProvider.provider);
+    await flushPromises();
+    vi.mocked(actionErrorProvider.tmuxSessionManager.selectPane).mockRejectedValueOnce("select down");
+    await actionErrorHandler({ action: "switchPane", sessionId: "repo-a", paneId: "%1" });
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("select down"));
+    vi.mocked(actionErrorProvider.tmuxSessionManager.selectPane).mockRejectedValueOnce(new Error("select error"));
+    await actionErrorHandler({ action: "switchPane", sessionId: "repo-a", paneId: "%1" });
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("select error"));
+
+    const launchErrorProvider = createProvider({
+      logger,
+      terminalProvider: { showAiToolSelector: vi.fn(), launchAiTool: vi.fn().mockRejectedValue("launch down") },
+    });
+    const { messageHandler: launchErrorHandler } = resolveProvider(launchErrorProvider.provider);
+    await flushPromises();
+    await launchErrorHandler({ action: "launchAiTool", sessionId: "repo-a", tool: "claude", savePreference: false });
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("launch down"));
+
+    vscode.workspace.workspaceFolders = [{ uri: { fsPath: "/workspaces/repo-a" } }];
+    const nativeShellProvider = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      instanceStore: {
+        getActive: vi.fn().mockReturnValue(undefined),
+        getAll: vi.fn().mockReturnValue([{ config: { id: "shell", label: "Shell" }, runtime: {}, state: "connected" }]),
+      },
+    });
+    resolveProvider(nativeShellProvider.provider);
+    await flushPromises();
+
+    (
+      nativeShellProvider.provider as unknown as { flushPendingMessage: () => void }
+    ).flushPendingMessage();
+
+    expect(
+      (
+        nativeShellProvider.provider as unknown as {
+          parseZellijTabIndex: (windowId: string | undefined) => number;
+        }
+      ).parseZellijTabIndex(undefined),
+    ).toBe(1);
+
+    const backendStringFailure = createProvider({
+      logger,
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      zellijDiscoverSessions: vi.fn().mockRejectedValue("backend string down"),
+    });
+    const { messageHandler: backendStringHandler } = resolveProvider(backendStringFailure.provider);
+    await flushPromises();
+    await backendStringHandler({ action: "activate", sessionId: "repo-a" });
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("backend string down"));
+
+    const oddWindowsProvider = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      listWindows: vi.fn().mockResolvedValue({
+        map: vi
+          .fn()
+          .mockImplementationOnce((mapper: (value: { windowId: string }) => unknown) => [mapper({ windowId: "@1" })])
+          .mockImplementationOnce((mapper: (value: { windowId: string; index: number; name: string; isActive: boolean }, index: number) => unknown) => [
+            mapper({ windowId: "@1", index: 1, name: "one", isActive: true }, 0),
+            mapper({ windowId: "@2", index: 2, name: "two", isActive: false }, 1),
+          ]),
+      }),
+      listWindowPaneGeometry: vi.fn().mockResolvedValue([]),
+    });
+    resolveProvider(oddWindowsProvider.provider);
+    await flushPromises();
+
+    const oddSessionsProvider = createProvider();
+    (
+      oddSessionsProvider.provider as unknown as {
+        discoverDashboardSessions: () => Promise<unknown>;
+      }
+    ).discoverDashboardSessions = async () => ({
+      filter: () => ({
+        [Symbol.iterator]: function* () {},
+        map: (mapper: (session: { id: string; name: string; workspace: string; isActive: boolean; backend: string }) => unknown) => [
+          mapper({ id: "ghost", name: "ghost", workspace: "repo-a", isActive: false, backend: "tmux" }),
+        ],
+      }),
+      length: 1,
+    });
+    resolveProvider(oddSessionsProvider.provider);
+    await flushPromises();
+
+    const fallbackShowAllProvider = createProvider({
+      discoverSessions: vi.fn().mockRejectedValue(new Error("show all fail")),
+    });
+    const { messageHandler: fallbackShowAllHandler } = resolveProvider(fallbackShowAllProvider.provider);
+    await flushPromises();
+    await fallbackShowAllHandler({ action: "toggleScope" });
+  });
+
+  it("covers synthetic dashboard payload fallbacks", async () => {
+    const { provider } = createProvider();
+    (
+      provider as unknown as {
+        discoverDashboardSessions: () => Promise<unknown>;
+      }
+    ).discoverDashboardSessions = async () => ({
+      length: 1,
+      [Symbol.iterator]: function* () {
+        yield { id: "ghost", name: "ghost", workspace: "repo-a", isActive: false, backend: "tmux" };
+      },
+      filter: () => ({
+        length: 1,
+        [Symbol.iterator]: function* () {},
+        map: (mapper: (session: {
+          id: string;
+          name: string;
+          workspace: string;
+          isActive: boolean;
+          backend: "tmux";
+        }) => unknown) => [
+          mapper({
+            id: "ghost",
+            name: "ghost",
+            workspace: "repo-a",
+            isActive: false,
+            backend: "tmux",
+          }),
+        ],
+      }),
+    });
+
+    const { view } = resolveProvider(provider);
+    await flushPromises();
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessions: [expect.objectContaining({ id: "ghost", paneCount: 0 })],
+      }),
+    );
+
+    const fresh = createProvider();
+    (
+      fresh.provider as unknown as { flushPendingMessage: () => void }
+    ).flushPendingMessage();
   });
 });

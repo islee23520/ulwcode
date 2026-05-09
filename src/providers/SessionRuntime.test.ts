@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as os from "node:os";
+import type * as vscodeApi from "vscode";
 import type * as vscodeTypes from "../test/mocks/vscode";
 import { SessionRuntime } from "./SessionRuntime";
 import { TerminalManager } from "../terminals/TerminalManager";
@@ -15,11 +16,12 @@ import {
 } from "../services/TmuxSessionManager";
 import { AiToolOperatorRegistry } from "../services/aiTools/AiToolOperatorRegistry";
 import { ZellijSessionManager } from "../services/ZellijSessionManager";
+import { NativeTerminalManager } from "../services/NativeTerminalManager";
 import {
   StaticTerminalBackend,
   TerminalBackendRegistry,
 } from "../services/terminalBackends";
-import type { TerminalBackendType } from "../types";
+import type { AiToolConfig, TerminalBackendType } from "../types";
 
 const vscode = await vi.importActual<typeof vscodeTypes>(
   "../test/mocks/vscode",
@@ -44,6 +46,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
   let sessionRuntime: SessionRuntime;
   let mockTmuxSessionManager: TmuxSessionManager;
   let mockZellijSessionManager: ZellijSessionManager;
+  let mockNativeTerminalManager: NativeTerminalManager;
   let backendRegistry: TerminalBackendRegistry;
   let mockTerminalManager: TerminalManager;
   let mockPortManager: PortManager;
@@ -61,9 +64,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       (sessionId: string, sessionName: string, forceShow?: boolean) => void
     >
   >;
-  let exitHandler:
-    | ((id: string) => void)
-    | undefined;
+  let exitHandler: ((id: string) => void) | undefined;
   let mockCallbacks: {
     postMessage: (message: unknown) => void;
     onActiveInstanceChanged: (instanceId: string) => void;
@@ -135,11 +136,39 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       sendTextToPane: vi.fn(),
       listPanes: vi.fn(),
       listTabs: vi.fn(),
-      getAttachCommand: vi.fn((sessionName: string) =>
-        `zellij attach '${sessionName}'`,
+      setActiveSessionName: vi.fn(),
+      getAttachCommand: vi.fn(
+        (sessionName: string) => `zellij attach '${sessionName}'`,
       ),
       isAvailable: vi.fn(async () => true),
     } as unknown as ZellijSessionManager;
+
+    mockNativeTerminalManager = {
+      type: "native" as const,
+      isAvailable: vi.fn(() => true),
+      create: vi.fn((instanceId, options) => ({
+        backend: "native",
+        restoreMode: "recreate" as const,
+        launchSpec: {
+          command: options.command,
+          args: options.args,
+          cwd: options.cwd,
+          name: instanceId,
+        },
+        state: {
+          version: 1 as const,
+          backend: "native",
+          restoreMode: "recreate" as const,
+          launchSpec: {
+            command: options.command,
+            args: options.args,
+            cwd: options.cwd,
+            name: instanceId,
+          },
+          createdAt: Date.now(),
+        },
+      })),
+    } as unknown as NativeTerminalManager;
 
     backendRegistry = new TerminalBackendRegistry([
       new StaticTerminalBackend("native", "Native", true),
@@ -213,6 +242,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       mockContextSharingService,
       mockAiToolRegistry,
       mockCallbacks,
+      mockNativeTerminalManager,
     );
 
     exitHandler = undefined;
@@ -248,8 +278,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
   };
 
   const setActiveBackend = (backend: TerminalBackendType): void => {
-    (sessionRuntime as unknown as { activeBackend: TerminalBackendType }).activeBackend =
-      backend;
+    (
+      sessionRuntime as unknown as { activeBackend: TerminalBackendType }
+    ).activeBackend = backend;
   };
 
   describe("checkPaneChanges", () => {
@@ -337,8 +368,18 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       upsertInstance({ zellijSessionId: "zellij-session" });
 
       vi.mocked(mockZellijSessionManager.listPanes).mockResolvedValue([
-        { id: "terminal_1", title: "shell", isFocused: true, isFloating: false },
-        { id: "terminal_2", title: "agent", isFocused: false, isFloating: false },
+        {
+          id: "terminal_1",
+          title: "shell",
+          isFocused: true,
+          isFloating: false,
+        },
+        {
+          id: "terminal_2",
+          title: "agent",
+          isFocused: false,
+          isFloating: false,
+        },
       ] as Awaited<ReturnType<ZellijSessionManager["listPanes"]>>);
       vi.mocked(mockZellijSessionManager.listTabs).mockResolvedValue([
         { index: 1, name: "main", isActive: true },
@@ -364,7 +405,12 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     it("starts zellij change monitoring with polling only", async () => {
       setActiveBackend("zellij");
       vi.mocked(mockZellijSessionManager.listPanes).mockResolvedValue([
-        { id: "terminal_1", title: "shell", isFocused: true, isFloating: false },
+        {
+          id: "terminal_1",
+          title: "shell",
+          isFocused: true,
+          isFloating: false,
+        },
       ] as Awaited<ReturnType<ZellijSessionManager["listPanes"]>>);
 
       await (
@@ -375,7 +421,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
       expect(mockZellijSessionManager.listPanes).toHaveBeenCalled();
       expect(mockTmuxSessionManager.listPanes).not.toHaveBeenCalled();
-      expect(mockTmuxSessionManager.onExternalPaneChange).not.toHaveBeenCalled();
+      expect(
+        mockTmuxSessionManager.onExternalPaneChange,
+      ).not.toHaveBeenCalled();
       expect(
         (sessionRuntime as unknown as { paneMonitorInterval?: unknown })
           .paneMonitorInterval,
@@ -413,7 +461,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
       expect(switchSpy).toHaveBeenCalledWith("replacement-session");
 
-      expect(instanceStore.get("default")?.runtime.tmuxSessionId).toBeUndefined();
+      expect(
+        instanceStore.get("default")?.runtime.tmuxSessionId,
+      ).toBeUndefined();
       expect(mockPortManager.releaseTerminalPorts).toHaveBeenCalledWith(
         "default",
       );
@@ -442,7 +492,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
       expect(nativeShellSpy).toHaveBeenCalled();
 
-      expect(instanceStore.get("default")?.runtime.tmuxSessionId).toBeUndefined();
+      expect(
+        instanceStore.get("default")?.runtime.tmuxSessionId,
+      ).toBeUndefined();
       expect(mockPortManager.releaseTerminalPorts).toHaveBeenCalledWith(
         "default",
       );
@@ -614,7 +666,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     });
 
     it("keeps explicit zellij selection when JSON config defaults to tmux", async () => {
-      setConfiguration({ terminalBackend: "tmux" satisfies TerminalBackendType });
+      setConfiguration({
+        terminalBackend: "tmux" satisfies TerminalBackendType,
+      });
       upsertInstance({ workspaceUri: "file:///workspace/project-a" });
       vi.mocked(mockZellijSessionManager.ensureSession).mockResolvedValue({
         action: "created",
@@ -660,7 +714,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     });
 
     it("keeps explicit tmux session selection when JSON config defaults to zellij", async () => {
-      setConfiguration({ terminalBackend: "zellij" satisfies TerminalBackendType });
+      setConfiguration({
+        terminalBackend: "zellij" satisfies TerminalBackendType,
+      });
       upsertInstance({ workspaceUri: "file:///workspace/project-a" });
       vi.spyOn(
         sessionRuntime as unknown as {
@@ -804,6 +860,409 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       ).toBeUndefined();
     });
 
+    it("calls nativeTerminalManager.create() for native backend", async () => {
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+      });
+      upsertInstance({
+        workspaceUri: "file:///workspace/project-a",
+        selectedAiTool: "preferred-tool",
+      });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<{
+            name: string;
+            args: string[];
+          }>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "preferred-tool", args: ["--chat"] });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "run-tool"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await sessionRuntime.startOpenCode();
+
+      expect(mockNativeTerminalManager.create).toHaveBeenCalledWith("default", {
+        command: "run-tool",
+        args: ["--chat"],
+        cwd: "/workspace/project-a",
+      });
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "default",
+        "run-tool",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default",
+        "/workspace/project-a",
+      );
+      expect(instanceStore.get("default")?.config.terminalBackend).toBe(
+        "native",
+      );
+      expect(instanceStore.get("default")?.runtime.terminalBackend).toBe(
+        "native",
+      );
+    });
+
+    it("starts a native backend even when no native terminal manager is provided", async () => {
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+      });
+      upsertInstance({
+        workspaceUri: "file:///workspace/project-a",
+        selectedAiTool: "preferred-tool",
+      });
+      sessionRuntime.dispose();
+      sessionRuntime = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        mockTmuxSessionManager,
+        mockZellijSessionManager,
+        backendRegistry,
+        instanceStore,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<{ name: string }>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "preferred-tool" });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "run-tool"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await expect(sessionRuntime.startOpenCode()).resolves.toBeUndefined();
+
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "default",
+        "run-tool",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default",
+        "/workspace/project-a",
+      );
+      expect(instanceStore.get("default")?.runtime.terminalBackend).toBe(
+        "native",
+      );
+      expect(
+        instanceStore.get("default")?.runtime.backendState,
+      ).toBeUndefined();
+    });
+
+    it("native instance saves backendState on startOpenCode", async () => {
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+      });
+      upsertInstance({
+        workspaceUri: "file:///workspace/project-a",
+        selectedAiTool: "preferred-tool",
+      });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<{
+            name: string;
+            args: string[];
+          }>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "preferred-tool", args: ["--chat"] });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "run-tool"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      const launchPlan = {
+        backend: "native",
+        restoreMode: "recreate" as const,
+        launchSpec: {
+          command: "run-tool",
+          args: ["--chat"],
+          cwd: "/workspace/project-a",
+          name: "default",
+        },
+        state: {
+          version: 1 as const,
+          backend: "native" as const,
+          restoreMode: "recreate" as const,
+          launchSpec: {
+            command: "run-tool",
+            args: ["--chat"],
+            cwd: "/workspace/project-a",
+            name: "default",
+          },
+          createdAt: 12345,
+        },
+      } satisfies ReturnType<NativeTerminalManager["create"]>;
+      vi.mocked(mockNativeTerminalManager.create).mockReturnValueOnce(
+        launchPlan,
+      );
+
+      await sessionRuntime.startOpenCode();
+
+      expect(instanceStore.get("default")?.runtime.backendState).toEqual({
+        version: 1,
+        backend: "native",
+        restoreMode: "recreate",
+        launchSpec: {
+          command: "run-tool",
+          args: ["--chat"],
+          cwd: "/workspace/project-a",
+          name: "default",
+        },
+        createdAt: 12345,
+      });
+    });
+
+    it("ignores mismatched persisted backendState version during native startup", async () => {
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+      });
+      instanceStore.upsert({
+        config: {
+          id: "default",
+          workspaceUri: "file:///workspace/project-a",
+          selectedAiTool: "preferred-tool",
+          terminalBackend: "native",
+        },
+        runtime: {
+          terminalKey: "default",
+          terminalBackend: "native",
+          backendState: {
+            version: 99 as 1,
+            backend: "native",
+            restoreMode: "recreate",
+            launchSpec: {
+              command: "old-tool",
+              cwd: "/workspace/project-a",
+              name: "default",
+            },
+            createdAt: 1,
+          },
+        },
+        state: "disconnected",
+      });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<{ name: string }>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "preferred-tool" });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "run-tool"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await expect(sessionRuntime.startOpenCode()).resolves.toBeUndefined();
+
+      expect(mockNativeTerminalManager.create).toHaveBeenCalledWith("default", {
+        command: "run-tool",
+        args: undefined,
+        cwd: "/workspace/project-a",
+      });
+      expect(instanceStore.get("default")?.runtime.backendState).toEqual(
+        expect.objectContaining({
+          version: 1,
+          backend: "native",
+        }),
+      );
+    });
+
+    it("tmux instance does not save backendState", async () => {
+      setConfiguration({
+        terminalBackend: "tmux" satisfies TerminalBackendType,
+      });
+      instanceStore.upsert({
+        config: {
+          id: "default",
+          workspaceUri: "file:///workspace/project-a",
+          selectedAiTool: "preferred-tool",
+        },
+        runtime: {
+          terminalKey: "default",
+          backendState: {
+            version: 1,
+            backend: "native",
+            restoreMode: "recreate",
+            launchSpec: {
+              command: "old-tool",
+              cwd: "/workspace/project-a",
+              name: "default",
+            },
+            createdAt: 1,
+          },
+        },
+        state: "connected",
+      });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<{ name: string }>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "preferred-tool" });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        },
+        "startExternalChangeMonitoring",
+      ).mockResolvedValue();
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
+        action: "created",
+        session: {
+          id: "workspace-session",
+          name: "project-a",
+          workspace: "/workspace/project-a",
+          isActive: true,
+        },
+      });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "run-tool"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await sessionRuntime.startOpenCode();
+
+      expect(instanceStore.get("default")?.runtime.terminalBackend).toBe(
+        "tmux",
+      );
+      expect(
+        instanceStore.get("default")?.runtime.backendState,
+      ).toBeUndefined();
+      expect(mockNativeTerminalManager.create).not.toHaveBeenCalled();
+    });
+
+    it("clears native backendState when switching through tmux and back to native shell", async () => {
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+      });
+      upsertInstance({
+        workspaceUri: "file:///workspace/project-a",
+        selectedAiTool: "preferred-tool",
+      });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<{ name: string }>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "preferred-tool" });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "run-tool"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await sessionRuntime.startOpenCode();
+      expect(instanceStore.get("default")?.runtime.backendState?.backend).toBe(
+        "native",
+      );
+
+      sessionRuntime.resetState(false);
+      setConfiguration({
+        terminalBackend: "tmux" satisfies TerminalBackendType,
+      });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        },
+        "startExternalChangeMonitoring",
+      ).mockResolvedValue();
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
+        action: "created",
+        session: {
+          id: "workspace-session",
+          name: "project-a",
+          workspace: "/workspace/project-a",
+          isActive: true,
+        },
+      });
+
+      await sessionRuntime.startOpenCode();
+
+      expect(instanceStore.get("default")?.runtime.terminalBackend).toBe(
+        "tmux",
+      );
+      expect(
+        instanceStore.get("default")?.runtime.backendState,
+      ).toBeUndefined();
+
+      sessionRuntime.resetState(false);
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+      });
+      await sessionRuntime.switchToNativeShell();
+      requestStartOpenCodeMock.mockClear();
+      await sessionRuntime.startOpenCode();
+
+      expect(instanceStore.get("default")?.runtime.terminalBackend).toBe(
+        "native",
+      );
+      expect(
+        instanceStore.get("default")?.runtime.backendState,
+      ).toBeUndefined();
+      expect(instanceStore.get("default")?.runtime.tmuxSessionId).toBeUndefined();
+    });
+
+    it("legacy instance without backendState starts normally", async () => {
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+      });
+      upsertInstance({
+        workspaceUri: "file:///workspace/project-a",
+        selectedAiTool: "preferred-tool",
+      });
+      sessionRuntime.dispose();
+      sessionRuntime = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        mockTmuxSessionManager,
+        mockZellijSessionManager,
+        backendRegistry,
+        instanceStore,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<{ name: string }>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "preferred-tool" });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "run-tool"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await expect(sessionRuntime.startOpenCode()).resolves.toBeUndefined();
+
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "default",
+        "run-tool",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default",
+        "/workspace/project-a",
+      );
+      expect(
+        instanceStore.get("default")?.runtime.backendState,
+      ).toBeUndefined();
+    });
+
     it("launches the selected tool directly when tmux is unavailable", async () => {
       upsertInstance({
         workspaceUri: "file:///workspace/project-a",
@@ -855,8 +1314,46 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         "default",
         "/workspace/project-a",
       );
-      expect(instanceStore.get("default")?.runtime.tmuxSessionId).toBeUndefined();
+      expect(
+        instanceStore.get("default")?.runtime.tmuxSessionId,
+      ).toBeUndefined();
       expect(instanceStore.get("default")?.runtime.port).toBe(4312);
+    });
+
+    it("starts a native backend from the home directory when no workspace is open", async () => {
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+      });
+      vscode.workspace.workspaceFolders = undefined;
+      upsertInstance({ selectedAiTool: "preferred-tool" });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<{ name: string }>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "preferred-tool" });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "run-tool"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await sessionRuntime.startOpenCode();
+
+      expect(mockNativeTerminalManager.create).toHaveBeenCalledWith("default", {
+        command: "run-tool",
+        args: undefined,
+        cwd: os.homedir(),
+      });
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "default",
+        "run-tool",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default",
+        os.homedir(),
+      );
     });
 
     it("starts a tmux-backed tool session with HTTP enabled", async () => {
@@ -1132,6 +1629,8 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         { paneId: "%2", isActive: true },
       ] as unknown as Awaited<ReturnType<TmuxSessionManager["listPanes"]>>);
 
+      setActiveBackend("tmux");
+      vscode.workspace.workspaceFolders = undefined;
       await sessionRuntime.zoomTmuxPane();
 
       expect(mockTmuxSessionManager.zoomPane).toHaveBeenCalledWith("%2");
@@ -1149,6 +1648,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
     it("kills tmux sessions and switches to a replacement workspace session when available", async () => {
       setActiveBackend("tmux");
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: "/workspace/project-a" }, name: "project-a", index: 0 },
+      ];
       upsertInstance({
         tmuxSessionId: "workspace-session",
         workspaceUri: "file:///workspace/project-a",
@@ -1317,5 +1819,2257 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       ).toBe("@file.ts#L1-L5");
       expect(sessionRuntime.formatPastedImage("image.png")).toBe("@image.png");
     });
+  });
+
+  describe("accessors, selection, and listener edge cases", () => {
+    it("reports active tool, terminal size, backend availability, and live process state", () => {
+      sessionRuntime.setLastKnownTerminalSize(132, 43);
+      (
+        sessionRuntime as unknown as { activeTool?: AiToolConfig }
+      ).activeTool = {
+        name: "codex",
+        label: "Codex",
+        path: "codex",
+        args: [],
+      };
+      vi.mocked(mockTerminalManager.getTerminal).mockReturnValue(
+        {} as ReturnType<TerminalManager["getTerminal"]>,
+      );
+      (sessionRuntime as unknown as { isStarted: boolean }).isStarted = true;
+
+      expect(sessionRuntime.getLastKnownTerminalSize()).toEqual({
+        cols: 132,
+        rows: 43,
+      });
+      expect(sessionRuntime.getActiveTool()?.name).toBe("codex");
+      expect(sessionRuntime.getBackendAvailability()).toEqual({
+        native: true,
+        tmux: true,
+        zellij: true,
+      });
+      expect(sessionRuntime.hasLiveTerminalProcess()).toBe(true);
+    });
+
+    it("resolves and remembers configured tools", () => {
+      setConfiguration({
+        aiTools: [
+          {
+            name: "codex",
+            label: "Codex",
+            path: "codex",
+            args: ["--ask"],
+          },
+        ],
+      });
+      upsertInstance();
+
+      expect(sessionRuntime.resolveToolByName("codex")?.label).toBe("Codex");
+      sessionRuntime.rememberSelectedTool("codex");
+
+      expect(instanceStore.get("default")?.config.selectedAiTool).toBe("codex");
+      expect(sessionRuntime.getActiveTool()?.name).toBe("codex");
+    });
+
+    it("cycles through available backends and falls back when sessions cannot be created", async () => {
+      const selectSpy = vi.spyOn(sessionRuntime, "selectTerminalBackend");
+
+      await sessionRuntime.cycleTerminalBackend();
+
+      expect(selectSpy).toHaveBeenCalledWith("tmux");
+
+      selectSpy.mockRestore();
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue(
+        undefined as unknown as Awaited<
+          ReturnType<TmuxSessionManager["ensureSession"]>
+        >,
+      );
+      const nativeSpy = vi
+        .spyOn(sessionRuntime, "switchToNativeShell")
+        .mockResolvedValue();
+
+      await sessionRuntime.selectTerminalBackend("tmux");
+
+      expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+        "Tmux session could not be created. Falling back to native shell.",
+      );
+      expect(nativeSpy).toHaveBeenCalled();
+
+      vi.mocked(mockZellijSessionManager.ensureSession).mockResolvedValue(
+        undefined as unknown as Awaited<
+          ReturnType<ZellijSessionManager["ensureSession"]>
+        >,
+      );
+      await sessionRuntime.selectTerminalBackend("zellij");
+
+      expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+        "Zellij session could not be created. Falling back to native shell.",
+      );
+    });
+
+    it("switches directly to native when native backend is selected", async () => {
+      const nativeSpy = vi
+        .spyOn(sessionRuntime, "switchToNativeShell")
+        .mockResolvedValue();
+
+      await sessionRuntime.selectTerminalBackend("native");
+
+      expect(nativeSpy).toHaveBeenCalled();
+    });
+
+    it("keeps existing active instance without force restart", async () => {
+      await sessionRuntime.switchToInstance("default");
+
+      expect(requestStartOpenCodeMock).not.toHaveBeenCalled();
+      expect(postMessageMock).not.toHaveBeenCalledWith({
+        type: "clearTerminal",
+      });
+    });
+
+    it("posts terminal output only for the active instance and exits native terminals normally", () => {
+      let dataHandler: ((event: { id: string; data: string }) => void) | undefined;
+      vi.mocked(mockTerminalManager.onData).mockImplementation((handler) => {
+        dataHandler = handler;
+        return { dispose: vi.fn() };
+      });
+
+      sessionRuntime.reconnectListeners();
+      dataHandler?.({ id: "other", data: "ignored" });
+      dataHandler?.({ id: "default", data: "hello" });
+      exitHandler?.("default");
+
+      expect(postMessageMock).toHaveBeenCalledWith({
+        type: "terminalOutput",
+        data: "hello",
+      });
+      expect(postMessageMock).toHaveBeenCalledWith({ type: "terminalExited" });
+    });
+
+    it("restarts by killing the active terminal and requesting a fresh launch", () => {
+      sessionRuntime.restart();
+
+      expect(mockTerminalManager.killTerminal).toHaveBeenCalledWith("default");
+      expect(postMessageMock).toHaveBeenCalledWith({ type: "clearTerminal" });
+      expect(requestStartOpenCodeMock).toHaveBeenCalled();
+    });
+  });
+
+  describe("startup fallback and persistence branches", () => {
+    it("does not start twice while started or starting", async () => {
+      (sessionRuntime as unknown as { isStarted: boolean }).isStarted = true;
+      await sessionRuntime.startOpenCode();
+      (sessionRuntime as unknown as { isStarted: boolean }).isStarted = false;
+      (sessionRuntime as unknown as { isStarting: boolean }).isStarting = true;
+      await sessionRuntime.startOpenCode();
+
+      expect(mockTerminalManager.createTerminal).not.toHaveBeenCalled();
+    });
+
+    it("falls back to native when tmux has no available session", async () => {
+      setConfiguration({ terminalBackend: "tmux" satisfies TerminalBackendType });
+      upsertInstance({ selectedAiTool: "codex" });
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockResolvedValue([]);
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<AiToolConfig>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "codex", label: "Codex", path: "", args: [] });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "codex"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await sessionRuntime.startOpenCode();
+
+      expect(sessionRuntime.getActiveBackend()).toBe("native");
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "default",
+        "codex",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default",
+        "/workspace/project-a",
+      );
+    });
+
+    it("validates stored zellij sessions and clears stale explicit selections", async () => {
+      setConfiguration({ terminalBackend: "zellij" satisfies TerminalBackendType });
+      upsertInstance({ zellijSessionId: "stale", selectedAiTool: "codex" });
+      (
+        sessionRuntime as unknown as { selectedZellijSessionId?: string }
+      ).selectedZellijSessionId = "stale";
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockResolvedValue([]);
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<AiToolConfig>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "codex", label: "Codex", path: "", args: [] });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "codex"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await sessionRuntime.startOpenCode();
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining("no longer exists"),
+      );
+      expect(sessionRuntime.getActiveBackend()).toBe("native");
+    });
+
+    it("returns early when startup tool selection is cancelled", async () => {
+      setConfiguration({ terminalBackend: "native" satisfies TerminalBackendType });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<AiToolConfig | undefined>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue(undefined);
+
+      await sessionRuntime.startOpenCode();
+
+      expect(mockTerminalManager.createTerminal).not.toHaveBeenCalled();
+      expect(sessionRuntime.isStartedFlag()).toBe(false);
+    });
+
+    it("handles HTTP port assignment failures without aborting startup", async () => {
+      setConfiguration({ terminalBackend: "native" satisfies TerminalBackendType });
+      upsertInstance({ selectedAiTool: "codex" });
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<AiToolConfig>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "codex", label: "Codex", path: "", args: [] });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "codex"),
+        supportsHttpApi: vi.fn(() => true),
+      } as never);
+      vi.mocked(mockPortManager.assignPortToTerminal).mockImplementation(() => {
+        throw new Error("no ports");
+      });
+
+      await sessionRuntime.startOpenCode();
+
+      expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+        "Failed to assign port for OpenCode HTTP API. Running without HTTP features.",
+      );
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "default",
+        "codex",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default",
+        "/workspace/project-a",
+      );
+    });
+
+    it("creates a fresh instance record when none exists", async () => {
+      setConfiguration({ terminalBackend: "native" satisfies TerminalBackendType });
+      instanceStore.remove("default");
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<AiToolConfig>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "codex", label: "Codex", path: "", args: [] });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "codex"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await sessionRuntime.startOpenCode();
+
+      expect(instanceStore.get("default")?.runtime.terminalBackend).toBe(
+        "native",
+      );
+    });
+
+    it("logs instance-store update failures", async () => {
+      setConfiguration({ terminalBackend: "native" satisfies TerminalBackendType });
+      upsertInstance();
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<AiToolConfig>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "codex", label: "Codex", path: "", args: [] });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "codex"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+      vi.spyOn(instanceStore, "upsert").mockImplementation(() => {
+        throw new Error("store read failed");
+      });
+
+      await sessionRuntime.startOpenCode();
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to update instance store"),
+      );
+    });
+  });
+
+  describe("zellij and backend resolution helpers", () => {
+    it("resolves configured backends and defaults invalid values to tmux", () => {
+      expect(
+        sessionRuntime.resolveConfiguredBackend({
+          get: vi.fn(() => "zellij"),
+        } as unknown as vscodeApi.WorkspaceConfiguration),
+      ).toBe("zellij");
+      expect(
+        sessionRuntime.resolveConfiguredBackend({
+          get: vi.fn(() => "bogus"),
+        } as unknown as vscodeApi.WorkspaceConfiguration),
+      ).toBe("tmux");
+    });
+
+    it("resolves fallback zellij sessions by workspace and active session", async () => {
+      vi.mocked(mockZellijSessionManager.discoverSessions)
+        .mockResolvedValueOnce([
+          {
+            id: "project-a",
+            name: "project-a",
+            workspace: "/workspace/project-a",
+            isActive: true,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: "project-a",
+            name: "project-a",
+            workspace: "/workspace/project-a",
+            isActive: false,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: "other",
+            name: "Other",
+            workspace: "/workspace/other",
+            isActive: true,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: "active",
+            name: "Active",
+            workspace: "/workspace/active",
+            isActive: true,
+          },
+          {
+            id: "first",
+            name: "First",
+            workspace: "/workspace/first",
+            isActive: false,
+          },
+        ])
+        .mockResolvedValueOnce([])
+        .mockRejectedValueOnce(new Error("zellij failed"));
+
+      await expect(
+        sessionRuntime.resolveFallbackZellijSessionId("/workspace/project-a"),
+      ).resolves.toBe("project-a");
+      await expect(
+        sessionRuntime.resolveFallbackZellijSessionId("/workspace/project-a"),
+      ).resolves.toBe("project-a");
+      await expect(
+        sessionRuntime.resolveFallbackZellijSessionId("/workspace/project-a"),
+      ).resolves.toBeUndefined();
+      await expect(
+        sessionRuntime.resolveFallbackZellijSessionId(),
+      ).resolves.toBe("active");
+      await expect(
+        sessionRuntime.resolveFallbackZellijSessionId(),
+      ).resolves.toBeUndefined();
+      await expect(
+        sessionRuntime.resolveFallbackZellijSessionId(),
+      ).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to resolve fallback zellij session"),
+      );
+    });
+
+    it("ensures zellij workspace sessions and warns on failure", async () => {
+      vi.mocked(mockZellijSessionManager.ensureSession)
+        .mockResolvedValueOnce({
+          action: "created",
+          session: {
+            id: "project-a",
+            name: "project-a",
+            workspace: "/workspace/project-a",
+            isActive: true,
+          },
+        })
+        .mockRejectedValueOnce(new Error("cannot create"));
+
+      await expect(
+        sessionRuntime.ensureZellijWorkspaceSession("/workspace/project-a"),
+      ).resolves.toBe("project-a");
+      await expect(
+        sessionRuntime.ensureZellijWorkspaceSession("/workspace/project-a"),
+      ).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to ensure zellij session"),
+      );
+    });
+
+    it("uses selected, stored, and instance-store mapped backend sessions", async () => {
+      upsertInstance({ id: "z", zellijSessionId: "zellij-session" });
+      upsertInstance({ id: "t", tmuxSessionId: "tmux-session" });
+
+      expect(sessionRuntime.resolveZellijSessionIdForInstance("z")).toBe(
+        "zellij-session",
+      );
+      expect(sessionRuntime.resolveTmuxSessionIdForInstance("t")).toBe(
+        "tmux-session",
+      );
+      await sessionRuntime.killTmuxSession("zellij-session");
+      expect(mockZellijSessionManager.killSession).toHaveBeenCalledWith(
+        "zellij-session",
+      );
+    });
+
+    it("handles no-manager helper variants", async () => {
+      const runtimeWithoutManagers = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        undefined,
+        undefined,
+        backendRegistry,
+        undefined,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+
+      await expect(
+        runtimeWithoutManagers.resolveFallbackTmuxSessionId(),
+      ).resolves.toBeUndefined();
+      await expect(
+        runtimeWithoutManagers.resolveFallbackZellijSessionId(),
+      ).resolves.toBeUndefined();
+      await expect(
+        runtimeWithoutManagers.ensureWorkspaceSession("/workspace/project-a"),
+      ).resolves.toBeUndefined();
+      await expect(
+        runtimeWithoutManagers.ensureZellijWorkspaceSession(
+          "/workspace/project-a",
+        ),
+      ).resolves.toBeUndefined();
+      await expect(
+        runtimeWithoutManagers.createTmuxSession(),
+      ).resolves.toBeUndefined();
+      expect(runtimeWithoutManagers.getActiveTerminalId()).toBe(
+        "opencode-main",
+      );
+      runtimeWithoutManagers.dispose();
+    });
+  });
+
+  describe("HTTP readiness, auto-context, and tool selection branches", () => {
+    it("handles missing and permanently unavailable HTTP API clients", async () => {
+      await sessionRuntime.pollForHttpReadiness();
+      expect(sessionRuntime.isHttpAvailable()).toBe(false);
+
+      (
+        sessionRuntime as unknown as {
+          apiClient?: { healthCheck: () => Promise<boolean> };
+        }
+      ).apiClient = {
+        healthCheck: vi
+          .fn()
+          .mockResolvedValueOnce(false)
+          .mockRejectedValue(new Error("down")),
+      };
+      vi.spyOn(sessionRuntime, "sleep").mockResolvedValue();
+
+      await sessionRuntime.pollForHttpReadiness();
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        "[TerminalProvider] HTTP API not available after retries, using message passing fallback",
+      );
+      expect(sessionRuntime.isHttpAvailable()).toBe(false);
+    });
+
+    it("sleeps for the requested delay", async () => {
+      vi.useFakeTimers();
+      const slept = sessionRuntime.sleep(25);
+      await vi.advanceTimersByTimeAsync(25);
+      await expect(slept).resolves.toBeUndefined();
+      vi.useRealTimers();
+    });
+
+    it("skips auto-context for every disabled precondition and logs append failures", async () => {
+      const sendAutoContext = () =>
+        (
+          sessionRuntime as unknown as { sendAutoContext: () => Promise<void> }
+        ).sendAutoContext();
+      (
+        sessionRuntime as unknown as { activeTool?: AiToolConfig }
+      ).activeTool = { name: "codex", label: "Codex", path: "", args: [] };
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        supportsAutoContext: vi.fn(() => true),
+        formatFileReference: vi.fn(() => "@file"),
+      } as never);
+
+      setConfiguration({ enableHttpApi: false });
+      await sendAutoContext();
+      setConfiguration({ autoShareContext: false });
+      await sendAutoContext();
+      setConfiguration();
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        supportsAutoContext: vi.fn(() => false),
+      } as never);
+      await sendAutoContext();
+
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        supportsAutoContext: vi.fn(() => true),
+      } as never);
+      await sendAutoContext();
+
+      (sessionRuntime as unknown as { httpAvailable: boolean }).httpAvailable =
+        true;
+      (
+        sessionRuntime as unknown as {
+          apiClient?: { appendPrompt: (value: string) => Promise<void> };
+        }
+      ).apiClient = { appendPrompt: vi.fn().mockRejectedValue(new Error("no")) };
+      vi.mocked(mockContextSharingService.getCurrentContext).mockReturnValue(
+        null,
+      );
+      await sendAutoContext();
+
+      vi.mocked(mockContextSharingService.getCurrentContext).mockReturnValue({
+        filePath: "file.ts",
+      } as ReturnType<ContextSharingService["getCurrentContext"]>);
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        supportsAutoContext: vi.fn(() => true),
+        formatFileReference: vi.fn(() => "@file.ts"),
+      } as never);
+      await sendAutoContext();
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to send auto-context"),
+      );
+    });
+
+    it("prompts before persisting a picked startup tool as default", async () => {
+      const updateMock = vi.fn(async () => undefined);
+      setConfiguration({
+        aiTools: [
+          { name: "codex", label: "Codex", path: "", args: [] },
+        ],
+        defaultAiTool: "",
+      });
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn(<T,>(key: string, defaultValue?: T): T => {
+          if (key === "aiTools") {
+            return [
+              { name: "codex", label: "Codex", path: "", args: [] },
+            ] as T;
+          }
+          return (defaultValue ?? "") as T;
+        }),
+        inspect: vi.fn(() => undefined),
+        update: updateMock,
+      } as ReturnType<typeof vscode.workspace.getConfiguration>);
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
+        label: "Codex",
+        description: "Launch Codex in the terminal",
+        tool: { name: "codex", label: "Codex", path: "", args: [] },
+      });
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue("Yes");
+      upsertInstance();
+
+      const tool = await (
+        sessionRuntime as unknown as {
+          resolveToolForStartup: (
+            config: vscodeApi.WorkspaceConfiguration,
+          ) => Promise<AiToolConfig | undefined>;
+        }
+      ).resolveToolForStartup(
+        vscode.workspace.getConfiguration() as unknown as vscodeApi.WorkspaceConfiguration,
+      );
+
+      expect(tool?.name).toBe("codex");
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        "Save Codex as default tool?",
+        { modal: false },
+        "Yes",
+        "No",
+      );
+      expect(updateMock).toHaveBeenCalledWith(
+        "defaultAiTool",
+        "codex",
+        vscode.ConfigurationTarget.Global,
+      );
+      expect(instanceStore.get("default")?.config.selectedAiTool).toBe("codex");
+    });
+
+    it("does not persist a picked startup tool as default when declined", async () => {
+      const updateMock = vi.fn(async () => undefined);
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn(<T,>(key: string, defaultValue?: T): T => {
+          if (key === "aiTools") {
+            return [
+              { name: "codex", label: "Codex", path: "", args: [] },
+            ] as T;
+          }
+          return (defaultValue ?? "") as T;
+        }),
+        inspect: vi.fn(() => undefined),
+        update: updateMock,
+      } as ReturnType<typeof vscode.workspace.getConfiguration>);
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
+        label: "Codex",
+        description: "Launch Codex in the terminal",
+        tool: { name: "codex", label: "Codex", path: "", args: [] },
+      });
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue("No");
+      upsertInstance();
+
+      const tool = await (
+        sessionRuntime as unknown as {
+          resolveToolForStartup: (
+            config: vscodeApi.WorkspaceConfiguration,
+          ) => Promise<AiToolConfig | undefined>;
+        }
+      ).resolveToolForStartup(
+        vscode.workspace.getConfiguration() as unknown as vscodeApi.WorkspaceConfiguration,
+      );
+
+      expect(tool?.name).toBe("codex");
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(instanceStore.get("default")?.config.selectedAiTool).toBe("codex");
+    });
+
+    it("returns undefined when startup tool selection is dismissed", async () => {
+      setConfiguration({
+        aiTools: [{ name: "codex", label: "Codex", path: "", args: [] }],
+        defaultAiTool: "",
+      });
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
+
+      await expect(
+        (
+          sessionRuntime as unknown as {
+            resolveToolForStartup: (
+              config: vscodeApi.WorkspaceConfiguration,
+            ) => Promise<AiToolConfig | undefined>;
+          }
+        ).resolveToolForStartup(
+          vscode.workspace.getConfiguration() as unknown as vscodeApi.WorkspaceConfiguration,
+        ),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("pane monitoring, clipboard sync, and routing branches", () => {
+    it("starts tmux monitoring, reacts to callbacks, and stops cleanly", async () => {
+      vi.useFakeTimers();
+      setActiveBackend("tmux");
+      const dispose = vi.fn();
+      let externalCallback: ((event: string) => void) | undefined;
+      vi.mocked(mockTmuxSessionManager.onExternalPaneChange).mockImplementation(
+        (callback) => {
+          externalCallback = callback;
+          return { dispose };
+        },
+      );
+      vi.mocked(mockTmuxSessionManager.listPanes).mockResolvedValue([
+        { paneId: "%1", isActive: true, currentCommand: "bash" },
+      ] as unknown as Awaited<ReturnType<TmuxSessionManager["listPanes"]>>);
+      vi.mocked(mockTmuxSessionManager.listWindows).mockResolvedValue([
+        { windowId: "@1", isActive: true, index: 1, name: "main" },
+      ] as unknown as Awaited<ReturnType<TmuxSessionManager["listWindows"]>>);
+
+      await (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring("session");
+      externalCallback?.("pane-change");
+      process.emit("SIGUSR2");
+      await vi.runOnlyPendingTimersAsync();
+      (
+        sessionRuntime as unknown as { stopExternalChangeMonitoring: () => void }
+      ).stopExternalChangeMonitoring();
+
+      expect(dispose).toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it("initializes zellij monitoring, including failed initialization", async () => {
+      vi.useFakeTimers();
+      setActiveBackend("zellij");
+      vi.mocked(mockZellijSessionManager.listPanes).mockRejectedValueOnce(
+        new Error("panes failed"),
+      );
+
+      await (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring("zellij-session");
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to initialize pane monitoring"),
+      );
+      vi.useRealTimers();
+    });
+
+    it("checks zellij pane changes using discovered sessions and logs errors", async () => {
+      setActiveBackend("zellij");
+      vi.mocked(mockZellijSessionManager.discoverSessions)
+        .mockResolvedValueOnce([
+          { id: "z1", name: "z1", workspace: "/workspace/z1", isActive: true },
+        ])
+        .mockRejectedValueOnce(new Error("discover"));
+      vi.mocked(mockZellijSessionManager.listPanes)
+        .mockResolvedValueOnce([
+          { id: "p1", title: "shell", isFocused: true, isFloating: false },
+        ])
+        .mockRejectedValueOnce(new Error("list"));
+      vi.mocked(mockZellijSessionManager.listTabs).mockResolvedValue([
+        { index: 2, name: "tab", isActive: true },
+      ]);
+
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+
+      expect(postMessageMock).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: "z1", windowIndex: 2 }),
+      );
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to discover zellij sessions"),
+      );
+    });
+
+    it("checks tmux pane changes no-session and error branches", async () => {
+      setActiveBackend("tmux");
+      vi.mocked(mockTmuxSessionManager.discoverSessions)
+        .mockRejectedValueOnce(new Error("discover"))
+        .mockResolvedValueOnce([
+          { id: "s1", name: "s1", workspace: "/workspace/s1", isActive: false },
+        ])
+        .mockResolvedValueOnce([
+          { id: "s1", name: "s1", workspace: "/workspace/s1", isActive: false },
+        ]);
+      vi.mocked(mockTmuxSessionManager.listPanes)
+        .mockRejectedValueOnce(new Error("list panes"))
+        .mockResolvedValueOnce([
+          { paneId: "%1", isActive: true, currentCommand: "bash" },
+          { paneId: "%2", isActive: false, currentCommand: "zsh" },
+        ] as unknown as Awaited<ReturnType<TmuxSessionManager["listPanes"]>>);
+      vi.mocked(mockTmuxSessionManager.listWindows).mockResolvedValue([
+        { windowId: "@1", isActive: true, index: 1, name: "main" },
+        { windowId: "@2", isActive: false, index: 2, name: "side" },
+      ] as unknown as Awaited<ReturnType<TmuxSessionManager["listWindows"]>>);
+
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to discover tmux sessions"),
+      );
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to check tmux pane changes"),
+      );
+      expect(postMessageMock).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: "s1", canKillPane: true }),
+      );
+    });
+
+    it("syncs tmux clipboard only when buffers change", async () => {
+      vi.useFakeTimers();
+      setActiveBackend("tmux");
+      vi.mocked(mockTmuxSessionManager.showBuffer)
+        .mockResolvedValueOnce("copied")
+        .mockResolvedValueOnce("copied")
+        .mockRejectedValueOnce(new Error("buffer"));
+
+      (
+        sessionRuntime as unknown as { startClipboardSync: () => void }
+      ).startClipboardSync();
+      await vi.advanceTimersByTimeAsync(1500);
+      (
+        sessionRuntime as unknown as { stopClipboardSync: () => void }
+      ).stopClipboardSync();
+
+      expect(vscode.env.clipboard.writeText).toHaveBeenCalledTimes(1);
+      expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith("copied");
+      vi.useRealTimers();
+    });
+
+    it("routes dropped text to zellij and handles routing failures", async () => {
+      setActiveBackend("zellij");
+      await expect(
+        sessionRuntime.routeDroppedTextToTmuxPane("hello", { col: 1, row: 1 }),
+      ).resolves.toBe(true);
+      vi.mocked(mockZellijSessionManager.sendTextToPane).mockRejectedValueOnce(
+        new Error("send"),
+      );
+      await expect(
+        sessionRuntime.routeDroppedTextToTmuxPane("hello", { col: 1, row: 1 }),
+      ).resolves.toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to route dropped text to zellij pane"),
+      );
+    });
+
+    it("returns false when tmux routing has no manager, no session, or errors", async () => {
+      const runtimeWithoutManagers = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        undefined,
+        undefined,
+        backendRegistry,
+        instanceStore,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      (
+        runtimeWithoutManagers as unknown as { activeBackend: TerminalBackendType }
+      ).activeBackend = "tmux";
+      await expect(
+        runtimeWithoutManagers.routeDroppedTextToTmuxPane("x", { col: 0, row: 0 }),
+      ).resolves.toBe(false);
+
+      setActiveBackend("tmux");
+      vscode.workspace.workspaceFolders = undefined;
+      await expect(
+        sessionRuntime.routeDroppedTextToTmuxPane("x", { col: 0, row: 0 }),
+      ).resolves.toBe(false);
+
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: "/workspace/project-a" }, name: "project-a", index: 0 },
+      ];
+      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
+        action: "attached",
+        session: { id: "s", name: "s", workspace: "/workspace/project-a", isActive: true },
+      });
+      vi.mocked(
+        mockTmuxSessionManager.listVisiblePaneGeometry,
+      ).mockRejectedValueOnce(new Error("geometry"));
+      await expect(
+        sessionRuntime.routeDroppedTextToTmuxPane("x", { col: 0, row: 0 }),
+      ).resolves.toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to route dropped text to tmux pane"),
+      );
+      runtimeWithoutManagers.dispose();
+    });
+  });
+
+  describe("session kill, formatting, and private fallback branches", () => {
+    it("ignores native and missing-manager kill requests and reports manager failures", async () => {
+      await sessionRuntime.killTmuxSession("anything");
+      expect(mockTmuxSessionManager.killSession).toHaveBeenCalledWith(
+        "anything",
+      );
+
+      vi.mocked(mockTmuxSessionManager.killSession).mockRejectedValueOnce(
+        new Error("kill failed"),
+      );
+      await sessionRuntime.killTmuxSession("anything");
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        "Failed to kill tmux session",
+      );
+
+      const runtimeWithoutManagers = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        undefined,
+        undefined,
+        backendRegistry,
+        undefined,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      await expect(
+        runtimeWithoutManagers.killTmuxSession("anything"),
+      ).resolves.toBeUndefined();
+      runtimeWithoutManagers.dispose();
+    });
+
+    it("handles zellij session kill failures", async () => {
+      setActiveBackend("zellij");
+      vi.mocked(mockZellijSessionManager.killSession).mockRejectedValueOnce(
+        new Error("zellij kill"),
+      );
+
+      await sessionRuntime.killTmuxSession("zellij-session");
+
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        "Failed to kill zellij session",
+      );
+    });
+
+    it("handles create and zoom failure variants", async () => {
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockRejectedValueOnce(
+        new Error("discover"),
+      );
+      await expect(sessionRuntime.createTmuxSession()).resolves.toBeUndefined();
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        "Failed to create tmux session",
+      );
+
+      setActiveBackend("tmux");
+      vscode.workspace.workspaceFolders = undefined;
+      await sessionRuntime.zoomTmuxPane();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Cannot zoom tmux pane"),
+      );
+
+      setActiveBackend("tmux");
+      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
+        action: "attached",
+        session: { id: "s", name: "s", workspace: "/workspace/project-a", isActive: true },
+      });
+      vi.mocked(mockTmuxSessionManager.listPanes).mockRejectedValueOnce(
+        new Error("panes"),
+      );
+      await sessionRuntime.zoomTmuxPane();
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to zoom tmux pane"),
+      );
+
+      setActiveBackend("zellij");
+      vi.mocked(mockZellijSessionManager.zoomPane).mockRejectedValueOnce(
+        new Error("zoom"),
+      );
+      await sessionRuntime.zoomTmuxPane();
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to zoom zellij pane"),
+      );
+    });
+
+    it("falls back to raw strings when no formatting operator exists", () => {
+      vi.mocked(mockAiToolRegistry.getByToolName).mockReturnValue(undefined);
+
+      expect(sessionRuntime.formatDroppedFiles(["a", "b"], { useAtSyntax: true })).toBe(
+        "a b",
+      );
+      expect(sessionRuntime.formatFileReference({ path: "file.ts" })).toBe(
+        "file.ts",
+      );
+      expect(sessionRuntime.formatPastedImage("image.png")).toBeUndefined();
+    });
+
+    it("handles malformed workspace URIs and missing instance stores", () => {
+      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
+      vi.mocked(vscode.Uri.parse).mockImplementationOnce(() => {
+        throw new Error("bad uri");
+      });
+      expect(sessionRuntime.resolveWorkspacePathFromActiveInstance()).toBeUndefined();
+
+      const runtimeWithoutStore = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        mockTmuxSessionManager,
+        mockZellijSessionManager,
+        backendRegistry,
+        undefined,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      expect(runtimeWithoutStore.resolveWorkspacePathFromActiveInstance()).toBeUndefined();
+      expect(runtimeWithoutStore.resolveTmuxSessionIdForInstance("x")).toBeUndefined();
+      expect(runtimeWithoutStore.resolveZellijSessionIdForInstance("x")).toBeUndefined();
+      runtimeWithoutStore.dispose();
+    });
+  });
+
+  describe("remaining defensive branches", () => {
+    it("selects tmux when backend session creation succeeds", async () => {
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
+        action: "created",
+        session: {
+          id: "project-a",
+          name: "project-a",
+          workspace: "/workspace/project-a",
+          isActive: true,
+        },
+      });
+      const switchSpy = vi
+        .spyOn(sessionRuntime, "switchToTmuxSession")
+        .mockResolvedValue();
+
+      await sessionRuntime.selectTerminalBackend("tmux");
+
+      expect(switchSpy).toHaveBeenCalledWith("project-a");
+    });
+
+    it("starts with an existing valid stored zellij session", async () => {
+      setConfiguration({ terminalBackend: "zellij" satisfies TerminalBackendType });
+      upsertInstance({ zellijSessionId: "project-a", selectedAiTool: "codex" });
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockResolvedValue([
+        {
+          id: "project-a",
+          name: "project-a",
+          workspace: "/workspace/project-a",
+          isActive: true,
+        },
+      ]);
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<AiToolConfig>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({ name: "codex", label: "Codex", path: "", args: [] });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "codex"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await sessionRuntime.startOpenCode();
+
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "default",
+        "zellij attach 'project-a'",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default",
+        "/workspace/project-a",
+      );
+    });
+
+    it("logs tmux setup failures during session switch and startup", async () => {
+      vi.spyOn(mockLogger, "debug");
+      vi.mocked(mockTmuxSessionManager.registerSessionHooks).mockRejectedValue(
+        new Error("hook"),
+      );
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        },
+        "startExternalChangeMonitoring",
+      ).mockRejectedValue(new Error("monitor"));
+      const switchSpy = vi
+        .spyOn(sessionRuntime, "switchToInstance")
+        .mockResolvedValue();
+
+      await sessionRuntime.switchToTmuxSession("tmux-session");
+
+      expect(switchSpy).toHaveBeenCalled();
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to register tmux session hooks"),
+      );
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to start external change monitoring"),
+      );
+    });
+
+    it("logs zellij switch and monitoring failures", async () => {
+      vi.mocked(mockZellijSessionManager.switchSession).mockRejectedValueOnce(
+        new Error("switch"),
+      );
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        },
+        "startExternalChangeMonitoring",
+      ).mockRejectedValue(new Error("monitor"));
+      vi.spyOn(sessionRuntime, "switchToInstance").mockResolvedValue();
+
+      await sessionRuntime.switchToZellijSession("zellij-session");
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to switch zellij session"),
+      );
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to start zellij change monitoring"),
+      );
+    });
+
+    it("posts terminalExited when attached tmux restoration fails", async () => {
+      upsertInstance({ tmuxSessionId: "workspace-session" });
+      (sessionRuntime as unknown as { isStarted: boolean }).isStarted = true;
+      vi.spyOn(sessionRuntime, "switchToNativeShell").mockRejectedValue(
+        new Error("native failed"),
+      );
+
+      sessionRuntime.reconnectListeners();
+      exitHandler?.("default");
+      await flushAsyncWork();
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to restore after tmux exit"),
+      );
+      expect(postMessageMock).toHaveBeenCalledWith({ type: "terminalExited" });
+    });
+
+    it("resolves private backend fallbacks from selected session ids", async () => {
+      (
+        sessionRuntime as unknown as { selectedZellijSessionId?: string }
+      ).selectedZellijSessionId = "selected-zellij";
+      await sessionRuntime.killTmuxSession("selected-zellij");
+      expect(mockZellijSessionManager.killSession).toHaveBeenCalledWith(
+        "selected-zellij",
+      );
+
+      (
+        sessionRuntime as unknown as { selectedTmuxSessionId?: string }
+      ).selectedTmuxSessionId = "selected-tmux";
+      await sessionRuntime.killTmuxSession("selected-tmux");
+      expect(mockTmuxSessionManager.killSession).toHaveBeenCalledWith(
+        "selected-tmux",
+      );
+    });
+
+    it("covers no-manager private pane/session helpers", async () => {
+      const runtimeWithoutManagers = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        undefined,
+        undefined,
+        backendRegistry,
+        instanceStore,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      (
+        runtimeWithoutManagers as unknown as { activeBackend: TerminalBackendType }
+      ).activeBackend = "tmux";
+
+      await (
+        runtimeWithoutManagers as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+      await expect(
+        runtimeWithoutManagers.routeDroppedTextToTmuxPane("x", { col: 1, row: 1 }),
+      ).resolves.toBe(false);
+      await expect(
+        runtimeWithoutManagers.killTmuxSession("tmux-session"),
+      ).resolves.toBeUndefined();
+      runtimeWithoutManagers.dispose();
+    });
+
+    it("covers no-manager zellij pane and kill helpers", async () => {
+      const runtimeWithoutZellij = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        mockTmuxSessionManager,
+        undefined,
+        backendRegistry,
+        instanceStore,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      (
+        runtimeWithoutZellij as unknown as { activeBackend: TerminalBackendType }
+      ).activeBackend = "zellij";
+
+      await (
+        runtimeWithoutZellij as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+      await expect(
+        runtimeWithoutZellij.killTmuxSession("zellij-session"),
+      ).resolves.toBeUndefined();
+      runtimeWithoutZellij.dispose();
+    });
+
+    it("routes tmux drops to false when geometry has no target", async () => {
+      setActiveBackend("tmux");
+      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
+        action: "attached",
+        session: {
+          id: "s",
+          name: "s",
+          workspace: "/workspace/project-a",
+          isActive: true,
+        },
+      });
+      vi.mocked(mockTmuxSessionManager.listVisiblePaneGeometry).mockResolvedValue([
+        { paneId: "%1", paneLeft: 0, paneTop: 0, paneWidth: 5, paneHeight: 5 },
+      ] as unknown as Awaited<
+        ReturnType<TmuxSessionManager["listVisiblePaneGeometry"]>
+      >);
+
+      await expect(
+        sessionRuntime.routeDroppedTextToTmuxPane("hello", { col: 9, row: 9 }),
+      ).resolves.toBe(false);
+    });
+
+    it("syncs active instance and handles subscription without an instance store", () => {
+      upsertInstance({ id: "other" });
+      (
+        sessionRuntime as unknown as { syncActiveInstance: (id: string) => void }
+      ).syncActiveInstance("other");
+      expect(instanceStore.getActive().config.id).toBe("other");
+
+      const runtimeWithoutStore = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        mockTmuxSessionManager,
+        mockZellijSessionManager,
+        backendRegistry,
+        undefined,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      runtimeWithoutStore.subscribeToActiveInstanceChanges();
+      (
+        runtimeWithoutStore as unknown as { syncActiveInstance: (id: string) => void }
+      ).syncActiveInstance("other");
+      runtimeWithoutStore.dispose();
+    });
+
+    it("covers clipboard and monitoring early returns", async () => {
+      (
+        sessionRuntime as unknown as { startClipboardSync: () => void }
+      ).startClipboardSync();
+      await (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring("native-session");
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+
+      expect(vscode.env.clipboard.writeText).not.toHaveBeenCalled();
+    });
+
+    it("returns early when auto-context was already sent", async () => {
+      (sessionRuntime as unknown as { autoContextSent: boolean }).autoContextSent =
+        true;
+      await (
+        sessionRuntime as unknown as { sendAutoContext: () => Promise<void> }
+      ).sendAutoContext();
+      expect(mockContextSharingService.getCurrentContext).not.toHaveBeenCalled();
+    });
+
+    it("covers remaining private defensive statements", async () => {
+      await sessionRuntime.zoomTmuxPane();
+
+      upsertInstance({ id: "mapped", tmuxSessionId: "mapped-tmux" });
+      await sessionRuntime.killTmuxSession("mapped-tmux");
+      expect(mockTmuxSessionManager.killSession).toHaveBeenCalledWith(
+        "mapped-tmux",
+      );
+
+      const runtimeWithoutManagers = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        undefined,
+        undefined,
+        backendRegistry,
+        instanceStore,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      await expect(
+        (
+          runtimeWithoutManagers as unknown as {
+            findReplacementTmuxSession: (
+              workspacePath: string,
+              killedSessionId: string,
+            ) => Promise<string | undefined>;
+          }
+        ).findReplacementTmuxSession("/workspace/project-a", "killed"),
+      ).resolves.toBeUndefined();
+      runtimeWithoutManagers.rememberSelectedTool("codex");
+      runtimeWithoutManagers.dispose();
+
+      vi.mocked(mockTmuxSessionManager.findSessionForWorkspace).mockRejectedValueOnce(
+        new Error("find failed"),
+      );
+      await expect(
+        (
+          sessionRuntime as unknown as {
+            findReplacementTmuxSession: (
+              workspacePath: string,
+              killedSessionId: string,
+            ) => Promise<string | undefined>;
+          }
+        ).findReplacementTmuxSession("/workspace/project-a", "killed"),
+      ).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to resolve replacement tmux session"),
+      );
+
+      vi.spyOn(instanceStore, "get").mockImplementationOnce(() => {
+        throw new Error("terminal key failed");
+      });
+      expect(sessionRuntime.getActiveTerminalId()).toBe("default");
+    });
+
+    it("ticks zellij monitoring and records tmux SIGUSR2 checks", async () => {
+      vi.useFakeTimers();
+      setActiveBackend("zellij");
+      vi.mocked(mockZellijSessionManager.listPanes).mockResolvedValue([
+        { id: "p1", title: "shell", isFocused: true, isFloating: false },
+      ]);
+      vi.mocked(mockZellijSessionManager.listTabs).mockResolvedValue([
+        { index: 1, name: "main", isActive: true },
+      ]);
+      await (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring("zellij-session");
+      await vi.advanceTimersByTimeAsync(1500);
+
+      setActiveBackend("tmux");
+      (
+        sessionRuntime as unknown as { selectedTmuxSessionId?: string }
+      ).selectedTmuxSessionId = "tmux-session";
+      (sessionRuntime as unknown as { sigusr2FiredSinceLastCheck: boolean }).sigusr2FiredSinceLastCheck = true;
+      vi.mocked(mockTmuxSessionManager.listPanes).mockResolvedValue([
+        { paneId: "%1", isActive: true, currentCommand: undefined },
+      ] as unknown as Awaited<ReturnType<TmuxSessionManager["listPanes"]>>);
+      vi.mocked(mockTmuxSessionManager.listWindows).mockResolvedValue([
+        { windowId: "@1", isActive: true, index: 1, name: "main" },
+      ] as unknown as Awaited<ReturnType<TmuxSessionManager["listWindows"]>>);
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+
+      expect(
+        (sessionRuntime as unknown as { sigusr2FiredSinceLastCheck: boolean })
+          .sigusr2FiredSinceLastCheck,
+      ).toBe(false);
+      vi.useRealTimers();
+    });
+
+    it("logs zellij pane checking failures after an active session is known", async () => {
+      setActiveBackend("zellij");
+      (
+        sessionRuntime as unknown as { selectedZellijSessionId?: string }
+      ).selectedZellijSessionId = "zellij-session";
+      vi.mocked(mockZellijSessionManager.listPanes).mockRejectedValueOnce(
+        new Error("zellij panes"),
+      );
+      vi.mocked(mockZellijSessionManager.listTabs).mockResolvedValue([]);
+
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to check zellij pane changes"),
+      );
+    });
+
+    it("resolves stored tools and skips persistence without records", () => {
+      setConfiguration({
+        aiTools: [{ name: "codex", label: "Codex", path: "", args: [] }],
+        defaultAiTool: "codex",
+      });
+      vi.mocked(mockAiToolRegistry.matchesName).mockImplementation(
+        (tool, name) => tool.name === name,
+      );
+      expect(
+        (
+          sessionRuntime as unknown as {
+            resolveStoredTool: (id?: string) => AiToolConfig | undefined;
+          }
+        ).resolveStoredTool("missing")?.name,
+      ).toBe("codex");
+      sessionRuntime.rememberSelectedTool("codex", "missing");
+      expect(instanceStore.get("missing")).toBeUndefined();
+    });
+
+    it("covers remaining reachable fallback statements", async () => {
+      vi.spyOn(mockLogger, "debug");
+      setConfiguration({ terminalBackend: "tmux" satisfies TerminalBackendType });
+      vscode.workspace.workspaceFolders = undefined;
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockResolvedValue([]);
+      await sessionRuntime.startOpenCode();
+      expect(sessionRuntime.getActiveBackend()).toBe("native");
+
+      sessionRuntime.resetState();
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: "/workspace/project-a" }, name: "project-a", index: 0 },
+      ];
+      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
+        action: "created",
+        session: {
+          id: "project-a",
+          name: "project-a",
+          workspace: "/workspace/project-a",
+          isActive: true,
+        },
+      });
+      vi.mocked(mockTmuxSessionManager.setMouseOn).mockRejectedValueOnce(
+        new Error("mouse"),
+      );
+      vi.mocked(mockTmuxSessionManager.registerSessionHooks).mockRejectedValueOnce(
+        new Error("hooks"),
+      );
+      vi.mocked(mockTmuxSessionManager.listPanes).mockRejectedValueOnce(
+        new Error("monitor"),
+      );
+      await sessionRuntime.startOpenCode();
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to enable tmux mouse mode"),
+      );
+
+      const runtimeWithoutZellij = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        mockTmuxSessionManager,
+        undefined,
+        backendRegistry,
+        instanceStore,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      await expect(
+        (
+          runtimeWithoutZellij as unknown as {
+            validateZellijSessionExists: (sessionId: string) => Promise<boolean>;
+          }
+        ).validateZellijSessionExists("missing"),
+      ).resolves.toBe(false);
+      runtimeWithoutZellij.dispose();
+
+      upsertInstance({ id: "bad-workspace", workspaceUri: "bad://uri" });
+      vi.mocked(vscode.Uri.parse).mockImplementationOnce(() => {
+        throw new Error("bad uri");
+      });
+      expect(sessionRuntime.resolveInstanceIdFromSessionId("uri")).toBe(
+        "bad-workspace",
+      );
+
+      instanceStore.setActive("default");
+      (
+        sessionRuntime as unknown as { syncActiveInstance: (id: string) => void }
+      ).syncActiveInstance("bad-workspace");
+      expect(instanceStore.getActive().config.id).toBe("bad-workspace");
+
+      const runtimeWithoutStore = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        mockTmuxSessionManager,
+        mockZellijSessionManager,
+        backendRegistry,
+        undefined,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      runtimeWithoutStore.rememberSelectedTool("codex");
+      runtimeWithoutStore.dispose();
+    });
+
+    it("covers contradictory manager guard fallbacks with a forced pane manager", async () => {
+      const forcedPaneManager = { marker: "present" };
+      Object.defineProperty(sessionRuntime, "activePaneManager", {
+        configurable: true,
+        get: () => forcedPaneManager,
+      });
+
+      setActiveBackend("tmux");
+      (
+        sessionRuntime as unknown as { tmuxSessionManager?: TmuxSessionManager }
+      ).tmuxSessionManager = undefined;
+      await expect(sessionRuntime.zoomTmuxPane()).resolves.toBeUndefined();
+      await expect(
+        sessionRuntime.routeDroppedTextToTmuxPane("dropped", {
+          col: 1,
+          row: 1,
+        }),
+      ).resolves.toBe(false);
+      await expect(
+        (
+          sessionRuntime as unknown as {
+            startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+          }
+        ).startExternalChangeMonitoring("forced-tmux"),
+      ).resolves.toBeUndefined();
+      await expect(
+        (
+          sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+        ).checkPaneChanges(),
+      ).resolves.toBeUndefined();
+
+      setActiveBackend("zellij");
+      (
+        sessionRuntime as unknown as {
+          zellijSessionManager?: ZellijSessionManager;
+        }
+      ).zellijSessionManager = undefined;
+      await expect(
+        (
+          sessionRuntime as unknown as {
+            checkZellijPaneChanges: () => Promise<void>;
+          }
+        ).checkZellijPaneChanges(),
+      ).resolves.toBeUndefined();
+    });
+
+    it("logs non-Error monitoring failures during tmux startup", async () => {
+      vi.spyOn(mockLogger, "debug");
+      setConfiguration({ terminalBackend: "tmux" satisfies TerminalBackendType });
+      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
+        action: "attached",
+        session: {
+          id: "project-a",
+          name: "project-a",
+          workspace: "/workspace/project-a",
+          isActive: true,
+        },
+      });
+      (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring = vi.fn(async () => {
+        throw "monitor failed";
+      });
+
+      await sessionRuntime.startOpenCode();
+
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "Failed to start external change monitoring: monitor failed",
+        ),
+      );
+    });
+
+    it("covers branch-only fallback paths on SessionRuntime helpers", async () => {
+      vi.spyOn(mockLogger, "warn");
+      vi.spyOn(mockLogger, "error");
+      vi.spyOn(mockLogger, "debug");
+
+      vi.mocked(mockTerminalManager.getByInstance).mockReturnValueOnce({
+        id: "existing",
+        pid: 123,
+      } as never as ReturnType<TerminalManager["getByInstance"]>);
+      await sessionRuntime.switchToInstance("existing");
+      expect(mockTerminalManager.resizeTerminal).not.toHaveBeenCalledWith(
+        "existing",
+        0,
+        0,
+      );
+
+      upsertInstance({ workspaceUri: "file:///" });
+      vi.mocked(vscode.Uri.parse).mockReturnValueOnce({
+        fsPath: "",
+      } as never as vscodeApi.Uri);
+      expect(sessionRuntime.resolveWorkspacePathFromActiveInstance()).toBeUndefined();
+
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockRejectedValueOnce(
+        "ensure down",
+      );
+      await expect(sessionRuntime.ensureWorkspaceSession("/")).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("ensure down"),
+      );
+
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockResolvedValueOnce([
+        { id: "first", name: "first", workspace: "/tmp", isActive: false },
+      ]);
+      await expect(sessionRuntime.resolveFallbackTmuxSessionId()).resolves.toBe(
+        "first",
+      );
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockRejectedValueOnce(
+        "fallback tmux down",
+      );
+      await expect(sessionRuntime.resolveFallbackTmuxSessionId()).resolves.toBeUndefined();
+
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockResolvedValueOnce([
+        { id: "first-zellij", name: "first-zellij", workspace: "/tmp", isActive: false },
+      ]);
+      await expect(
+        sessionRuntime.resolveFallbackZellijSessionId(),
+      ).resolves.toBe("first-zellij");
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockRejectedValueOnce(
+        "fallback zellij down",
+      );
+      await expect(
+        sessionRuntime.resolveFallbackZellijSessionId(),
+      ).resolves.toBeUndefined();
+
+      vi.mocked(mockZellijSessionManager.ensureSession).mockRejectedValueOnce(
+        "zellij ensure down",
+      );
+      await expect(
+        sessionRuntime.ensureZellijWorkspaceSession("/"),
+      ).resolves.toBeUndefined();
+
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: "/" }, name: "root", index: 0 },
+      ];
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockResolvedValueOnce([
+        { id: "opencode", name: "opencode", workspace: "/", isActive: false },
+      ]);
+      vi.mocked(mockTmuxSessionManager.createSession).mockRejectedValueOnce(
+        "create down",
+      );
+      await expect(sessionRuntime.createTmuxSession()).resolves.toBeUndefined();
+
+      setActiveBackend("zellij");
+      vi.mocked(mockZellijSessionManager.zoomPane).mockRejectedValueOnce(
+        "zellij zoom down",
+      );
+      await sessionRuntime.zoomTmuxPane();
+
+      setActiveBackend("tmux");
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValueOnce({
+        action: "attached",
+        session: { id: "zoom", name: "zoom", workspace: "/", isActive: true },
+      });
+      vi.mocked(mockTmuxSessionManager.listPanes).mockResolvedValueOnce([
+        { paneId: "%1", index: 0, title: "%1", isActive: false, currentCommand: "shell" },
+      ]);
+      vi.mocked(mockTmuxSessionManager.zoomPane).mockRejectedValueOnce(
+        "tmux zoom down",
+      );
+      await sessionRuntime.zoomTmuxPane();
+    });
+
+    it("covers remaining startup, listener, and session-management branch slots", async () => {
+      vi.spyOn(mockLogger, "debug");
+      vi.spyOn(mockLogger, "warn");
+      vi.spyOn(mockLogger, "error");
+
+      vi.mocked(mockTerminalManager.onData).mockImplementationOnce((callback) => {
+        callback({ id: "not-active", data: "ignored" });
+        return { dispose: vi.fn() };
+      });
+      sessionRuntime.reconnectListeners();
+      expect(postMessageMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: "ignored" }),
+      );
+
+      setConfiguration({ terminalBackend: "tmux" satisfies TerminalBackendType });
+      (
+        sessionRuntime as unknown as { selectedTmuxSessionId?: string }
+      ).selectedTmuxSessionId = "explicit-tmux";
+      vi.mocked(mockTmuxSessionManager.setMouseOn).mockRejectedValueOnce(
+        "mouse down",
+      );
+      vi.mocked(mockTmuxSessionManager.registerSessionHooks).mockRejectedValueOnce(
+        "hooks down",
+      );
+      (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring = vi.fn(async () => {
+        throw new Error("monitor error");
+      });
+      await sessionRuntime.startOpenCode();
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining("mouse down"),
+      );
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining("hooks down"),
+      );
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining("monitor error"),
+      );
+      sessionRuntime.resetState();
+
+      (
+        sessionRuntime as unknown as { selectedTmuxSessionId?: string }
+      ).selectedTmuxSessionId = undefined;
+      setConfiguration({ terminalBackend: "zellij" satisfies TerminalBackendType });
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockResolvedValueOnce([]);
+      await sessionRuntime.startOpenCode();
+      sessionRuntime.resetState();
+
+      (
+        sessionRuntime as unknown as { selectedZellijSessionId?: string }
+      ).selectedZellijSessionId = "stale-zellij";
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockResolvedValueOnce([]);
+      await sessionRuntime.startOpenCode();
+      sessionRuntime.resetState();
+
+      vi.mocked(mockPortManager.assignPortToTerminal).mockImplementationOnce(() => {
+        throw "port down";
+      });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "opencode"),
+        supportsHttpApi: vi.fn(() => true),
+      } as never);
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+        enableHttpApi: true,
+        defaultAiTool: "opencode",
+      });
+      await sessionRuntime.startOpenCode();
+      sessionRuntime.resetState();
+
+      const runtimeWithoutManagers = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        undefined,
+        undefined,
+        backendRegistry,
+        undefined,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      await runtimeWithoutManagers.switchToTmuxSessionWithTool("no-tmux");
+      await runtimeWithoutManagers.switchToZellijSession("no-zellij");
+      runtimeWithoutManagers.dispose();
+    });
+
+    it("covers kill, restore, monitoring, and auto-context branch slots", async () => {
+      vi.spyOn(mockLogger, "warn");
+      vi.spyOn(mockLogger, "error");
+      upsertInstance({ id: "unrelated", workspaceUri: undefined, tmuxSessionId: "other" });
+      setActiveBackend("tmux");
+      await (
+        sessionRuntime as unknown as {
+          restoreAfterAttachedTmuxSessionExit: (sessionId: string) => Promise<void>;
+        }
+      ).restoreAfterAttachedTmuxSessionExit("exited-without-workspace");
+
+      vi.mocked(mockTmuxSessionManager.killSession).mockRejectedValueOnce(
+        "kill tmux down",
+      );
+      await sessionRuntime.killTmuxSession("other-tmux");
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("kill tmux down"),
+      );
+
+      setActiveBackend("zellij");
+      vi.mocked(mockZellijSessionManager.killSession).mockRejectedValueOnce(
+        "kill zellij down",
+      );
+      await sessionRuntime.killTmuxSession("zellij-to-kill");
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("kill zellij down"),
+      );
+
+      vi.mocked(mockZellijSessionManager.sendTextToPane).mockRejectedValueOnce(
+        "drop zellij down",
+      );
+      await expect(
+        sessionRuntime.routeDroppedTextToTmuxPane("drop", { col: 0, row: 0 }),
+      ).resolves.toBe(false);
+
+      setActiveBackend("tmux");
+      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValueOnce({
+        action: "attached",
+        session: { id: "drop", name: "drop", workspace: "/", isActive: true },
+      });
+      vi.mocked(mockTmuxSessionManager.listVisiblePaneGeometry).mockRejectedValueOnce(
+        "drop tmux down",
+      );
+      await expect(
+        sessionRuntime.routeDroppedTextToTmuxPane("drop", { col: 0, row: 0 }),
+      ).resolves.toBe(false);
+
+      vi.mocked(mockTmuxSessionManager.listPanes).mockResolvedValueOnce([
+        { paneId: "%1", index: 0, title: "%1", isActive: false },
+      ]);
+      await (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring("monitor-no-command");
+
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockRejectedValueOnce(
+        "discover tmux down",
+      );
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+
+      setActiveBackend("zellij");
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockRejectedValueOnce(
+        "discover zellij down",
+      );
+      await (
+        sessionRuntime as unknown as { checkZellijPaneChanges: () => Promise<void> }
+      ).checkZellijPaneChanges();
+
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockResolvedValueOnce([
+        { id: "zellij-active", name: "zellij-active", workspace: "/tmp", isActive: true },
+      ]);
+      vi.mocked(mockZellijSessionManager.listPanes).mockResolvedValueOnce([
+        { id: "p1", title: "shell", isFocused: true, isFloating: false },
+      ]);
+      vi.mocked(mockZellijSessionManager.listTabs).mockResolvedValueOnce([]);
+      await (
+        sessionRuntime as unknown as { checkZellijPaneChanges: () => Promise<void> }
+      ).checkZellijPaneChanges();
+
+      (
+        sessionRuntime as unknown as { activeTool?: AiToolConfig }
+      ).activeTool = undefined;
+      await (
+        sessionRuntime as unknown as { sendAutoContext: () => Promise<void> }
+      ).sendAutoContext();
+
+      (
+        sessionRuntime as unknown as { activeTool?: AiToolConfig }
+      ).activeTool = { name: "codex", label: "Codex", path: "codex", args: [] };
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        supportsAutoContext: vi.fn(() => true),
+        formatFileReference: vi.fn((reference) => reference.path),
+      } as never);
+      (
+        sessionRuntime as unknown as { httpAvailable: boolean; apiClient: OpenCodeApiClient }
+      ).httpAvailable = true;
+      (
+        sessionRuntime as unknown as { apiClient: { appendPrompt: (prompt: string) => Promise<void> } }
+      ).apiClient = { appendPrompt: vi.fn(async () => { throw "context down"; }) };
+      vi.mocked(mockContextSharingService.getCurrentContext).mockReturnValue({
+        filePath: "src/file.ts",
+        selectionStart: 1,
+        selectionEnd: 1,
+      });
+      await (
+        sessionRuntime as unknown as { sendAutoContext: () => Promise<void> }
+      ).sendAutoContext();
+    });
+
+    it("covers final defensive branch variants", async () => {
+      vi.spyOn(mockLogger, "debug");
+      vi.spyOn(mockLogger, "warn");
+      vi.spyOn(mockLogger, "error");
+
+      upsertInstance({ id: "active-empty-fs", workspaceUri: "file:///empty" });
+      instanceStore.setActive("active-empty-fs");
+      vi.mocked(vscode.Uri.parse).mockReturnValueOnce({ fsPath: "" } as never as vscodeApi.Uri);
+      expect(sessionRuntime.resolveWorkspacePathFromActiveInstance()).toBeUndefined();
+
+      setConfiguration({ terminalBackend: "zellij" satisfies TerminalBackendType });
+      upsertInstance({ zellijSessionId: "store-stale-zellij" });
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockResolvedValueOnce([]);
+      await sessionRuntime.startOpenCode();
+      sessionRuntime.resetState();
+
+      vi.mocked(mockTerminalManager.onData).mockImplementationOnce((callback) => {
+        callback({ id: "definitely-not-active", data: "ignored" });
+        return { dispose: vi.fn() };
+      });
+      sessionRuntime.reconnectListeners();
+      exitHandler?.("definitely-not-active");
+
+      const runtimeWithoutStore = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        mockTmuxSessionManager,
+        mockZellijSessionManager,
+        backendRegistry,
+        undefined,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+      );
+      await (
+        runtimeWithoutStore as unknown as {
+          restoreAfterAttachedTmuxSessionExit: (sessionId: string) => Promise<void>;
+        }
+      ).restoreAfterAttachedTmuxSessionExit("no-store");
+      await runtimeWithoutStore.killTmuxSession("no-store-tmux");
+      (
+        runtimeWithoutStore as unknown as { activeBackend: TerminalBackendType }
+      ).activeBackend = "zellij";
+      await runtimeWithoutStore.killTmuxSession("no-store-zellij");
+      runtimeWithoutStore.dispose();
+
+      upsertInstance({ id: "restore-no-workspace" });
+      instanceStore.setActive("restore-no-workspace");
+      vi.spyOn(sessionRuntime, "switchToNativeShell").mockRejectedValueOnce(
+        new Error("restore error"),
+      );
+      await (
+        sessionRuntime as unknown as {
+          restoreAfterAttachedTmuxSessionExit: (sessionId: string) => Promise<void>;
+        }
+      ).restoreAfterAttachedTmuxSessionExit("restore-error");
+
+      vi.mocked(mockTmuxSessionManager.registerSessionHooks).mockRejectedValueOnce(
+        new Error("hook error"),
+      );
+      await sessionRuntime.switchToTmuxSession("tmux-errors");
+
+      vi.mocked(mockZellijSessionManager.switchSession).mockRejectedValueOnce(
+        new Error("switch error"),
+      );
+      await sessionRuntime.switchToZellijSession("zellij-errors");
+
+      setActiveBackend("tmux");
+      vi.mocked(mockTmuxSessionManager.listPanes).mockResolvedValueOnce([
+        { paneId: "%cmd", index: 0, title: "%cmd", isActive: true, currentCommand: undefined },
+      ]);
+      await (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring("current-command-fallback");
+
+      vi.mocked(mockTmuxSessionManager.listPanes).mockRejectedValueOnce(
+        "monitor init down",
+      );
+      await (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring("monitor-init-string");
+
+      setActiveBackend("zellij");
+      (
+        sessionRuntime as unknown as { paneMonitorInterval?: ReturnType<typeof setInterval> }
+      ).paneMonitorInterval = setInterval(() => undefined, 10);
+      await (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring("zellij-existing-interval");
+
+      setActiveBackend("tmux");
+      (
+        sessionRuntime as unknown as { selectedTmuxSessionId?: string; knownActiveWindowId?: string; _lastCanKillPane?: boolean }
+      ).selectedTmuxSessionId = "pane-check";
+      (
+        sessionRuntime as unknown as { knownActiveWindowId?: string; _lastCanKillPane?: boolean }
+      ).knownActiveWindowId = "w1";
+      (
+        sessionRuntime as unknown as { _lastCanKillPane?: boolean }
+      )._lastCanKillPane = false;
+      vi.mocked(mockTmuxSessionManager.listPanes).mockResolvedValueOnce([
+        { paneId: "%1", index: 0, title: "%1", isActive: true, currentCommand: "shell" },
+      ]);
+      vi.mocked(mockTmuxSessionManager.listWindows).mockResolvedValueOnce([
+        { windowId: "w1", index: 0, name: "one", isActive: true },
+        { windowId: "w2", index: 1, name: "two", isActive: false },
+      ]);
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+      vi.mocked(mockTmuxSessionManager.listPanes).mockRejectedValueOnce(
+        new Error("check error"),
+      );
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+
+      setActiveBackend("zellij");
+      vi.mocked(mockZellijSessionManager.discoverSessions).mockResolvedValueOnce([
+        { id: "zellij-check", name: "zellij-check", workspace: "/tmp", isActive: true },
+      ]);
+      vi.mocked(mockZellijSessionManager.listPanes).mockRejectedValueOnce(
+        "zellij check down",
+      );
+      await (
+        sessionRuntime as unknown as { checkZellijPaneChanges: () => Promise<void> }
+      ).checkZellijPaneChanges();
+    });
+
+    it("covers remaining false-side startup and workspace parsing branches", async () => {
+      vi.spyOn(mockLogger, "warn");
+      upsertInstance({ id: "active-no-fs", workspaceUri: "file:///no-fs" });
+      instanceStore.setActive("active-no-fs");
+      (
+        sessionRuntime as unknown as { activeInstanceId: string }
+      ).activeInstanceId = "active-no-fs";
+      vi.mocked(vscode.Uri.parse).mockReturnValueOnce(
+        {} as unknown as vscodeApi.Uri,
+      );
+      expect(
+        sessionRuntime.resolveWorkspacePathFromActiveInstance(),
+      ).toBeUndefined();
+
+      sessionRuntime.resetState();
+      (
+        sessionRuntime as unknown as { forceNativeShellNextStart: boolean }
+      ).forceNativeShellNextStart = true;
+      (
+        sessionRuntime as unknown as {
+          pendingLaunchToolName?: string;
+          selectedTmuxSessionId?: string;
+        }
+      ).pendingLaunchToolName = "ignored-tool";
+      (
+        sessionRuntime as unknown as {
+          pendingLaunchToolName?: string;
+          selectedTmuxSessionId?: string;
+        }
+      ).selectedTmuxSessionId = "ignored-tmux";
+      const resolveToolSpy = vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: (config: unknown) => Promise<AiToolConfig | undefined>;
+        },
+        "resolveToolForStartup",
+      );
+      const upsertSpy = vi
+        .spyOn(instanceStore, "upsert")
+        .mockImplementationOnce(() => {
+          throw "upsert string";
+        });
+
+      await sessionRuntime.startOpenCode();
+
+      expect(resolveToolSpy).not.toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("upsert string"),
+      );
+      upsertSpy.mockRestore();
+    });
+
+    it("covers tmux restore and kill fallbacks without workspace paths", async () => {
+      vi.spyOn(mockLogger, "error");
+      vi.spyOn(mockLogger, "warn");
+      upsertInstance({ id: "other-tmux", tmuxSessionId: "not-kill-me" });
+      upsertInstance({ id: "active-tmux", tmuxSessionId: "kill-me" });
+      instanceStore.setActive("active-tmux");
+      setActiveBackend("tmux");
+      (
+        sessionRuntime as unknown as { activeInstanceId: string; isStarted: boolean }
+      ).activeInstanceId = "active-tmux";
+      (
+        sessionRuntime as unknown as { activeInstanceId: string; isStarted: boolean }
+      ).isStarted = true;
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveWorkspacePathForTmuxFallback: () => string | undefined;
+        },
+        "resolveWorkspacePathForTmuxFallback",
+      ).mockReturnValue(undefined);
+      const findReplacementSpy = vi.spyOn(
+        sessionRuntime as unknown as {
+          findReplacementTmuxSession: (
+            workspacePath: string,
+            killedSessionId: string,
+          ) => Promise<string | undefined>;
+        },
+        "findReplacementTmuxSession",
+      );
+      const nativeSpy = vi
+        .spyOn(sessionRuntime, "switchToNativeShell")
+        .mockResolvedValue(undefined);
+
+      await sessionRuntime.killTmuxSession("kill-me");
+
+      expect(mockPortManager.releaseTerminalPorts).toHaveBeenCalledWith(
+        "active-tmux",
+      );
+      expect(instanceStore.get("active-tmux")?.runtime.tmuxSessionId).toBeUndefined();
+      expect(findReplacementSpy).not.toHaveBeenCalled();
+      expect(nativeSpy).toHaveBeenCalled();
+
+      nativeSpy.mockRejectedValueOnce("restore string");
+      await (
+        sessionRuntime as unknown as {
+          restoreAfterAttachedTmuxSessionExit: (sessionId: string) => Promise<void>;
+        }
+      ).restoreAfterAttachedTmuxSessionExit("restore-string");
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining("restore string"),
+      );
+    });
+
+    it("logs non-Error tmux and zellij switch monitoring failures", async () => {
+      vi.spyOn(mockLogger, "debug");
+      vi.spyOn(mockLogger, "warn");
+      vi.mocked(mockTmuxSessionManager.registerSessionHooks).mockRejectedValueOnce(
+        "hook string",
+      );
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        },
+        "startExternalChangeMonitoring",
+      ).mockRejectedValueOnce(42);
+
+      await sessionRuntime.switchToTmuxSessionWithTool("tmux-string-errors");
+
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining("hook string"),
+      );
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining("42"),
+      );
+
+      vi.mocked(mockZellijSessionManager.switchSession).mockRejectedValueOnce(42);
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        },
+        "startExternalChangeMonitoring",
+      ).mockRejectedValueOnce("zellij monitor string");
+
+      await sessionRuntime.switchToZellijSession("zellij-string-errors");
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("42"),
+      );
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("zellij monitor string"),
+      );
+    });
+
+    it("logs non-Error replacement and pane monitoring failures", async () => {
+      vi.spyOn(mockLogger, "warn");
+      vi.mocked(mockTmuxSessionManager.findSessionForWorkspace).mockRejectedValueOnce(
+        "find string",
+      );
+      await expect(
+        (
+          sessionRuntime as unknown as {
+            findReplacementTmuxSession: (
+              workspacePath: string,
+              killedSessionId: string,
+            ) => Promise<string | undefined>;
+          }
+        ).findReplacementTmuxSession("/workspace/project-a", "killed"),
+      ).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("find string"),
+      );
+
+      setActiveBackend("tmux");
+      (
+        sessionRuntime as unknown as { selectedTmuxSessionId?: string }
+      ).selectedTmuxSessionId = "pane-string";
+      vi.mocked(mockTmuxSessionManager.listPanes).mockRejectedValueOnce(
+        "pane string",
+      );
+      await (
+        sessionRuntime as unknown as { checkPaneChanges: () => Promise<void> }
+      ).checkPaneChanges();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("pane string"),
+      );
+
+      (
+        sessionRuntime as unknown as {
+          externalChangeListener?: { dispose: () => void };
+        }
+      ).externalChangeListener = { dispose: vi.fn() };
+      await (
+        sessionRuntime as unknown as {
+          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
+        }
+      ).startExternalChangeMonitoring("existing-listener");
+    });
+
+    it("resolves a pending startup tool when no backend session is attached", async () => {
+      const syntheticBackend = "synthetic" as unknown as TerminalBackendType;
+      const runtimeWithPendingToolOnly = new SessionRuntime(
+        mockTerminalManager,
+        {} as OutputCaptureManager,
+        undefined as unknown as OpenCodeApiClient,
+        mockPortManager,
+        mockTmuxSessionManager,
+        mockZellijSessionManager,
+        {
+          resolveAvailable: vi.fn(() => syntheticBackend),
+        } as unknown as TerminalBackendRegistry,
+        instanceStore,
+        mockLogger,
+        mockContextSharingService,
+        mockAiToolRegistry,
+        mockCallbacks,
+        mockNativeTerminalManager,
+      );
+      (
+        runtimeWithPendingToolOnly as unknown as { pendingLaunchToolName?: string }
+      ).pendingLaunchToolName = "pending-tool";
+      vi.spyOn(
+        runtimeWithPendingToolOnly as unknown as {
+          resolveToolForStartup: (config: unknown) => Promise<AiToolConfig | undefined>;
+        },
+        "resolveToolForStartup",
+      ).mockResolvedValue({
+        name: "pending-tool",
+        label: "Pending Tool",
+        path: "",
+        args: [],
+      });
+      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
+        getLaunchCommand: vi.fn(() => "run-pending-tool"),
+        supportsHttpApi: vi.fn(() => false),
+      } as never);
+
+      await runtimeWithPendingToolOnly.startOpenCode();
+
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "default",
+        "run-pending-tool",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default",
+        "/workspace/project-a",
+      );
+      runtimeWithPendingToolOnly.dispose();
+    });
+
+    // The remaining uncovered SessionRuntime branches are defensive contradictions
+    // that cannot be reached through the public/private method contracts without
+    // mutating production code: after activePaneManager is truthy for tmux/zellij,
+    // the corresponding manager null checks at lines 1142, 1259, 1565, 1619, and
+    // 1690 are false by construction. Several V8 branch slots also correspond to
+    // optional chaining / nullish coalescing sub-branches inside these same guards.
   });
 });

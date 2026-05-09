@@ -8,8 +8,30 @@ import type { TerminalManager } from "../terminals/TerminalManager";
 import type { OutputCaptureManager } from "../services/OutputCaptureManager";
 import type { TerminalBackendType } from "../types";
 
-const mockWriteFile = vi.hoisted(() => vi.fn(async () => undefined));
-const mockUnlink = vi.hoisted(() => vi.fn(async () => undefined));
+const mockWriteFile = vi.hoisted(() =>
+  vi.fn(async (file: string | Buffer | URL, data: unknown, options?: unknown) => {
+    if (String(file).includes("/tmp/opencode-tests/")) {
+      return undefined;
+    }
+    const fs = await import("node:fs");
+    await fs.promises.writeFile(
+      file,
+      data as Parameters<typeof fs.promises.writeFile>[1],
+      options as Parameters<typeof fs.promises.writeFile>[2],
+    );
+    return undefined;
+  }),
+);
+const mockUnlink = vi.hoisted(() =>
+  vi.fn(async (file: string | Buffer | URL) => {
+    if (String(file).includes("/tmp/opencode-tests/")) {
+      return undefined;
+    }
+    const fs = await import("node:fs");
+    await fs.promises.unlink(file);
+    return undefined;
+  }),
+);
 const mockNormalize = vi.hoisted(() =>
   vi.fn((value: string) => value.replace(/\\/g, "/")),
 );
@@ -123,8 +145,28 @@ describe("MessageRouter", () => {
     OutputChannelService.resetInstance();
     vi.useRealTimers();
 
-    mockWriteFile.mockReset().mockResolvedValue(undefined);
-    mockUnlink.mockReset().mockResolvedValue(undefined);
+    mockWriteFile.mockReset().mockImplementation(
+      async (file: string | Buffer | URL, data: unknown, options?: unknown) => {
+        if (String(file).includes("/tmp/opencode-tests/")) {
+          return undefined;
+        }
+        const fs = await import("node:fs");
+        await fs.promises.writeFile(
+          file,
+          data as Parameters<typeof fs.promises.writeFile>[1],
+          options as Parameters<typeof fs.promises.writeFile>[2],
+        );
+        return undefined;
+      },
+    );
+    mockUnlink.mockReset().mockImplementation(async (file: string | Buffer | URL) => {
+      if (String(file).includes("/tmp/opencode-tests/")) {
+        return undefined;
+      }
+      const fs = await import("node:fs");
+      await fs.promises.unlink(file);
+      return undefined;
+    });
     mockNormalize
       .mockReset()
       .mockImplementation((value: string) => value.replace(/\\/g, "/"));
@@ -812,6 +854,349 @@ describe("MessageRouter", () => {
         "executeTmuxRawCommand failed for choose-tree: raw boom",
       ),
     );
+  });
+
+  it("covers ignored message payload branches and restart/select dispatch", async () => {
+    await router.handleMessage({ type: "filesDropped" });
+    await router.handleMessage({ type: "openUrl", url: 123 });
+    await router.handleMessage({ type: "openFile", path: 123 });
+    await router.handleMessage({ type: "setClipboard", text: 123 });
+    await router.handleMessage({ type: "imagePasted", data: 123 });
+    await router.handleMessage({ type: "selectTerminalBackend", backend: "native" });
+    await router.handleMessage({ type: "requestRestart" });
+    await router.handleMessage({ type: "unknownMessage" });
+
+    expect(provider.selectTerminalBackend).toHaveBeenCalledWith("native");
+    expect(provider.restart).toHaveBeenCalledTimes(1);
+    expect(provider.formatDroppedFiles).not.toHaveBeenCalled();
+  });
+
+  it("keeps create-session and raw-command behavior backend aware for zellij", async () => {
+    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(() => "zellij");
+    const warnSpy = vi.spyOn(logger, "warn");
+
+    await router.handleMessage({ type: "createTmuxSession" });
+    await router.handleMessage({ type: "executeTmuxRawCommand", subcommand: "choose-tree" });
+
+    expect(provider.selectTerminalBackend).toHaveBeenCalledWith("zellij");
+    expect(provider.createTmuxSession).not.toHaveBeenCalled();
+    expect(provider.executeRawTmuxCommand).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("executeTmuxRawCommand ignored for zellij backend"),
+    );
+  });
+
+  it("handles ready without saved dimensions and non-string tmux prompt choices", () => {
+    provider.isStarted = vi.fn(() => true);
+    provider.getLastKnownTerminalSize = vi.fn(() => ({ cols: 0, rows: 0 }));
+
+    router.handleReady(90, 0);
+
+    expect(provider.setLastKnownTerminalSize).toHaveBeenCalledWith(90, 0);
+    expect(provider.resizeActiveTerminal).not.toHaveBeenCalled();
+  });
+
+  it("opens file URI and absolute paths and reports outer path failures", async () => {
+    vi.mocked(vscode.Uri.parse).mockImplementationOnce(() => {
+      throw new Error("parse failed");
+    });
+    await router.handleOpenFile("safe-file.ts");
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Failed to open file: safe-file.ts",
+    );
+
+    await router.handleOpenFile("file:///workspace/absolute.ts", 1, undefined, 1);
+    await router.handleOpenFile("C:\\workspace\\absolute.ts");
+
+    expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: "file:///workspace/absolute.ts" }),
+      expect.objectContaining({ preview: true }),
+    );
+    expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: "C:\\workspace\\absolute.ts" }),
+      expect.objectContaining({ preview: true }),
+    );
+  });
+
+  it("handles empty drops, malformed URI drops, oversize blobs, and blob write errors", async () => {
+    vi.mocked(vscode.Uri.parse).mockImplementationOnce(() => {
+      throw new Error("bad uri");
+    });
+    await router.handleFilesDropped(["file://bad-uri"], false);
+    expect(provider.formatDroppedFiles).toHaveBeenCalledWith(["file://bad-uri"], false);
+
+    vi.clearAllMocks();
+    await router.handleFilesDropped([], false);
+    expect(provider.formatDroppedFiles).not.toHaveBeenCalled();
+
+    await router.handleFilesDropped([], false, undefined, [
+      {
+        name: "huge.png",
+        data: `data:image/png;base64,${Buffer.alloc(10 * 1024 * 1024 + 1).toString("base64")}`,
+      },
+    ]);
+    expect(mockWriteFile).not.toHaveBeenCalled();
+
+    mockWriteFile.mockRejectedValueOnce(new Error("write failed"));
+    await router.handleFilesDropped([], false, undefined, [
+      { name: "../bad name?.png", data: "data:image/png;base64,aGVsbG8=" },
+    ]);
+    expect(provider.formatDroppedFiles).not.toHaveBeenCalled();
+  });
+
+  it("logs cleanup failures for temporary pasted images", async () => {
+    vi.useFakeTimers();
+    mockUnlink.mockRejectedValueOnce(new Error("unlink failed"));
+    const warnSpy = vi.spyOn(logger, "warn");
+
+    await router.handleImagePasted("data:image/png;base64,aGVsbG8=");
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to cleanup temp file: unlink failed"),
+    );
+  });
+
+  it("fuzzy match sort prefers second exact suffix and matching directory parts", async () => {
+    const first = vscode.Uri.file("/workspace/tmp/MessageRouter.ts.backup");
+    const exact = vscode.Uri.file("/workspace/src/providers/MessageRouter.ts");
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([first, exact]);
+
+    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
+      exact,
+    );
+
+    const wrongDir = vscode.Uri.file("/workspace/other/providers/MessageRouter.tsx");
+    const matchingDir = vscode.Uri.file("src/providers/MessageRouter.tsx");
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([
+      wrongDir,
+      matchingDir,
+    ]);
+
+    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.tsx")).toEqual(
+      matchingDir,
+    );
+  });
+
+  it("routes zellij session switches and ignores malformed session messages", async () => {
+    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(() => "zellij");
+
+    await router.handleMessage({ type: "switchSession", sessionId: "zellij-a" });
+    await router.handleMessage({ type: "switchSession", sessionId: 42 });
+    await router.handleMessage({ type: "killSession", sessionId: 42 });
+    await router.handleMessage({ type: "sendTmuxPromptChoice", choice: "ignored" });
+
+    expect(provider.switchToZellijSession).toHaveBeenCalledWith("zellij-a");
+    expect(provider.switchToTmuxSession).not.toHaveBeenCalled();
+    expect(provider.killTmuxSession).not.toHaveBeenCalled();
+    expect(provider.selectTerminalBackend).not.toHaveBeenCalled();
+    expect(provider.switchToNativeShell).not.toHaveBeenCalled();
+  });
+
+  it("logs non-Error command failures with stringified messages", async () => {
+    vi.mocked(vscode.commands.executeCommand).mockRejectedValueOnce("command down");
+    provider.executeRawTmuxCommand = vi.fn().mockRejectedValueOnce("raw down");
+    const errorSpy = vi.spyOn(logger, "error");
+
+    await router.handleMessage({
+      type: "executeTmuxCommand",
+      commandId: "opencodeTui.tmuxCreateWindow",
+    });
+    await router.handleMessage({
+      type: "executeTmuxRawCommand",
+      subcommand: "rename-window",
+    });
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("command down"),
+    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("raw down"));
+    errorSpy.mockRestore();
+  });
+
+  it("resolves direct, absolute, relative, and fallback file paths", async () => {
+    const originalFolders = vscode.workspace.workspaceFolders;
+    vi.mocked(vscode.Uri.parse).mockImplementation((uri: string) => {
+      const match = uri.match(/^([a-z]+):\/\/(.+)$/);
+      return new vscode.Uri(
+        match ? match[2] : uri,
+        match ? match[2] : uri,
+        match ? match[1] : "",
+      );
+    });
+
+    await router.handleOpenFile("file:///workspace/from-uri.ts");
+    await router.handleOpenFile("/workspace/absolute.ts");
+    await router.handleOpenFile("C:\\workspace\\absolute.ts");
+    await router.handleOpenFile("relative/no-workspace.ts");
+    vscode.workspace.workspaceFolders = undefined;
+    await router.handleOpenFile("relative/no-folder.ts");
+    vscode.workspace.workspaceFolders = [];
+    await router.handleOpenFile("relative/empty-folder.ts");
+    vscode.workspace.workspaceFolders = originalFolders;
+
+    expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: "file:///workspace/from-uri.ts" }),
+      expect.objectContaining({ preview: true }),
+    );
+    expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: "/workspace/absolute.ts" }),
+      expect.objectContaining({ preview: true }),
+    );
+    expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: "C:\\workspace\\absolute.ts" }),
+      expect.objectContaining({ preview: true }),
+    );
+    expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: "/workspace/relative/no-workspace.ts" }),
+      expect.objectContaining({ preview: true }),
+    );
+    expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: "relative/no-folder.ts" }),
+      expect.objectContaining({ preview: true }),
+    );
+    expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: "relative/empty-folder.ts" }),
+      expect.objectContaining({ preview: true }),
+    );
+  });
+
+  it("covers empty paste, unformatted images, sanitized blob fallbacks, and capture fallbacks", async () => {
+    vi.mocked(vscode.env.clipboard.readText).mockResolvedValueOnce("");
+    await router.handlePaste();
+    expect(provider.pasteText).not.toHaveBeenCalled();
+
+    provider.formatPastedImage = vi.fn(() => undefined);
+    await router.handleImagePasted("data:image/png;base64,aGVsbG8=");
+    expect(provider.pasteText).not.toHaveBeenCalled();
+
+    mockRandomUUID.mockReturnValueOnce("drop-empty").mockReturnValueOnce("drop-bad");
+    await router.handleFilesDropped([], false, undefined, [
+      { name: "   ", data: "data:image/png;base64,aGVsbG8=" },
+      { name: "folder/???.png", data: "data:image/png;base64,aGVsbG8=" },
+    ]);
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      "/tmp/opencode-tests/opencode-drop-drop-empty-dropped-file",
+      expect.any(Buffer),
+      { flag: "wx", mode: 0o600 },
+    );
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      "/tmp/opencode-tests/opencode-drop-drop-bad-___.png",
+      expect.any(Buffer),
+      { flag: "wx", mode: 0o600 },
+    );
+
+    captureManager.startCapture = vi.fn(() => ({ success: false }));
+    router.startTerminalCapture(
+      createMockTerminal("External") as unknown as vscodeApi.Terminal,
+      "External",
+    );
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Failed to start capture: Unknown error",
+    );
+  });
+
+  it("sorts fuzzy matches through every comparator branch and logs string errors", async () => {
+    const errorSpy = vi.spyOn(logger, "error");
+    const exactFirst = vscode.Uri.file("/workspace/tmp/MessageRouter.ts");
+    const exactSecond = vscode.Uri.file(
+      "/workspace/src/providers/MessageRouter.ts",
+    );
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([
+      exactFirst,
+      exactSecond,
+    ]);
+    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
+      exactSecond,
+    );
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([
+      exactSecond,
+      exactFirst,
+    ]);
+    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
+      exactSecond,
+    );
+
+    const firstDirMatch = vscode.Uri.file("src/other/MessageRouter.ts");
+    const secondDirMatch = vscode.Uri.file("other/src/MessageRouter.ts");
+    const neutral = vscode.Uri.file("other/place/MessageRouter.ts");
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([
+      secondDirMatch,
+      firstDirMatch,
+      neutral,
+    ]);
+    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
+      firstDirMatch,
+    );
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([
+      firstDirMatch,
+      secondDirMatch,
+      neutral,
+    ]);
+    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
+      firstDirMatch,
+    );
+
+    vi.mocked(vscode.workspace.findFiles).mockRejectedValueOnce("find failed");
+    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Fuzzy match failed: find failed"),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("covers defensive non-Error and fallback branches", async () => {
+    const errorSpy = vi.spyOn(logger, "error");
+    const warnSpy = vi.spyOn(logger, "warn");
+
+    provider.zoomTmuxPane = vi.fn().mockRejectedValueOnce("zoom down");
+    await router.handleMessage({ type: "zoomTmuxPane" });
+
+    vi.mocked(vscode.env.clipboard.readText).mockRejectedValueOnce("paste down");
+    await router.handlePaste();
+    vi.mocked(vscode.env.clipboard.writeText).mockRejectedValueOnce("clip down");
+    await router.handleSetClipboard("text");
+
+    mockWriteFile.mockRejectedValueOnce("image down");
+    await router.handleImagePasted("data:image/png;base64,aGVsbG8=");
+
+    mockWriteFile.mockRejectedValueOnce("blob down");
+    await router.handleFilesDropped([], false, undefined, [
+      { name: "blob.png", data: "data:image/png;base64,aGVsbG8=" },
+    ]);
+
+    vi.useFakeTimers();
+    mockUnlink.mockRejectedValueOnce("unlink down");
+    await router.handleImagePasted("data:image/png;base64,aGVsbG8=");
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    const sanitized = (
+      router as unknown as {
+        sanitizeDroppedBlobFileName: (name: string) => string;
+      }
+    ).sanitizeDroppedBlobFileName({
+      split: () => [{ trim: () => ({ replace: () => "" }) }],
+    } as unknown as string);
+
+    vscode.window.terminals = [
+      {
+        name: "No Cwd",
+        show: vi.fn(),
+        sendText: vi.fn(),
+        shellIntegration: { cwd: {} },
+      } as unknown as vscodeApi.Terminal,
+    ];
+    expect(await router.getTerminalEntries()).toEqual([{ name: "No Cwd", cwd: "" }]);
+
+    expect(sanitized).toBe("dropped-file");
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("zoom down"));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("paste down"));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("clip down"));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("image down"));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("blob down"));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("unlink down"));
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
 });

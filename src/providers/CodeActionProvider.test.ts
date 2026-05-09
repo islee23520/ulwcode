@@ -309,6 +309,40 @@ describe("OpenCodeCodeActionProvider", () => {
     );
   });
 
+  it("command handler stringifies non-Error failures", async () => {
+    const diagnostic = makeDiagnostic(vscode.DiagnosticSeverity.Error, "error");
+    const document = makeDocument();
+    const contextManager = {
+      getDiagnostics: vi.fn(() => [diagnostic]),
+    };
+    const sendPrompt = vi.fn(async () => {
+      throw "network offline";
+    });
+
+    const provider = new OpenCodeCodeActionProvider(
+      contextManager as any,
+      sendPrompt,
+    );
+
+    provider.registerCommand();
+    const registerCalls = vi.mocked(vscode.commands.registerCommand).mock.calls;
+    const explainAndFixRegistration = registerCalls.find(
+      (call) => call[0] === "opencodeTui.explainAndFix",
+    );
+    const handler = explainAndFixRegistration?.[1] as (
+      args: unknown,
+    ) => Promise<void>;
+
+    await handler({
+      diagnostic,
+      documentUri: document.uri.path,
+    });
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Failed to send diagnostic prompt: network offline",
+    );
+  });
+
   it("integrates with PromptFormatter", async () => {
     const targetDiagnostic = makeDiagnostic(
       vscode.DiagnosticSeverity.Error,

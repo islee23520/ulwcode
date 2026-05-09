@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as os from "os";
+import type * as vscodeApi from "vscode";
 import type * as nodePtyTypes from "../test/mocks/node-pty";
 import type * as vscodeTypes from "../test/mocks/vscode";
 import { OutputCaptureManager } from "../services/OutputCaptureManager";
@@ -14,8 +15,16 @@ import { DEFAULT_AI_TOOLS } from "../types";
 vi.mock("fs", () => ({
   default: {
     readFileSync: vi.fn(() => "<html><body>{{CSP_SOURCE}}</body></html>"),
+    promises: {
+      writeFile: vi.fn(async () => undefined),
+      unlink: vi.fn(async () => undefined),
+    },
   },
   readFileSync: vi.fn(() => "<html><body>{{CSP_SOURCE}}</body></html>"),
+  promises: {
+    writeFile: vi.fn(async () => undefined),
+    unlink: vi.fn(async () => undefined),
+  },
 }));
 
 const vscode = await vi.importActual<typeof vscodeTypes>(
@@ -210,6 +219,357 @@ describe("TerminalProvider", () => {
       true,
       undefined,
     );
+  });
+
+  describe("native restore Quick Pick", () => {
+    it("shows Quick Pick for disconnected native instance with selectedAiTool", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "native-disconnected",
+          selectedAiTool: "codex",
+          terminalBackend: "native",
+        },
+        runtime: { terminalKey: "native-disconnected" },
+        state: "disconnected",
+      });
+
+      provider = createProvider({ instanceStore });
+      const startSpy = vi
+        .spyOn(provider["sessionRuntime"], "startOpenCode")
+        .mockResolvedValue(undefined);
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "Claude Code",
+        description: "claude",
+        toolName: "claude",
+      });
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: "Codex (previously used)",
+            toolName: "codex",
+          }),
+        ]),
+        { placeHolder: "Select AI tool to restore terminal" },
+      );
+      expect(startSpy).toHaveBeenCalledTimes(1);
+      expect(
+        instanceStore.get("native-disconnected")?.config.selectedAiTool,
+      ).toBe("claude");
+    });
+
+    it("does not show Quick Pick for connected native instance", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "native-connected",
+          selectedAiTool: "codex",
+          terminalBackend: "native",
+        },
+        runtime: { terminalKey: "native-connected" },
+        state: "connected",
+      });
+
+      provider = createProvider({ instanceStore });
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
+
+    it("does not show Quick Pick for disconnected tmux instance", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "tmux-disconnected",
+          selectedAiTool: "codex",
+          terminalBackend: "tmux",
+        },
+        runtime: {
+          terminalKey: "tmux-disconnected",
+          tmuxSessionId: "tmux-disconnected",
+        },
+        state: "disconnected",
+      });
+
+      provider = createProvider({ instanceStore });
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
+
+    it("does not show Quick Pick without selectedAiTool", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "native-first-run",
+          terminalBackend: "native",
+        },
+        runtime: { terminalKey: "native-first-run" },
+        state: "disconnected",
+      });
+
+      provider = createProvider({ instanceStore });
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
+
+    it("cancel preserves disconnected state", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "native-cancelled",
+          selectedAiTool: "codex",
+          terminalBackend: "native",
+        },
+        runtime: { terminalKey: "native-cancelled" },
+        state: "disconnected",
+      });
+
+      provider = createProvider({ instanceStore });
+      const startSpy = vi
+        .spyOn(provider["sessionRuntime"], "startOpenCode")
+        .mockResolvedValue(undefined);
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
+      expect(startSpy).not.toHaveBeenCalled();
+      expect(instanceStore.get("native-cancelled")?.state).toBe(
+        "disconnected",
+      );
+    });
+
+    it("shows Quick Pick again when a cancelled native restore is reopened", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "native-retry",
+          selectedAiTool: "codex",
+          terminalBackend: "native",
+        },
+        runtime: { terminalKey: "native-retry" },
+        state: "disconnected",
+      });
+
+      provider = createProvider({ instanceStore });
+      const startSpy = vi
+        .spyOn(provider["sessionRuntime"], "startOpenCode")
+        .mockResolvedValue(undefined);
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(2);
+      expect(startSpy).not.toHaveBeenCalled();
+      expect(instanceStore.get("native-retry")?.state).toBe("disconnected");
+    });
+
+    it("restores a disconnected native instance that already has backendState", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "native-with-state",
+          selectedAiTool: "codex",
+          terminalBackend: "native",
+        },
+        runtime: {
+          terminalKey: "native-with-state",
+          terminalBackend: "native",
+          backendState: {
+            version: 1,
+            backend: "native",
+            restoreMode: "recreate",
+            launchSpec: {
+              command: "codex",
+              cwd: "/workspace/project",
+              name: "native-with-state",
+            },
+            createdAt: 1000,
+          },
+        },
+        state: "disconnected",
+      });
+
+      provider = createProvider({ instanceStore });
+      const startSpy = vi
+        .spyOn(provider["sessionRuntime"], "startOpenCode")
+        .mockResolvedValue(undefined);
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "Codex (previously used)",
+        description: "codex",
+        toolName: "codex",
+      });
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
+      expect(startSpy).toHaveBeenCalledTimes(1);
+      expect(instanceStore.get("native-with-state")?.runtime.backendState).toEqual(
+        expect.objectContaining({
+          backend: "native",
+          launchSpec: expect.objectContaining({ command: "codex" }),
+        }),
+      );
+    });
+
+    it("selected AI tool no longer in config falls back gracefully", async () => {
+      mockConfiguration({
+        autoStartOnOpen: false,
+        enableHttpApi: false,
+        aiTools: [
+          {
+            name: "codex",
+            label: "Codex",
+            path: "",
+            args: [],
+          },
+        ],
+      });
+
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "native-missing-tool",
+          selectedAiTool: "nonexistent-tool",
+          terminalBackend: "native",
+        },
+        runtime: { terminalKey: "native-missing-tool" },
+        state: "disconnected",
+      });
+
+      provider = createProvider({ instanceStore });
+      const startSpy = vi
+        .spyOn(provider["sessionRuntime"], "startOpenCode")
+        .mockResolvedValue(undefined);
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "Codex",
+        description: "codex",
+        toolName: "codex",
+      });
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: "Codex",
+            toolName: "codex",
+          }),
+        ]),
+        { placeHolder: "Select AI tool to restore terminal" },
+      );
+      expect(startSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("multiple disconnected instances only prompts for active", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "native-inactive",
+          selectedAiTool: "claude",
+          terminalBackend: "native",
+        },
+        runtime: { terminalKey: "native-inactive" },
+        state: "disconnected",
+      });
+      instanceStore.upsert({
+        config: {
+          id: "native-active",
+          selectedAiTool: "codex",
+          terminalBackend: "native",
+        },
+        runtime: { terminalKey: "native-active" },
+        state: "disconnected",
+      });
+      instanceStore.setActive("native-active");
+
+      provider = createProvider({ instanceStore });
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "Claude Code",
+        description: "claude",
+        toolName: "claude",
+      });
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      const quickPickItems = vi.mocked(vscode.window.showQuickPick).mock
+        .calls[0]?.[0];
+
+      expect(quickPickItems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: "Codex (previously used)",
+            toolName: "codex",
+          }),
+        ]),
+      );
+      expect(
+        quickPickItems?.some(
+          (item: { label?: string }) =>
+            item.label === "Claude Code (previously used)",
+        ),
+      ).toBe(false);
+    });
+
+    it("empty instance store does not trigger Quick Pick", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+
+      provider = createProvider({ instanceStore: new InstanceStore() });
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
+
+    it("disconnected native without terminalBackend does not trigger Quick Pick", async () => {
+      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
+
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: {
+          id: "native-no-backend",
+          selectedAiTool: "codex",
+        },
+        runtime: { terminalKey: "native-no-backend" },
+        state: "disconnected",
+      });
+
+      provider = createProvider({ instanceStore });
+
+      resolveProvider(provider);
+      await flushAsyncStartup();
+
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
   });
 
   it("routes zoomTmuxPane messages through the provider zoom path", async () => {
@@ -1354,6 +1714,16 @@ describe("TerminalProvider", () => {
     expect(startSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("does not auto-start when autoStartOnOpen is disabled", () => {
+    mockConfiguration({ autoStartOnOpen: false });
+    provider = createProvider();
+    const startSpy = vi.spyOn(provider, "startOpenCode").mockResolvedValue();
+
+    resolveProvider(provider);
+
+    expect(startSpy).not.toHaveBeenCalled();
+  });
+
   it("waits for visibility before auto-starting hidden webviews", () => {
     mockConfiguration({ autoStartOnOpen: true });
     provider = createProvider();
@@ -1394,7 +1764,7 @@ describe("TerminalProvider", () => {
     );
   });
 
-  it("closes the sidebar when opening the editor tab and collapse-on-open is enabled", async () => {
+  it("closes the auxiliary bar (secondary sidebar) when opening the editor tab and collapse-on-open is enabled", async () => {
     mockConfiguration({ collapseSecondaryBarOnEditorOpen: true });
     provider = createProvider();
     resolveProvider(provider);
@@ -1405,14 +1775,11 @@ describe("TerminalProvider", () => {
       "workbench.action.closeAuxiliaryBar",
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "workbench.action.closeSidebar",
-    );
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "workbench.action.lockEditorGroup",
     );
   });
 
-  it("closes the sidebars before creating the editor panel to avoid layout race", async () => {
+  it("closes the auxiliary bar before creating the editor panel to avoid layout race", async () => {
     mockConfiguration({ collapseSecondaryBarOnEditorOpen: true });
     provider = createProvider();
     resolveProvider(provider);
@@ -1426,14 +1793,10 @@ describe("TerminalProvider", () => {
     const closeAuxIdx = executeCalls.findIndex(
       (args) => args[0] === "workbench.action.closeAuxiliaryBar",
     );
-    const closeSidebarIdx = executeCalls.findIndex(
-      (args) => args[0] === "workbench.action.closeSidebar",
-    );
     const createOrder = vi.mocked(vscode.window.createWebviewPanel).mock
       .invocationCallOrder[0];
 
     expect(executeOrders[closeAuxIdx]).toBeLessThan(createOrder);
-    expect(executeOrders[closeSidebarIdx]).toBeLessThan(createOrder);
   });
 
   it("keeps the sidebar open when opening the editor tab and collapse-on-open is disabled", async () => {
@@ -1445,9 +1808,6 @@ describe("TerminalProvider", () => {
 
     expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
       "workbench.action.closeAuxiliaryBar",
-    );
-    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
-      "workbench.action.closeSidebar",
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "workbench.action.lockEditorGroup",
@@ -1699,5 +2059,631 @@ describe("TerminalProvider", () => {
 
     expect(provider.lastKnownCols).toBe(132);
     expect(provider.lastKnownRows).toBe(44);
+  });
+
+  it("covers router bridge wrappers for zellij, backend selection, paste, resize, and command toggles", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    const { messageHandler, view } = resolveProvider(provider);
+    const runtime = provider["sessionRuntime"];
+
+    const switchZellijSpy = vi
+      .spyOn(runtime, "switchToZellijSession")
+      .mockResolvedValue(undefined);
+    const selectBackendSpy = vi
+      .spyOn(runtime, "selectTerminalBackend")
+      .mockResolvedValue(undefined);
+    const cycleBackendSpy = vi
+      .spyOn(runtime, "cycleTerminalBackend")
+      .mockResolvedValue(undefined);
+    const resizeSpy = vi.spyOn(terminalManager, "resizeTerminal");
+
+    messageHandler({ type: "selectTerminalBackend", backend: "zellij" });
+    messageHandler({ type: "cycleTerminalBackend" });
+    await provider.switchToZellijSession("zellij-a");
+    await provider.selectTerminalBackend("native");
+    await provider.cycleTerminalBackend();
+    provider.pasteText("from bridge");
+    provider.lastKnownCols = 88;
+    provider.lastKnownRows = 24;
+    messageHandler({ type: "terminalResize", cols: 120, rows: 33 });
+
+    expect(selectBackendSpy).toHaveBeenCalledWith("zellij");
+    expect(selectBackendSpy).toHaveBeenCalledWith("native");
+    expect(cycleBackendSpy).toHaveBeenCalledTimes(2);
+    expect(switchZellijSpy).toHaveBeenCalledWith("zellij-a");
+    expect(resizeSpy).toHaveBeenCalledWith("opencode-main", 120, 33);
+    expect(view.webview.postMessage).toHaveBeenCalledWith({
+      type: "clipboardContent",
+      text: "from bridge",
+    });
+  });
+
+  it("handles auto-start visibility paths with restore acceptance and cancellation", async () => {
+    mockConfiguration({ autoStartOnOpen: true });
+    const instanceStore = new InstanceStore();
+    instanceStore.upsert({
+      config: {
+        id: "native-hidden-restore",
+        selectedAiTool: "codex",
+        terminalBackend: "native",
+      },
+      runtime: { terminalKey: "native-hidden-restore" },
+      state: "disconnected",
+    });
+    provider = createProvider({ instanceStore });
+    const startSpy = vi
+      .spyOn(provider["sessionRuntime"], "startOpenCode")
+      .mockResolvedValue(undefined);
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
+
+    const view = vscode.WebviewView() as never as ReturnType<typeof vscode.WebviewView>;
+    view.visible = false;
+    provider.resolveWebviewView(view as never, {} as never, {} as never);
+
+    const visibilityListener = vi.mocked(view.onDidChangeVisibility).mock
+      .calls[0]?.[0] as () => void;
+    view.visible = true;
+    visibilityListener();
+    await flushAsyncStartup();
+
+    expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
+    expect(startSpy).not.toHaveBeenCalled();
+
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+      label: "Codex (previously used)",
+      description: "codex",
+      toolName: "codex",
+    });
+    visibilityListener();
+    await flushAsyncStartup();
+
+    expect(startSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs native restore lookup failures and falls back to autostart", () => {
+    mockConfiguration({ autoStartOnOpen: true });
+    const failingStore = new InstanceStore();
+    vi.spyOn(failingStore, "getActive").mockImplementation(() => {
+      throw new Error("store down");
+    });
+    provider = createProvider({ instanceStore: failingStore });
+    const startSpy = vi.spyOn(provider, "startOpenCode").mockResolvedValue();
+    const infoSpy = vi.spyOn(provider["logger"], "info");
+
+    resolveProvider(provider);
+
+    expect(infoSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Native restore skipped: store down"),
+    );
+    expect(startSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconnects live editor panels and reposts config when an editor panel is disposed with sidebar still present", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    const runtime = provider["sessionRuntime"];
+    vi.spyOn(runtime, "hasLiveTerminalProcess").mockReturnValue(true);
+    vi.spyOn(runtime, "isStartedFlag").mockReturnValue(true);
+    const reconnectSpy = vi.spyOn(runtime, "reconnectListeners");
+    const { view } = resolveProvider(provider);
+    vi.mocked(view.webview.postMessage).mockClear();
+
+    await provider.openInEditorTab();
+    const panel = vi.mocked(vscode.window.createWebviewPanel).mock.results[0]
+      ?.value;
+    const disposeListener = vi.mocked(panel.onDidDispose).mock.calls[0]?.[0] as
+      | (() => void)
+      | undefined;
+
+    disposeListener?.();
+
+    expect(reconnectSpy).toHaveBeenCalledTimes(2);
+    expect(view.webview.postMessage).toHaveBeenCalledWith({
+      type: "webviewVisible",
+    });
+  });
+
+  it("posts zellij and native active session states to newly initialized editor panels", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    const runtime = provider["sessionRuntime"];
+    vi.spyOn(runtime, "getActiveBackend").mockReturnValue("zellij");
+    vi.spyOn(runtime, "resolveZellijSessionIdForInstance").mockReturnValue(
+      "zellij-active",
+    );
+    vi.spyOn(runtime, "getSelectedTmuxSessionId").mockReturnValue(undefined);
+    vi.spyOn(runtime, "resolveTmuxSessionIdForInstance").mockReturnValue(
+      undefined,
+    );
+
+    await provider.openInEditorTab();
+    let panel = vi.mocked(vscode.window.createWebviewPanel).mock.results[0]
+      ?.value;
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      type: "activeSession",
+      sessionName: "zellij-active",
+      sessionId: "zellij-active",
+      backend: "zellij",
+    });
+
+    const disposeListener = vi.mocked(panel.onDidDispose).mock.calls[0]?.[0] as
+      | (() => void)
+      | undefined;
+    disposeListener?.();
+    vi.spyOn(runtime, "getActiveBackend").mockReturnValue("native");
+    vi.spyOn(runtime, "resolveZellijSessionIdForInstance").mockReturnValue(
+      undefined,
+    );
+    await provider.openInEditorTab();
+    panel = vi.mocked(vscode.window.createWebviewPanel).mock.results[1]?.value;
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      type: "activeSession",
+      backend: "native",
+    });
+  });
+
+  it("rejects invalid raw tmux commands, missing managers, missing sessions, and cancelled prompts", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    vi.spyOn(provider["sessionRuntime"], "getActiveBackend").mockReturnValue(
+      "tmux",
+    );
+    await expect(provider.executeRawTmuxCommand("rename-session")).rejects.toThrow(
+      /tmux session manager unavailable/i,
+    );
+
+    const inactiveManager = {
+      executeRawCommand: vi.fn(async () => "unused"),
+    } as never as TmuxSessionManager;
+    provider = createProvider({ tmuxSessionManager: inactiveManager });
+    vi.spyOn(provider["sessionRuntime"], "getActiveBackend").mockReturnValue(
+      "tmux",
+    );
+    await expect(provider.executeRawTmuxCommand("rename-session")).rejects.toThrow(
+      /No active tmux session/i,
+    );
+
+    const activeStore = new InstanceStore();
+    activeStore.upsert({
+      config: { id: "raw-instance" },
+      runtime: { terminalKey: "raw-instance", tmuxSessionId: "tmux-raw" },
+      state: "connected",
+    });
+    provider = createProvider({ instanceStore: activeStore, tmuxSessionManager: inactiveManager });
+    vi.spyOn(provider["sessionRuntime"], "getActiveBackend").mockReturnValue(
+      "tmux",
+    );
+    await expect(provider.executeRawTmuxCommand("bad-command")).rejects.toThrow(
+      /Unsupported tmux subcommand/i,
+    );
+
+    vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce(undefined);
+    await expect(provider.executeRawTmuxCommand("rename-window")).rejects.toThrow(
+      /tmux command cancelled/i,
+    );
+  });
+
+  it("prompts for all value-based raw tmux commands and preserves passthrough args", async () => {
+    mockConfiguration();
+    const activeStore = new InstanceStore();
+    activeStore.upsert({
+      config: { id: "raw-values" },
+      runtime: { terminalKey: "raw-values", tmuxSessionId: "tmux-values" },
+      state: "connected",
+    });
+    const executeRawCommand = vi.fn(async () => "ok");
+    provider = createProvider({
+      instanceStore: activeStore,
+      tmuxSessionManager: { executeRawCommand } as never as TmuxSessionManager,
+    });
+    vi.spyOn(provider["sessionRuntime"], "getActiveBackend").mockReturnValue(
+      "tmux",
+    );
+    vi.mocked(vscode.window.showInputBox)
+      .mockResolvedValueOnce("window next")
+      .mockResolvedValueOnce("tiled");
+
+    await provider.executeRawTmuxCommand("rename-window", ["old-window"]);
+    await provider.executeRawTmuxCommand("select-layout", ["even-horizontal"]);
+    await provider.executeRawTmuxCommand("choose-tree", ["-Z"]);
+
+    expect(vscode.window.showInputBox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Rename tmux window",
+        value: "old-window",
+      }),
+    );
+    expect(vscode.window.showInputBox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Select tmux layout",
+        value: "even-horizontal",
+      }),
+    );
+    expect(executeRawCommand).toHaveBeenNthCalledWith(1, "tmux-values", "rename-window", ["window next"]);
+    expect(executeRawCommand).toHaveBeenNthCalledWith(2, "tmux-values", "select-layout", ["tiled"]);
+    expect(executeRawCommand).toHaveBeenNthCalledWith(3, "tmux-values", "choose-tree", ["-Z"]);
+  });
+
+  it("skips zellij AI launch when the manager is unavailable and when no tool is resolved", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    vi.spyOn(provider["sessionRuntime"], "getActiveBackend").mockReturnValue(
+      "zellij",
+    );
+    const warnSpy = vi.spyOn(provider["logger"], "warn");
+
+    await provider.launchAiTool("zellij-no-manager", "codex", false);
+    await provider.launchAiTool("zellij-no-tool", "missing-tool", false);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[TerminalProvider] launchAiTool skipped: zellij manager unavailable",
+    );
+  });
+
+  it("routes remaining webview bridge callbacks through TerminalProvider", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    const { messageHandler } = resolveProvider(provider);
+    const runtime = provider["sessionRuntime"];
+    vi.spyOn(runtime, "getActiveBackend").mockReturnValue("zellij");
+    vi.spyOn(runtime, "switchToZellijSession").mockResolvedValue(undefined);
+    vi.spyOn(runtime, "switchToNativeShell").mockResolvedValue(undefined);
+    vi.spyOn(runtime, "routeDroppedTextToTmuxPane").mockResolvedValue(true);
+    vi.spyOn(runtime, "formatDroppedFiles").mockReturnValue("@src/a.ts");
+    vi.spyOn(runtime, "formatPastedImage").mockReturnValue("@image.png");
+    vi.spyOn(provider, "toggleEditorAttachment").mockResolvedValue(undefined);
+    const dashboardSpy = vi.spyOn(provider, "toggleDashboard");
+    const restartSpy = vi.spyOn(runtime, "restart").mockImplementation(() => {});
+
+    messageHandler({ type: "switchSession", sessionId: "zellij-route" });
+    messageHandler({ type: "toggleDashboard" });
+    messageHandler({ type: "toggleEditorAttachment" });
+    messageHandler({ type: "requestRestart" });
+    messageHandler({ type: "sendTmuxPromptChoice", choice: "shell" });
+    messageHandler({ type: "filesDropped", files: ["/tmp/a.ts"], shiftKey: true, dropCell: { col: 1, row: 2 } });
+    messageHandler({ type: "imagePasted", data: "data:image/png;base64,aGVsbG8=" });
+    await flushAsyncStartup();
+
+    expect(runtime.switchToZellijSession).toHaveBeenCalledWith("zellij-route");
+    expect(dashboardSpy).toHaveBeenCalledTimes(1);
+    expect(provider.toggleEditorAttachment).toHaveBeenCalledTimes(1);
+    expect(restartSpy).toHaveBeenCalledTimes(1);
+    expect(runtime.switchToNativeShell).toHaveBeenCalledTimes(1);
+    expect(runtime.routeDroppedTextToTmuxPane).toHaveBeenCalledWith("@src/a.ts ", { col: 1, row: 2 });
+    expect(runtime.formatPastedImage).not.toHaveBeenCalledWith("not-created");
+  });
+
+  it("routes clipboard paste and pasted images through provider bridge callbacks", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    const { messageHandler, view } = resolveProvider(provider);
+    const runtime = provider["sessionRuntime"];
+    vi.spyOn(runtime, "formatPastedImage").mockReturnValue("@clipboard.png");
+    vi.mocked(vscode.env.clipboard.readText).mockResolvedValue("clipboard text");
+
+    messageHandler({ type: "triggerPaste" });
+    messageHandler({ type: "imagePasted", data: "data:image/png;base64,aGVsbG8=" });
+    await flushAsyncStartup();
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith({
+      type: "clipboardContent",
+      text: "clipboard text",
+    });
+    expect(runtime.formatPastedImage).toHaveBeenCalledWith(
+      expect.stringContaining("opencode-clipboard-"),
+    );
+    expect(view.webview.postMessage).toHaveBeenCalledWith({
+      type: "clipboardContent",
+      text: "@clipboard.png",
+    });
+  });
+
+  it("routes the session runtime AI selector callback through the provider", () => {
+    mockConfiguration();
+    provider = createProvider();
+    resolveProvider(provider);
+    const selectorSpy = vi
+      .spyOn(provider, "showAiToolSelector")
+      .mockImplementation(() => undefined);
+    const runtime = provider["sessionRuntime"] as unknown as {
+      callbacks: {
+        showAiToolSelector: (
+          sessionId: string,
+          sessionName: string,
+          forceShow?: boolean,
+        ) => void;
+      };
+    };
+
+    runtime.callbacks.showAiToolSelector("session-a", "Session A", true);
+
+    expect(selectorSpy).toHaveBeenCalledWith("session-a", "Session A", true);
+  });
+
+  it("falls back to start when native restore record disappears during visible autostart", async () => {
+    mockConfiguration({ autoStartOnOpen: true });
+    const activeStore = new InstanceStore();
+    activeStore.upsert({
+      config: {
+        id: "native-vanish",
+        terminalBackend: "native",
+        selectedAiTool: "opencode",
+      },
+      runtime: { terminalKey: "native-vanish" },
+      state: "disconnected",
+    });
+    const getActiveSpy = vi.spyOn(activeStore, "getActive");
+    getActiveSpy.mockImplementationOnce(() => ({
+      config: {
+        id: "native-vanish",
+        terminalBackend: "native",
+        selectedAiTool: "opencode",
+      },
+      runtime: { terminalKey: "native-vanish" },
+      state: "disconnected",
+    }));
+    getActiveSpy.mockImplementationOnce(() => undefined as never);
+    provider = createProvider({ instanceStore: activeStore });
+    const startSpy = vi.spyOn(provider, "startOpenCode").mockResolvedValue();
+
+    resolveProvider(provider);
+    await flushAsyncStartup();
+
+    expect(startSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("covers autostart restore fallback callbacks directly", async () => {
+    mockConfiguration({ autoStartOnOpen: true });
+    provider = createProvider();
+    const internals = provider as unknown as {
+      getNativeRestoreRecord: () => unknown;
+      promptNativeRestore: () => Promise<boolean>;
+    };
+    vi.spyOn(internals, "getNativeRestoreRecord").mockReturnValue({});
+    vi.spyOn(internals, "promptNativeRestore").mockResolvedValue(false);
+    const startSpy = vi.spyOn(provider, "startOpenCode").mockResolvedValue();
+
+    resolveProvider(provider);
+    await flushAsyncStartup();
+
+    expect(startSpy).toHaveBeenCalledTimes(1);
+
+    const view = vscode.WebviewView() as never as ReturnType<
+      typeof vscode.WebviewView
+    >;
+    view.visible = false;
+    provider.resolveWebviewView(view as never, {} as never, {} as never);
+    const visibilityListener = vi.mocked(view.onDidChangeVisibility).mock
+      .calls[0]?.[0] as () => void;
+    view.visible = true;
+    visibilityListener();
+    await flushAsyncStartup();
+
+    expect(startSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("covers autostart restore callbacks that do not relaunch", async () => {
+    mockConfiguration({ autoStartOnOpen: true });
+    provider = createProvider();
+    const internals = provider as unknown as {
+      getNativeRestoreRecord: () => unknown;
+      promptNativeRestore: () => Promise<boolean>;
+      isStarted: () => boolean;
+    };
+    vi.spyOn(internals, "getNativeRestoreRecord").mockReturnValue({});
+    vi.spyOn(internals, "promptNativeRestore").mockResolvedValue(true);
+    const startSpy = vi.spyOn(provider, "startOpenCode").mockResolvedValue();
+    resolveProvider(provider);
+    await flushAsyncStartup();
+    expect(startSpy).not.toHaveBeenCalled();
+
+    vi.spyOn(internals, "isStarted").mockReturnValue(true);
+    const view = vscode.WebviewView() as never as ReturnType<
+      typeof vscode.WebviewView
+    >;
+    view.visible = false;
+    provider.resolveWebviewView(view as never, {} as never, {} as never);
+    const visibilityListener = vi.mocked(view.onDidChangeVisibility).mock
+      .calls[0]?.[0] as () => void;
+    view.visible = true;
+    visibilityListener();
+    await flushAsyncStartup();
+
+    expect(startSpy).not.toHaveBeenCalled();
+  });
+
+  it("falls back to start when native restore record disappears on first visibility", async () => {
+    mockConfiguration({ autoStartOnOpen: true });
+    const activeStore = new InstanceStore();
+    activeStore.upsert({
+      config: {
+        id: "native-hidden-vanish",
+        terminalBackend: "native",
+        selectedAiTool: "opencode",
+      },
+      runtime: { terminalKey: "native-hidden-vanish" },
+      state: "disconnected",
+    });
+    const getActiveSpy = vi.spyOn(activeStore, "getActive");
+    getActiveSpy.mockImplementationOnce(() => ({
+      config: {
+        id: "native-hidden-vanish",
+        terminalBackend: "native",
+        selectedAiTool: "opencode",
+      },
+      runtime: { terminalKey: "native-hidden-vanish" },
+      state: "disconnected",
+    }));
+    getActiveSpy.mockImplementationOnce(() => undefined as never);
+    provider = createProvider({ instanceStore: activeStore });
+    const view = vscode.WebviewView() as never as ReturnType<
+      typeof vscode.WebviewView
+    >;
+    view.visible = false;
+    const startSpy = vi.spyOn(provider, "startOpenCode").mockResolvedValue();
+
+    provider.resolveWebviewView(view as never, {} as never, {} as never);
+    const visibilityListener = vi.mocked(view.onDidChangeVisibility).mock
+      .calls[0]?.[0] as () => void;
+    view.visible = true;
+    visibilityListener();
+    await flushAsyncStartup();
+
+    expect(startSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("formats empty editor selections and falls back to terminal prompt writes", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    resolveProvider(provider);
+    const runtime = provider["sessionRuntime"];
+    vi.spyOn(runtime, "getApiClient").mockReturnValue(undefined);
+    const writeSpy = vi.spyOn(terminalManager, "writeToTerminal");
+    const editor = {
+      document: { uri: { fsPath: "/workspaces/repo-a/src/empty.ts", path: "" } },
+      selection: {
+        isEmpty: true,
+        start: { line: 10 },
+        end: { line: 20 },
+      },
+    } as never as vscodeApi.TextEditor;
+    vi.mocked(vscode.workspace.asRelativePath).mockReturnValueOnce(
+      "src/empty.ts",
+    );
+
+    expect(provider.formatEditorReference(editor)).toBe("@src/empty.ts");
+    await provider.sendPrompt("fallback prompt");
+
+    expect(writeSpy).toHaveBeenCalledWith("opencode-main", "fallback prompt");
+  });
+
+  it("covers remaining TerminalProvider error and fallback branches", async () => {
+    mockConfiguration({ defaultAiTool: "", aiTools: DEFAULT_AI_TOOLS });
+    const throwingStore = new InstanceStore();
+    vi.spyOn(throwingStore, "getActive").mockImplementation(() => {
+      throw "native store down";
+    });
+    provider = createProvider({
+      instanceStore: throwingStore,
+      zellijSessionManager: {
+        selectPane: vi.fn(async () => undefined),
+        sendTextToPane: vi.fn(async () => undefined),
+      },
+    });
+    const runtime = provider["sessionRuntime"];
+    const logger = provider["logger"];
+    vi.spyOn(logger, "info");
+    vi.spyOn(logger, "warn");
+    resolveProvider(provider);
+
+    const apiClient = { appendPrompt: vi.fn(async () => { throw "http down"; }) };
+    vi.spyOn(runtime, "getApiClient").mockReturnValue(
+      apiClient as never as ReturnType<typeof runtime.getApiClient>,
+    );
+    vi.spyOn(runtime, "isHttpAvailable").mockReturnValue(true);
+    await provider.sendPrompt("prompt via fallback");
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("http down"),
+    );
+
+    vi.spyOn(runtime, "getActiveBackend").mockReturnValue("zellij");
+    await provider.launchAiTool("zellij-pane", "codex", false, "pane-1");
+    expect(provider["zellijSessionManager"]?.selectPane).toHaveBeenCalledWith(
+      "pane-1",
+    );
+
+    const zellijManager = provider["zellijSessionManager"] as unknown as {
+      sendTextToPane: ReturnType<typeof vi.fn>;
+    };
+    vi.mocked(zellijManager.sendTextToPane).mockRejectedValueOnce("launch down");
+    await provider.launchAiTool("zellij-pane", "codex", false);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("launch down"),
+    );
+
+    provider.showAiToolSelector("session-without-runtime", "Session", true);
+    expect(provider["_view"]?.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "session-without-runtime" }),
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining("native store down"),
+    );
+  });
+
+  it("covers visible and hidden autostart skip branches", () => {
+    mockConfiguration({ autoStartOnOpen: true });
+    provider = createProvider();
+    vi.spyOn(
+      provider as unknown as { isStarted: () => boolean },
+      "isStarted",
+    ).mockReturnValue(true);
+    resolveProvider(provider);
+
+    const hiddenView = vscode.WebviewView() as never as ReturnType<
+      typeof vscode.WebviewView
+    >;
+    hiddenView.visible = false;
+    provider.resolveWebviewView(hiddenView as never, {} as never, {} as never);
+    const visibilityListener = vi.mocked(hiddenView.onDidChangeVisibility).mock
+      .calls[0]?.[0] as () => void;
+    visibilityListener();
+
+    expect(provider["sessionRuntime"].isStartedFlag()).toBe(false);
+  });
+
+  it("covers hidden autostart fallback and disposes its visibility listener", () => {
+    mockConfiguration({ autoStartOnOpen: true });
+    provider = createProvider();
+    const view = vscode.WebviewView() as never as ReturnType<typeof vscode.WebviewView>;
+    view.visible = false;
+    const startSpy = vi.spyOn(provider, "startOpenCode").mockResolvedValue();
+
+    provider.resolveWebviewView(view as never, {} as never, {} as never);
+    const visibilityDisposable = vi.mocked(view.onDidChangeVisibility).mock.results[0]?.value;
+    const visibilityListener = vi.mocked(view.onDidChangeVisibility).mock.calls[0]?.[0] as () => void;
+    const disposeListener = vi.mocked(view.onDidDispose).mock.calls[0]?.[0] as () => void;
+
+    view.visible = true;
+    visibilityListener();
+    disposeListener();
+
+    expect(startSpy).toHaveBeenCalledTimes(1);
+    expect(visibilityDisposable.dispose).toHaveBeenCalledTimes(2);
+  });
+
+  it("validates raw tmux prompt input and resets stale editor panels", async () => {
+    mockConfiguration();
+    const activeStore = new InstanceStore();
+    activeStore.upsert({
+      config: { id: "raw-validate" },
+      runtime: { terminalKey: "raw-validate", tmuxSessionId: "tmux-validate" },
+      state: "connected",
+    });
+    const executeRawCommand = vi.fn(async () => "ok");
+    provider = createProvider({
+      instanceStore: activeStore,
+      tmuxSessionManager: { executeRawCommand } as never as TmuxSessionManager,
+    });
+    vi.spyOn(provider["sessionRuntime"], "getActiveBackend").mockReturnValue("tmux");
+    vi.mocked(vscode.window.showInputBox).mockImplementationOnce(async (options) => {
+      expect(options?.validateInput?.("   ")).toBe("A value is required");
+      expect(options?.validateInput?.(" ok ")).toBeUndefined();
+      return "validated";
+    });
+    await provider.executeRawTmuxCommand("rename-session", ["old"]);
+
+    const runtime = provider["sessionRuntime"];
+    const writeSpy = vi.spyOn(terminalManager, "writeToTerminal");
+    vi.spyOn(runtime, "hasLiveTerminalProcess").mockReturnValue(false);
+    vi.spyOn(runtime, "isStartedFlag").mockReturnValue(true);
+    const resetSpy = vi.spyOn(runtime, "resetState");
+    const panel = (vscode.window.createWebviewPanel as unknown as () => ReturnType<typeof vscode.window.createWebviewPanel>)();
+    await provider.deserializeWebviewPanel(panel as never, undefined);
+    const panelMessageHandler = vi.mocked(panel.webview.onDidReceiveMessage).mock.calls[0]?.[0] as (message: unknown) => void;
+    panelMessageHandler({ type: "terminalInput", data: "ls\n" });
+
+    expect(resetSpy).toHaveBeenCalledTimes(1);
+    expect(writeSpy).toHaveBeenCalledWith("raw-validate", "ls\n");
   });
 });
