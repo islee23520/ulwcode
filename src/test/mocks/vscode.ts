@@ -210,32 +210,46 @@ export const env = {
   },
 };
 
-export const Uri = {
-  file: vi.fn((path: string) => ({
-    fsPath: path,
-    path,
-    toString: () => `file://${path}`,
-  })),
-  joinPath: vi.fn((base: any, ...paths: string[]) => ({
-    fsPath: [base.fsPath || base.path, ...paths].join("/"),
-    path: [base.path || base.fsPath, ...paths].join("/"),
-  })),
-  parse: vi.fn((uri: string) => {
-    const match = uri.match(/^([a-z]+):\/\/(.+)$/);
-    return {
-      scheme: match ? match[1] : "file",
-      fsPath: match ? match[2] : uri,
-      path: match ? match[2] : uri,
-    };
-  }),
-};
+export class Uri {
+  constructor(
+    public readonly fsPath: string,
+    public readonly path: string = fsPath,
+    public readonly scheme: string = "file",
+  ) {}
 
-export const Range = vi.fn(
-  (startLine: number, startChar: number, endLine: number, endChar: number) => ({
+  toString() {
+    return `${this.scheme}://${this.path}`;
+  }
+
+  static file = vi.fn((path: string) => new Uri(path, path, "file"));
+
+  static joinPath = vi.fn(
+    (base: { fsPath?: string; path?: string }, ...paths: string[]) => {
+      const basePath = base.fsPath || base.path || "";
+      return new Uri(
+        [basePath, ...paths].join("/"),
+        [base.path || base.fsPath || "", ...paths].join("/"),
+      );
+    },
+  );
+
+  static parse = vi.fn((uri: string) => {
+    const match = uri.match(/^([a-z]+):\/\/(.+)$/);
+    return new Uri(match ? match[2] : uri, match ? match[2] : uri, match ? match[1] : "file");
+  });
+}
+
+export const Range = vi.fn(function Range(
+  startLine: number,
+  startChar: number,
+  endLine: number,
+  endChar: number,
+) {
+  return {
     start: { line: startLine, character: startChar },
     end: { line: endLine, character: endChar },
-  }),
-);
+  };
+});
 
 export class EventEmitter<T = any> {
   private listeners: Array<(data: T) => void> = [];
