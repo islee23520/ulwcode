@@ -1151,4 +1151,195 @@ describe("ExtensionLifecycle", () => {
       });
     });
   });
+
+  describe("sendKeybindingsToShell auto-enable (ensureSendKeybindingsToShellDefault)", () => {
+    it("should respect explicit user config (globalValue) and skip auto-enable", async () => {
+      const inspectMock = vi.fn(() => ({ globalValue: false }));
+      const updateMock = vi.fn();
+      vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
+        if (section === "opencodeTui") {
+          return {
+            inspect: inspectMock,
+            update: updateMock,
+            get: vi.fn(),
+          } as any;
+        }
+        return { get: vi.fn(), update: vi.fn(), inspect: vi.fn() } as any;
+      });
+
+      await lifecycle.activate(mockContext);
+
+      expect(inspectMock).toHaveBeenCalledWith("sendKeybindingsToShell");
+      expect(updateMock).not.toHaveBeenCalledWith(
+        "sendKeybindingsToShell",
+        true,
+        vscode.ConfigurationTarget.Global,
+      );
+    });
+
+    it("should respect explicit user config (workspaceValue) and skip auto-enable", async () => {
+      const inspectMock = vi.fn(() => ({ workspaceValue: true }));
+      const updateMock = vi.fn();
+      vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
+        if (section === "opencodeTui") {
+          return {
+            inspect: inspectMock,
+            update: updateMock,
+            get: vi.fn(),
+          } as any;
+        }
+        return { get: vi.fn(), update: vi.fn(), inspect: vi.fn() } as any;
+      });
+
+      await lifecycle.activate(mockContext);
+
+      expect(inspectMock).toHaveBeenCalledWith("sendKeybindingsToShell");
+      expect(updateMock).not.toHaveBeenCalledWith(
+        "sendKeybindingsToShell",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("should respect explicit user config (workspaceFolderValue) and skip auto-enable", async () => {
+      const inspectMock = vi.fn(() => ({ workspaceFolderValue: false }));
+      const updateMock = vi.fn();
+      vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
+        if (section === "opencodeTui") {
+          return {
+            inspect: inspectMock,
+            update: updateMock,
+            get: vi.fn(),
+          } as any;
+        }
+        return { get: vi.fn(), update: vi.fn(), inspect: vi.fn() } as any;
+      });
+
+      await lifecycle.activate(mockContext);
+
+      expect(inspectMock).toHaveBeenCalledWith("sendKeybindingsToShell");
+      expect(updateMock).not.toHaveBeenCalledWith(
+        "sendKeybindingsToShell",
+        true,
+        vscode.ConfigurationTarget.Global,
+      );
+    });
+
+    it("should skip auto-enable when alreadyAutoEnabled flag is true in globalState", async () => {
+      vi.mocked(mockContext.globalState.get).mockImplementation((key: string, def: any) => {
+        if (key === "opencodeTui.hasAutoEnabledKeybindings") return true;
+        return def;
+      });
+
+      await lifecycle.activate(mockContext);
+
+      expect(mockContext.globalState.get).toHaveBeenCalledWith(
+        "opencodeTui.hasAutoEnabledKeybindings",
+        false,
+      );
+      // ensure no auto-enable update happened for this path (default getConfiguration mock has update)
+      // we can check globalState update not called for the flag
+      expect(mockContext.globalState.update).not.toHaveBeenCalledWith(
+        "opencodeTui.hasAutoEnabledKeybindings",
+        true,
+      );
+    });
+
+    it("should catch and swallow errors from config.update (error path)", async () => {
+      const failingUpdate = vi.fn().mockRejectedValue(new Error("update failed for test"));
+      const warnSpy = vi.fn();
+      // pre-set a logger so the ?.warn call actually evaluates the template literal on line 588
+      Reflect.set(lifecycle, "outputChannelService", { warn: warnSpy });
+
+      vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
+        if (section === "opencodeTui") {
+          return {
+            inspect: vi.fn(() => undefined),
+            update: failingUpdate,
+            get: vi.fn(),
+          } as any;
+        }
+        return { get: vi.fn(), update: vi.fn(), inspect: vi.fn() } as any;
+      });
+
+      // should not throw even on failure inside ensure
+      await expect(lifecycle.activate(mockContext)).resolves.not.toThrow();
+      expect(failingUpdate).toHaveBeenCalledWith(
+        "sendKeybindingsToShell",
+        true,
+        vscode.ConfigurationTarget.Global,
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to auto-enable sendKeybindingsToShell"),
+      );
+    });
+
+    it("should no-op early when context is falsy (line 549 guard)", async () => {
+      // ensure the defensive early return is covered
+      Reflect.set(lifecycle, "context", undefined);
+      await expect(
+        (lifecycle as any).ensureSendKeybindingsToShellDefault(),
+      ).resolves.toBeUndefined();
+    });
+
+    it("should stringify non-Error rejection in catch (covers ternary false branch at 588)", async () => {
+      const failingUpdate = vi.fn().mockRejectedValue("string failure for coverage");
+      const warnSpy = vi.fn();
+      Reflect.set(lifecycle, "outputChannelService", { warn: warnSpy });
+
+      vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
+        if (section === "opencodeTui") {
+          return {
+            inspect: vi.fn(() => undefined),
+            update: failingUpdate,
+            get: vi.fn(),
+          } as any;
+        }
+        return { get: vi.fn(), update: vi.fn(), inspect: vi.fn() } as any;
+      });
+
+      await expect(lifecycle.activate(mockContext)).resolves.not.toThrow();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("string failure for coverage"),
+      );
+    });
+
+    it("should auto-enable when no explicit user value exists and not already enabled", async () => {
+      const updateMock = vi.fn().mockResolvedValue(undefined);
+      const globalStateUpdateMock = vi.fn().mockResolvedValue(undefined);
+      const infoSpy = vi.fn();
+
+      Reflect.set(lifecycle, "outputChannelService", { info: infoSpy });
+      vi.mocked(mockContext.globalState.get).mockImplementation((key: string, def: any) => {
+        if (key === "opencodeTui.hasAutoEnabledKeybindings") return false;
+        return def;
+      });
+      vi.mocked(mockContext.globalState.update).mockImplementation(globalStateUpdateMock);
+      vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
+        if (section === "opencodeTui") {
+          return {
+            inspect: vi.fn(() => ({})),
+            update: updateMock,
+            get: vi.fn(),
+          } as any;
+        }
+        return { get: vi.fn(), update: vi.fn(), inspect: vi.fn() } as any;
+      });
+
+      await lifecycle.activate(mockContext);
+
+      expect(updateMock).toHaveBeenCalledWith(
+        "sendKeybindingsToShell",
+        true,
+        vscode.ConfigurationTarget.Global,
+      );
+      expect(globalStateUpdateMock).toHaveBeenCalledWith(
+        "opencodeTui.hasAutoEnabledKeybindings",
+        true,
+      );
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Automatically enabled 'sendKeybindingsToShell: true'"),
+      );
+    });
+  });
 });

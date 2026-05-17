@@ -97,6 +97,14 @@ describe("createKeyboardHandler", () => {
       }, false, false);
     });
 
+    it("passes Ctrl+C through so the terminal can receive the control byte", () => {
+      expectKeyboardHandling(makeKeyboard(), {
+        ctrlKey: true,
+        key: "c",
+        code: "KeyC",
+      }, true, true);
+    });
+
     it("passes Ctrl+Shift+letter chords through to VS Code", () => {
       expectKeyboardHandling(makeKeyboard(), {
         ctrlKey: true,
@@ -112,6 +120,14 @@ describe("createKeyboardHandler", () => {
         key: "1",
         code: "Digit1",
       }, false, false);
+    });
+
+    it("passes Ctrl+C through to the terminal as a control byte", () => {
+      expectKeyboardHandling(makeKeyboard(), {
+        ctrlKey: true,
+        key: "c",
+        code: "KeyC",
+      }, true, true);
     });
 
     it("keeps Ctrl+V with the terminal for native paste", () => {

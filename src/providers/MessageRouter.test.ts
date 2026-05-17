@@ -272,6 +272,15 @@ describe("MessageRouter", () => {
     });
   });
 
+  it("forwards Ctrl+C control bytes unchanged to the active terminal", async () => {
+    await router.handleMessage({ type: "terminalInput", data: "\x03" });
+
+    expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
+      "terminal-1",
+      "\x03",
+    );
+  });
+
   it("routes handleMessage cases for provider bridge actions and clipboard operations", async () => {
     vi.mocked(vscode.env.clipboard.readText).mockResolvedValue(
       "clipboard text",

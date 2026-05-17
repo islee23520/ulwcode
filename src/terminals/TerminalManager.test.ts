@@ -192,6 +192,15 @@ describe("TerminalManager", () => {
       expect(writeSpy).toHaveBeenCalledWith("test data");
     });
 
+    it("should preserve raw control bytes when writing to the terminal", () => {
+      const terminal = manager.createTerminal("test-id");
+      const writeSpy = vi.spyOn(terminal.process, "write");
+
+      manager.writeToTerminal("test-id", "\x03");
+
+      expect(writeSpy).toHaveBeenCalledWith("\x03");
+    });
+
     it("should not throw for non-existent terminal", () => {
       expect(() => {
         manager.writeToTerminal("non-existent", "test");
@@ -442,7 +451,7 @@ describe("TerminalManager", () => {
 
       expect(nodePty.spawn).toHaveBeenCalledWith(
         "cmd.exe",
-        ["/c", "opencode"],
+        ["/k", "opencode"],
         expect.objectContaining({
           env: expect.objectContaining({
             SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
@@ -469,7 +478,29 @@ describe("TerminalManager", () => {
 
       expect(nodePty.spawn).toHaveBeenCalledWith(
         "pwsh.exe",
-        ["-Command", "opencode"],
+        ["-NoExit", "-Command", "opencode"],
+        expect.any(Object),
+      );
+    });
+
+    it("should detect powershell.exe (includes check) and use -NoExit -Command args on Windows", () => {
+      Object.defineProperty(process, "platform", {
+        value: "win32",
+      });
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn((key: string) => {
+          if (key === "shellPath") return "powershell.exe";
+          if (key === "shellArgs") return [];
+          return undefined;
+        }),
+        update: vi.fn(),
+      } as any);
+
+      manager.createTerminal("test-id", "opencode");
+
+      expect(nodePty.spawn).toHaveBeenCalledWith(
+        "powershell.exe",
+        ["-NoExit", "-Command", "opencode"],
         expect.any(Object),
       );
     });
@@ -496,7 +527,7 @@ describe("TerminalManager", () => {
 
       expect(nodePty.spawn).toHaveBeenCalledWith(
         "C:\\Windows\\System32\\cmd.exe",
-        ["-c", "opencode"],
+        ["/k", "opencode"],
         expect.any(Object),
       );
     });
@@ -523,7 +554,7 @@ describe("TerminalManager", () => {
 
       expect(nodePty.spawn).toHaveBeenCalledWith(
         "cmd.exe",
-        ["/c", "opencode"],
+        ["/k", "opencode"],
         expect.any(Object),
       );
     });
@@ -573,6 +604,118 @@ describe("TerminalManager", () => {
         "/bin/bash",
         ["-c", "opencode"],
         expect.any(Object),
+      );
+    });
+  });
+
+  describe("Windows shell launch regression #37", () => {
+    const setWindowsPlatform = () => {
+      Object.defineProperty(process, "platform", {
+        value: "win32",
+      });
+    };
+
+    const mockShellConfiguration = (shellPath: string, shellArgs: string[]) => {
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn((key: string) => {
+          if (key === "shellPath") return shellPath;
+          if (key === "shellArgs") return shellArgs;
+          return undefined;
+        }),
+        update: vi.fn(),
+      } as any);
+    };
+
+    it("should detect pwsh.exe from a full Windows path with spaces", () => {
+      setWindowsPlatform();
+      mockShellConfiguration(
+        "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+        [],
+      );
+
+      manager.createTerminal("pwsh-terminal", "opencode");
+
+      expect(nodePty.spawn).toHaveBeenCalledWith(
+        "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+        ["-NoExit", "-Command", "opencode"],
+        expect.objectContaining({
+          env: expect.objectContaining({
+            TERM: "xterm-256color",
+          }),
+        }),
+      );
+    });
+
+    it("should detect cmd.exe from COMSPEC and avoid POSIX -c fallback", () => {
+      setWindowsPlatform();
+      vscode.env.shell = "";
+      process.env.COMSPEC = "C:\\Windows\\System32\\cmd.exe";
+      mockShellConfiguration("", []);
+
+      manager.createTerminal("cmd-terminal", "opencode");
+
+      expect(nodePty.spawn).toHaveBeenCalledWith(
+        "C:\\Windows\\System32\\cmd.exe",
+        ["/k", "opencode"],
+        expect.objectContaining({
+          env: expect.objectContaining({
+            SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
+          }),
+        }),
+      );
+      expect(vi.mocked(nodePty.spawn)).not.toHaveBeenCalledWith(
+        expect.any(String),
+        ["-c", "opencode"],
+        expect.anything(),
+      );
+    });
+
+    it("should merge env and keep Windows defaults when a custom shell is launched", () => {
+      setWindowsPlatform();
+      mockShellConfiguration(
+        "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+        [],
+      );
+
+      manager.createTerminal(
+        "env-terminal",
+        "opencode",
+        {
+          _EXTENSION_OPENCODE_PORT: "8123",
+          OPENCODE_CALLER: "vscode",
+        },
+      );
+
+      const spawnCalls = vi.mocked(nodePty.spawn).mock.calls;
+      const spawnCall = spawnCalls[spawnCalls.length - 1];
+
+      expect(spawnCall?.[2].env).toEqual(
+        expect.objectContaining({
+          _EXTENSION_OPENCODE_PORT: "8123",
+          OPENCODE_CALLER: "vscode",
+          TERM: "xterm-256color",
+          SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
+        }),
+      );
+    });
+
+    it("should honor shellArgs overrides on Windows even when no command is passed", () => {
+      setWindowsPlatform();
+      mockShellConfiguration(
+        "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+        ["-NoLogo", "-NoProfile"],
+      );
+
+      manager.createTerminal("override-terminal");
+
+      expect(nodePty.spawn).toHaveBeenCalledWith(
+        "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+        ["-NoLogo", "-NoProfile"],
+        expect.objectContaining({
+          env: expect.objectContaining({
+            TERM: "xterm-256color",
+          }),
+        }),
       );
     });
   });

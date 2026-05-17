@@ -394,6 +394,11 @@
           "default": [],
           "description": "Custom arguments to pass to the shell. Leave empty for automatic detection. Example: [\"/c\"] for cmd.exe or [\"-Command\"] for PowerShell."
         },
+        "opencodeTui.sendKeybindingsToShell": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send Ctrl/Cmd + letter shortcuts (including Ctrl+P) directly to the sidebar terminal instead of letting VS Code intercept them. This extension's main purpose is running opencode (a TUI with its own keybindings), so the default is ON. You can turn it off if you prefer normal IDE shortcuts even when the sidebar terminal is focused. Control keys like Ctrl+C are always sent to the terminal."
+        },
         "opencodeTui.autoShareContext": {
           "type": "boolean",
           "default": true,

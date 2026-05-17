@@ -15,6 +15,13 @@ export interface KeyboardHandlerOptions {
    * When omitted, Shift+Enter is not intercepted.
    */
   sendInput?: (data: string) => void;
+  /**
+   * When true, send workbench primary modifier chords (Ctrl/Cmd + letter/digit)
+   * to the sidebar terminal's PTY instead of suppressing them for the IDE.
+   * This allows TUI shortcuts (e.g. Ctrl+P in opencode) to work.
+   * Shell control keys (Ctrl+C, Ctrl+D, etc.) are always routed to the terminal.
+   */
+  sendKeybindingsToShell?: boolean;
 }
 
 export function createKeyboardHandler(options: KeyboardHandlerOptions = {}) {
@@ -32,6 +39,21 @@ export function createKeyboardHandler(options: KeyboardHandlerOptions = {}) {
     !event.altKey &&
     (event.ctrlKey || event.metaKey) &&
     isLetterOrDigitCode(event.code);
+
+  /** Control chords that shells/TUIs always expect (never suppress for IDE). */
+  const ALWAYS_TERMINAL_CONTROL = new Set([
+    "KeyC",
+    "KeyD",
+    "KeyZ",
+    "KeyL",
+    "KeyU",
+    "KeyK",
+    "KeyA",
+    "KeyE",
+    "KeyR",
+    "KeyW",
+    "KeyV", // allow Ctrl+V fallthrough path too
+  ]);
 
   /** Detect bare Shift+Enter without Ctrl/Meta/Alt modifiers. */
   const isShiftEnter = (event: KeyboardEvent): boolean =>
@@ -58,6 +80,14 @@ export function createKeyboardHandler(options: KeyboardHandlerOptions = {}) {
     }
 
     if (isWorkbenchPrimaryModifier(event)) {
+      if (
+        options.sendKeybindingsToShell ||
+        ALWAYS_TERMINAL_CONTROL.has(event.code)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+      }
       return false;
     }
 

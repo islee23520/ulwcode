@@ -813,6 +813,10 @@ export class TerminalProvider
         "block",
       ),
       scrollback: config.get<number>("scrollback", 10000),
+      sendKeybindingsToShell: config.get<boolean>(
+        "sendKeybindingsToShell",
+        true,
+      ),
     };
   }
 
@@ -841,6 +845,7 @@ export class TerminalProvider
       cursorBlink: String(terminalConfig.cursorBlink),
       cursorStyle: terminalConfig.cursorStyle,
       scrollback: String(terminalConfig.scrollback),
+      sendKeybindingsToShell: String(terminalConfig.sendKeybindingsToShell),
     });
   }
 

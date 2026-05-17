@@ -23,6 +23,7 @@ export function renderTerminalHtml({
   cursorBlink,
   cursorStyle,
   scrollback,
+  sendKeybindingsToShell,
 }: TerminalHtmlParams): string {
   return `<!doctype html>
 <html lang="en">
@@ -44,6 +45,7 @@ export function renderTerminalHtml({
       cursorBlink,
       cursorStyle,
       scrollback,
+      sendKeybindingsToShell,
     })}
     ${renderAiSelector()}
     ${renderTmuxPrompt()}

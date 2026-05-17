@@ -50,6 +50,7 @@ export class ExtensionLifecycle {
   private terminalDashboardProvider: TerminalDashboardProvider | undefined;
   private activated = false;
   private tuiProviderRegistration: vscode.Disposable | undefined;
+  private context?: vscode.ExtensionContext;
 
   private static readonly TERMINAL_ID = "opencode-main";
 
@@ -90,6 +91,7 @@ export class ExtensionLifecycle {
   }
 
   async activate(context: vscode.ExtensionContext): Promise<void> {
+    this.context = context;
     const logger = OutputChannelService.getInstance();
     if (this.activated) {
       logger.warn(
@@ -99,6 +101,10 @@ export class ExtensionLifecycle {
     }
     this.activated = true;
     logger.info("Initializing Open Sidebar TUI...");
+
+    // One-time setup on fresh install: auto-enable sendKeybindingsToShell
+    // so Ctrl+P / Ctrl+other keys go to the sidebar opencode terminal immediately.
+    await this.ensureSendKeybindingsToShellDefault();
 
     try {
       this.terminalManager = new TerminalManager();
@@ -528,5 +534,59 @@ export class ExtensionLifecycle {
     this.contextSharingService = undefined;
 
     logger?.info("Open Sidebar TUI deactivated");
+  }
+
+  /**
+   * On first installation / activation, automatically enable
+   * `sendKeybindingsToShell` so that Ctrl+P and other TUI shortcuts
+   * work immediately in the sidebar terminal without the user having
+   * to manually edit settings.
+   *
+   * We only do this if the user has never explicitly set the value
+   * (we respect their choice if they turned it off).
+   */
+  private async ensureSendKeybindingsToShellDefault(): Promise<void> {
+    if (!this.context) return;
+
+    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const inspect = config.inspect<boolean>("sendKeybindingsToShell");
+
+    const userHasExplicitValue =
+      inspect?.globalValue !== undefined ||
+      inspect?.workspaceValue !== undefined ||
+      inspect?.workspaceFolderValue !== undefined;
+
+    if (userHasExplicitValue) {
+      return; // respect user's choice
+    }
+
+    const alreadyAutoEnabled = this.context.globalState.get<boolean>(
+      "opencodeTui.hasAutoEnabledKeybindings",
+      false,
+    );
+
+    if (alreadyAutoEnabled) {
+      return;
+    }
+
+    try {
+      await config.update(
+        "sendKeybindingsToShell",
+        true,
+        vscode.ConfigurationTarget.Global,
+      );
+      await this.context.globalState.update(
+        "opencodeTui.hasAutoEnabledKeybindings",
+        true,
+      );
+
+      this.outputChannelService?.info(
+        "[ExtensionLifecycle] Automatically enabled 'sendKeybindingsToShell: true' on first install so Ctrl+P / TUI keys work in the sidebar terminal out of the box.",
+      );
+    } catch (err) {
+      this.outputChannelService?.warn(
+        `[ExtensionLifecycle] Failed to auto-enable sendKeybindingsToShell: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 }

@@ -50,6 +50,7 @@ export function initTerminal(
 
   const keyboardHandler = createKeyboardHandler({
     sendInput: (data) => options.onData(data),
+    sendKeybindingsToShell: config.sendKeybindingsToShell,
   });
   terminal.attachCustomKeyEventHandler(keyboardHandler.handler);
 

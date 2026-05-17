@@ -4,6 +4,7 @@ export interface TerminalContainerParams {
   cursorBlink: string;
   cursorStyle: string;
   scrollback: string;
+  sendKeybindingsToShell?: string;
 }
 
 export function renderTerminalContainer({
@@ -12,6 +13,7 @@ export function renderTerminalContainer({
   cursorBlink,
   cursorStyle,
   scrollback,
+  sendKeybindingsToShell = "false",
 }: TerminalContainerParams): string {
   return `<div
       id="terminal-container"
@@ -20,5 +22,6 @@ export function renderTerminalContainer({
       data-cursor-blink="${cursorBlink}"
       data-cursor-style="${cursorStyle}"
       data-scrollback="${scrollback}"
+      data-send-keybindings-to-shell="${sendKeybindingsToShell}"
     ></div>`;
 }

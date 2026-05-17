@@ -384,6 +384,7 @@ export type HostMessage =
       cursorBlink: boolean;
       cursorStyle: "block" | "underline" | "bar";
       scrollback: number;
+      sendKeybindingsToShell?: boolean;
     }
   | {
       type: "activeSession";

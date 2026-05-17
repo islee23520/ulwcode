@@ -48,8 +48,8 @@ export class TerminalManager {
       this.killTerminal(id);
     }
 
-    const { shell, args: shellArgs } = this.getShellConfig();
-    const ptyArgs = command ? [...shellArgs, command] : [];
+    const { shell, args: shellArgs } = this.getShellConfig(!!command);
+    const ptyArgs = command ? [...shellArgs, command] : shellArgs;
 
     const onDataEmitter = new vscode.EventEmitter<{
       id: string;
@@ -207,7 +207,9 @@ export class TerminalManager {
     }
   }
 
-  private getShellConfig(): { shell: string; args: string[] } {
+  private getShellConfig(
+    runCommand = false,
+  ): { shell: string; args: string[] } {
     const config = vscode.workspace.getConfiguration("opencodeTui");
     const overrideShell = config.get<string>("shellPath");
     const overrideArgs = config.get<string[]>("shellArgs");
@@ -223,12 +225,17 @@ export class TerminalManager {
       return { shell, args: overrideArgs };
     }
 
-    const shellName = path.basename(shell).toLowerCase();
-    if (process.platform === "win32") {
-      if (shellName === "cmd.exe" || shellName === "cmd")
-        return { shell, args: ["/c"] };
-      if (shellName.includes("powershell") || shellName.includes("pwsh"))
-        return { shell, args: ["-Command"] };
+    if (!runCommand) {
+      return { shell, args: [] };
+    }
+
+    const shellName = path.win32.basename(shell).toLowerCase();
+    const isWin = process.platform === "win32" || shell.includes("\\") || shell.includes(":\\");
+    if (isWin) {
+      if (shellName === "cmd.exe" || shellName === "cmd" || shellName.endsWith("cmd.exe"))
+        return { shell, args: ["/k"] };
+      if (shellName.includes("powershell") || shellName.includes("pwsh") || shellName.endsWith("pwsh.exe"))
+        return { shell, args: ["-NoExit", "-Command"] };
     }
     return { shell, args: ["-c"] };
   }

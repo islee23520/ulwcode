@@ -4,6 +4,7 @@ export interface TerminalConfig {
   cursorBlink: boolean;
   cursorStyle: "block" | "underline" | "bar";
   scrollback: number;
+  sendKeybindingsToShell: boolean;
 }
 
 export function readTerminalConfig(element: HTMLElement): TerminalConfig {
@@ -18,5 +19,7 @@ export function readTerminalConfig(element: HTMLElement): TerminalConfig {
       | "underline"
       | "bar",
     scrollback: parseInt(element.dataset.scrollback || "10000", 10),
+    sendKeybindingsToShell:
+      element.dataset.sendKeybindingsToShell === "true",
   };
 }
