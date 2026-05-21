@@ -666,6 +666,7 @@ export class TerminalDashboardProvider
           message.sessionId,
           message.tool,
           message.savePreference,
+          message.targetPaneId,
         );
         await this.postSessionsToWebview();
         return;

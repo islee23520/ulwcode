@@ -1634,7 +1634,7 @@ describe("TerminalDashboardProvider", () => {
       "zellij-a",
       "claude",
       true,
-      undefined,
+      "terminal_2",
     );
 
     const noTerminalProvider = createProvider();
