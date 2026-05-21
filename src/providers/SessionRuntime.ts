@@ -963,7 +963,6 @@ export class SessionRuntime {
         return undefined;
       }
 
-      // Prefer the active session only if it matches the current workspace
       const workspaceBasename = workspacePath
         ? path.basename(workspacePath)
         : undefined;
@@ -980,7 +979,6 @@ export class SessionRuntime {
         if (matchingAny) {
           return matchingAny.id;
         }
-        // No workspace-matched session; do NOT attach to an unrelated session
         return undefined;
       }
 
@@ -1561,7 +1559,6 @@ export class SessionRuntime {
     try {
       this.activeInstanceId = this.instanceStore.getActive().config.id;
     } catch {
-      // No active instance yet — use default
     }
 
     this.activeInstanceSubscription = this.instanceStore.onDidSetActive(
@@ -1581,7 +1578,6 @@ export class SessionRuntime {
         this.instanceStore.setActive(instanceId);
       }
     } catch {
-      // No active instance — nothing to sync
     }
   }
 
@@ -1626,7 +1622,6 @@ export class SessionRuntime {
           await vscode.env.clipboard.writeText(buf);
         }
       } catch {
-        // Clipboard sync is best-effort; skip this cycle
       }
     }, 500);
   }

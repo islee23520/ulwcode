@@ -105,7 +105,7 @@ npx @vscode/vsce package
 ## Usage
 
 1. Click the OpenCode icon in the Activity Bar (sidebar) to open Terminal Managers
-2. The Open Sidebar Terminal terminal is available in the secondary sidebar
+2. The Open Sidebar Terminal is available in the secondary sidebar
 3. Open Sidebar Terminal automatically starts when the terminal view is activated
 4. Interact with OpenCode directly in the sidebar
 
@@ -378,7 +378,7 @@ src/
 
 ## Implementation Details
 
-Based on the excellent [vscode-sidebar-terminal](https://github.com/s-hiraoku/vscode-sidebar-terminal) extension, streamlined specifically for Open Sidebar Terminal:
+Based on the [vscode-sidebar-terminal](https://github.com/s-hiraoku/vscode-sidebar-terminal) extension, streamlined specifically for Open Sidebar Terminal:
 
 - **Terminal Backend**: node-pty for PTY support
 - **Terminal Frontend**: xterm.js with WebGL rendering

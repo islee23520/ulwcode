@@ -28,9 +28,6 @@ interface DashboardSessionSource {
   backend: DashboardBackend;
 }
 
-/**
- * Terminal Managers provider. Webview-based tmux session manager with inline pane controls (split, switch, resize, swap, kill). Filters sessions to current workspace.
- */
 export class TerminalDashboardProvider
   implements vscode.WebviewViewProvider, vscode.Disposable
 {
@@ -54,12 +51,6 @@ export class TerminalDashboardProvider
     private readonly zellijSessionManager?: ZellijSessionManager,
   ) {}
 
-  /**
-   * Resolves the webview view and sets up message handling and visibility changes.
-   * @param webviewView The webview view to resolve
-   * @param _context Webview view resolve context
-   * @param _token Cancellation token
-   */
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
@@ -133,9 +124,6 @@ export class TerminalDashboardProvider
     this.panel?.reveal();
   }
 
-  /**
-   * Discovers, filters, and posts tmux sessions and their panes to the webview.
-   */
   private async postSessionsToWebview(): Promise<void> {
     const webview = this.getActiveWebview();
     if (!webview) {
@@ -368,8 +356,6 @@ export class TerminalDashboardProvider
       }
     }
 
-    // Default to tmux (the tmuxSessionManager is always provided via constructor).
-    // If the session was not found in zellij, it is treated as a tmux session.
     return "tmux";
   }
 
@@ -382,10 +368,6 @@ export class TerminalDashboardProvider
     }
   }
 
-  /**
-   * Handles incoming messages from the webview and executes corresponding commands or actions.
-   * @param message The message received from the webview
-   */
   private async handleWebviewMessage(
     message: TmuxDashboardActionMessage | undefined,
   ): Promise<void> {
@@ -454,17 +436,15 @@ export class TerminalDashboardProvider
         if (this.instanceStore) {
           try {
             this.instanceStore.setActive(message.instanceId);
-            await vscode.commands.executeCommand(
-              "opencodeTui.switchNativeShell",
-            );
-          } catch {
-            // instance may not exist, refresh silently
+          await vscode.commands.executeCommand(
+            "opencodeTui.switchNativeShell",
+          );
+        } catch {
           }
         }
         await this.postSessionsToWebview();
         return;
       case "showAiToolSelector": {
-        // Get the active pane to use as the default target for AI tool launch
         let targetPaneId: string | undefined;
         try {
           if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
@@ -747,11 +727,6 @@ export class TerminalDashboardProvider
     }
   }
 
-  /**
-   * Generates the HTML content for the webview by reading the external template.
-   * @param webview The webview to generate HTML for
-   * @returns The HTML string
-   */
   private getHtmlContent(webview: vscode.Webview): string {
     const scriptUri = webview
       .asWebviewUri(
@@ -784,11 +759,6 @@ export class TerminalDashboardProvider
       );
   }
 
-  /**
-   * Shows the AI tool selector in the webview after a new tmux session is created.
-   * @param sessionId The newly created session ID
-   * @param sessionName Display name for the session
-   */
   public async showAiToolSelector(
     sessionId: string,
     sessionName: string,
@@ -826,10 +796,6 @@ export class TerminalDashboardProvider
     }
   }
 
-  /**
-   * Handles AI tool selection from the webview.
-   * Launches the selected tool in the target pane of the tmux session.
-   */
   private async handleLaunchAiTool(
     sessionId: string,
     toolName: string,
@@ -858,11 +824,6 @@ export class TerminalDashboardProvider
     }
   }
 
-  /**
-   * Builds native shell DTOs from InstanceStore records that have no tmux session.
-   * @param workspacePath The current workspace path for filtering
-   * @returns Array of native shell DTOs
-   */
   private buildNativeShellDtos(workspacePath?: string): NativeShellDto[] {
     if (!this.instanceStore) {
       return [];
@@ -886,11 +847,7 @@ export class TerminalDashboardProvider
             ? vscode.Uri.parse(record.config.workspaceUri).fsPath
             : undefined;
 
-          if (recordWorkspace !== workspacePath) {
-            return false;
-          }
-
-          return true;
+          return recordWorkspace === workspacePath;
         })
         .map((record) => ({
           id: record.config.id,
@@ -903,10 +860,6 @@ export class TerminalDashboardProvider
     }
   }
 
-  /**
-   * Generates a random nonce for CSP.
-   * @returns A random 32-character string
-   */
   private getNonce(): string {
     let text = "";
     const possible =
@@ -917,9 +870,6 @@ export class TerminalDashboardProvider
     return text;
   }
 
-  /**
-   * Disposes of subscriptions and cleans up resources.
-   */
   public dispose(): void {
     this.stopPolling();
     this.disposeSubscriptions();

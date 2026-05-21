@@ -420,14 +420,10 @@ export class MessageRouter {
     );
 
     const normalizedFiles = files.map((file) => {
-      // Normalize any URI-scheme string (file://, vscode-file://, etc.) to a
-      // filesystem path using vscode.Uri.parse so that outside-workspace
-      // absolute paths are preserved correctly before asRelativePath is called.
       if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(file)) {
         try {
           return vscode.Uri.parse(file).fsPath;
         } catch {
-          // fall through to raw value
         }
       }
       return file;

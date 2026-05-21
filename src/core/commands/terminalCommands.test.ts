@@ -270,7 +270,7 @@ describe("registerTerminalCommands", () => {
     getCommand(noProviderCommands, "opencodeTui.sendAtMention")();
 
     expect(noProviderDeps.outputChannel?.warn).toHaveBeenCalledWith(
-      "[DIAG:sendAtMention] skipped — provider=false editor=true",
+      "[DIAG:sendAtMention] skipped — provider=false",
     );
     expect(noProviderDeps.sendTerminalCwd).toHaveBeenCalledTimes(1);
     expect(noProviderDeps.sendPrompt).not.toHaveBeenCalled();
@@ -285,7 +285,7 @@ describe("registerTerminalCommands", () => {
     getCommand(noEditorCommands, "opencodeTui.sendAtMention")();
 
     expect(noEditorDeps.outputChannel?.warn).toHaveBeenCalledWith(
-      "[DIAG:sendAtMention] skipped — editor=false contextSharingService=true",
+      "[DIAG:sendAtMention] skipped — editor missing",
     );
     expect(noEditorDeps.sendTerminalCwd).toHaveBeenCalledTimes(1);
     expect(noEditorDeps.sendPrompt).not.toHaveBeenCalled();

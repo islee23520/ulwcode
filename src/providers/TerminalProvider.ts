@@ -895,7 +895,6 @@ export class TerminalProvider
         "workbench.view.extension.opencodeTuiContainer",
       );
     } catch {
-      // Best-effort reveal; fall through to showing the specific view when available.
     }
 
     this._view?.show?.(true);
