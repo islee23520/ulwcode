@@ -454,6 +454,7 @@ export class TerminalProvider
     toolName: string,
     savePreference: boolean,
     targetPaneId?: string,
+    backendHint?: TerminalBackendType,
   ): Promise<void> {
     if (savePreference) {
       const config = vscode.workspace.getConfiguration("opencodeTui");
@@ -477,11 +478,13 @@ export class TerminalProvider
     const launchCommand = operator.getLaunchCommand(tool);
     const instance = this.instanceStore?.get(instanceId);
     const activeBackend = this.sessionRuntime.getActiveBackend();
-    const effectiveBackend: TerminalBackendType = instance?.runtime.tmuxSessionId
-      ? "tmux"
-      : instance?.runtime.zellijSessionId
-        ? "zellij"
-        : activeBackend;
+    const effectiveBackend: TerminalBackendType = backendHint
+      ? backendHint
+      : instance?.runtime.tmuxSessionId
+        ? "tmux"
+        : instance?.runtime.zellijSessionId
+          ? "zellij"
+          : activeBackend;
 
     try {
       if (effectiveBackend === "zellij") {
@@ -793,7 +796,18 @@ export class TerminalProvider
   private flushPendingWebviewMessages(webview: vscode.Webview): void {
     const messages = this.pendingWebviewMessages.splice(0);
     for (const message of messages) {
-      webview.postMessage(message);
+      const postResult = webview.postMessage(message) as
+        | boolean
+        | Thenable<boolean>;
+      if (this.isThenablePostResult(postResult)) {
+        void postResult.then((delivered) => {
+          if (!delivered && this.isQueueableHostMessage(message)) {
+            this.replacePendingWebviewMessage(message);
+          }
+        });
+      } else if (!postResult && this.isQueueableHostMessage(message)) {
+        this.replacePendingWebviewMessage(message);
+      }
     }
   }
 

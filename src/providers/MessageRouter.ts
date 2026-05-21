@@ -55,6 +55,7 @@ export interface MessageRouterProviderBridge {
     toolName: string,
     savePreference: boolean,
     targetPaneId?: string,
+    backendHint?: TerminalBackendType,
   ): Promise<void>;
   showAiToolSelector(
     sessionId: string,
@@ -163,14 +164,17 @@ export class MessageRouter {
           void this.provider.createTmuxSession();
         }
         break;
-      case "launchAiTool":
+      case "launchAiTool": {
+        const backendHint = this.provider.getActiveBackend();
         void this.provider.launchAiTool(
           message.sessionId,
           message.tool,
           message.savePreference,
           message.targetPaneId,
+          backendHint,
         );
         break;
+      }
       case "zoomTmuxPane":
         try {
           await this.provider.zoomTmuxPane();

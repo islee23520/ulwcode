@@ -14,6 +14,7 @@ import {
   TmuxDashboardWindowDto,
   NativeShellDto,
   AiToolConfig,
+  TerminalBackendType,
   resolveAiToolConfigs,
 } from "../types";
 
@@ -372,6 +373,15 @@ export class TerminalDashboardProvider
     return "tmux";
   }
 
+  private async ensureZellijSession(sessionId: string): Promise<void> {
+    if (
+      this.zellijSessionManager &&
+      typeof this.zellijSessionManager.switchSession === "function"
+    ) {
+      await this.zellijSessionManager.switchSession(sessionId);
+    }
+  }
+
   /**
    * Handles incoming messages from the webview and executes corresponding commands or actions.
    * @param message The message received from the webview
@@ -458,6 +468,7 @@ export class TerminalDashboardProvider
         let targetPaneId: string | undefined;
         try {
           if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+            await this.ensureZellijSession(message.sessionId);
             const panes = await this.zellijSessionManager?.listPanes();
             const activePane = panes?.find((pane) => pane.isFocused);
             targetPaneId = activePane?.id;
@@ -491,6 +502,7 @@ export class TerminalDashboardProvider
         {
           const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+            await this.ensureZellijSession(message.sessionId);
             await this.zellijSessionManager?.createTab({
               workingDirectory: workspacePath,
             });
@@ -512,6 +524,7 @@ export class TerminalDashboardProvider
         return;
       case "nextWindow":
         if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+          await this.ensureZellijSession(message.sessionId);
           await this.zellijSessionManager?.nextTab();
         } else {
           await this.tmuxSessionManager.nextWindow(message.sessionId);
@@ -520,6 +533,7 @@ export class TerminalDashboardProvider
         return;
       case "prevWindow":
         if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+          await this.ensureZellijSession(message.sessionId);
           await this.zellijSessionManager?.prevTab();
         } else {
           await this.tmuxSessionManager.prevWindow(message.sessionId);
@@ -528,6 +542,7 @@ export class TerminalDashboardProvider
         return;
       case "killWindow":
         if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+          await this.ensureZellijSession(message.sessionId);
           await this.zellijSessionManager?.killTab();
         } else {
           await this.tmuxSessionManager.killWindow(message.windowId);
@@ -539,6 +554,7 @@ export class TerminalDashboardProvider
           `[TerminalDashboard] selectWindow: sessionId=${message.sessionId}, windowId=${message.windowId}`,
         );
         if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+          await this.ensureZellijSession(message.sessionId);
           await this.zellijSessionManager?.selectTab(
             this.parseZellijTabIndex(message.windowId),
           );
@@ -549,6 +565,7 @@ export class TerminalDashboardProvider
         return;
       case "switchPane":
         if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+          await this.ensureZellijSession(message.sessionId);
           await this.zellijSessionManager?.selectPane(message.paneId);
         } else {
           await this.tmuxSessionManager.selectPane(
@@ -561,6 +578,7 @@ export class TerminalDashboardProvider
       case "splitPane":
         {
           if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+            await this.ensureZellijSession(message.sessionId);
             if (message.paneId) {
               await this.zellijSessionManager?.selectPane(message.paneId);
             }
@@ -589,6 +607,7 @@ export class TerminalDashboardProvider
       case "splitPaneWithCommand":
         {
           if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+            await this.ensureZellijSession(message.sessionId);
             if (message.paneId) {
               await this.zellijSessionManager?.selectPane(message.paneId);
             }
@@ -617,6 +636,7 @@ export class TerminalDashboardProvider
         return;
       case "killPane":
         if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+          await this.ensureZellijSession(message.sessionId);
           if (message.paneId) {
             await this.zellijSessionManager?.selectPane(message.paneId);
           }
@@ -628,6 +648,7 @@ export class TerminalDashboardProvider
         return;
       case "resizePane":
         if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
+          await this.ensureZellijSession(message.sessionId);
           const directionMap = {
             L: "left",
             R: "right",
@@ -781,7 +802,7 @@ export class TerminalDashboardProvider
         config.get("aiTools", []),
       );
 
-      await webview.postMessage({
+      const postResult = await webview.postMessage({
         type: "showAiToolSelector",
         sessionId,
         sessionName,
@@ -789,7 +810,9 @@ export class TerminalDashboardProvider
         tools,
         targetPaneId,
       } satisfies TmuxDashboardHostMessage);
-      return;
+      if (postResult !== false) {
+        return;
+      }
     }
 
     if (this.terminalProvider) {
@@ -818,11 +841,15 @@ export class TerminalDashboardProvider
     }
 
     try {
+      const sessionBackend = await this.getSessionBackend(sessionId);
+      const backendHint: TerminalBackendType =
+        sessionBackend === "zellij" ? "zellij" : "tmux";
       await this.terminalProvider.launchAiTool(
         sessionId,
         toolName,
         savePreference,
         targetPaneId,
+        backendHint,
       );
     } catch (error) {
       this.logger?.error(
