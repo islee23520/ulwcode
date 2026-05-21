@@ -505,6 +505,75 @@ describe("TerminalManager", () => {
       );
     });
 
+    it("should detect pwsh from a Unix-style path and use -NoExit -Command args on Windows", () => {
+      Object.defineProperty(process, "platform", {
+        value: "win32",
+      });
+
+      const originalIncludes = String.prototype.includes;
+      const originalEndsWith = String.prototype.endsWith;
+      const includesSpy = vi
+        .spyOn(String.prototype, "includes")
+        .mockImplementation(function (this: string, searchString: string) {
+          if (searchString === "powershell" || searchString === "pwsh") {
+            return false;
+          }
+          return originalIncludes.call(this, searchString);
+        });
+      const endsWithSpy = vi
+        .spyOn(String.prototype, "endsWith")
+        .mockImplementation(function (this: string, searchString: string) {
+          if (searchString === "pwsh.exe") {
+            return true;
+          }
+          return originalEndsWith.call(this, searchString);
+        });
+
+      try {
+        vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+          get: vi.fn((key: string) => {
+            if (key === "shellPath") return "/usr/bin/pwsh";
+            if (key === "shellArgs") return [];
+            return undefined;
+          }),
+          update: vi.fn(),
+        } as any);
+
+        manager.createTerminal("pwsh-terminal", "opencode");
+
+        expect(nodePty.spawn).toHaveBeenCalledWith(
+          "/usr/bin/pwsh",
+          ["-NoExit", "-Command", "opencode"],
+          expect.any(Object),
+        );
+      } finally {
+        includesSpy.mockRestore();
+        endsWithSpy.mockRestore();
+      }
+    });
+
+    it("should fall back to -c for non-PowerShell Windows shells", () => {
+      Object.defineProperty(process, "platform", {
+        value: "win32",
+      });
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn((key: string) => {
+          if (key === "shellPath") return "C:\\Tools\\bash.exe";
+          if (key === "shellArgs") return [];
+          return undefined;
+        }),
+        update: vi.fn(),
+      } as any);
+
+      manager.createTerminal("bash-terminal", "opencode");
+
+      expect(nodePty.spawn).toHaveBeenCalledWith(
+        "C:\\Tools\\bash.exe",
+        ["-c", "opencode"],
+        expect.any(Object),
+      );
+    });
+
     it("should fall back to COMSPEC on Windows when VS Code shell is empty", () => {
       Object.defineProperty(process, "platform", {
         value: "win32",

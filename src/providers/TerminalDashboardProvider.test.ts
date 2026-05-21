@@ -46,6 +46,7 @@ describe("TerminalDashboardProvider", () => {
     zellijDiscoverSessions?: ReturnType<typeof vi.fn>;
     zellijListPanes?: ReturnType<typeof vi.fn>;
     zellijListTabs?: ReturnType<typeof vi.fn>;
+    zellijSwitchSession?: ReturnType<typeof vi.fn>;
     instanceStore?: {
       getAll: ReturnType<typeof vi.fn>;
       getActive?: ReturnType<typeof vi.fn>;
@@ -76,6 +77,8 @@ describe("TerminalDashboardProvider", () => {
     const zellijDiscoverSessions = options?.zellijDiscoverSessions;
     const zellijListPanes = options?.zellijListPanes ?? vi.fn().mockResolvedValue([]);
     const zellijListTabs = options?.zellijListTabs ?? vi.fn().mockResolvedValue([]);
+    const zellijSwitchSession =
+      options?.zellijSwitchSession ?? vi.fn().mockResolvedValue(undefined);
     const logger =
       options?.logger ??
       ({
@@ -118,6 +121,7 @@ describe("TerminalDashboardProvider", () => {
           splitPane: vi.fn().mockResolvedValue("terminal_8"),
           killPane: vi.fn().mockResolvedValue(undefined),
           resizePane: vi.fn().mockResolvedValue(undefined),
+          switchSession: zellijSwitchSession,
         }
       : undefined;
 
@@ -128,6 +132,7 @@ describe("TerminalDashboardProvider", () => {
       listWindowPaneGeometry,
       zellijListPanes,
       zellijListTabs,
+      zellijSwitchSession,
       logger,
       instanceStore,
       terminalProvider,
@@ -1061,6 +1066,28 @@ describe("TerminalDashboardProvider", () => {
     expect(zellijSessionManager?.killPane).toHaveBeenCalled();
   });
 
+  it("switches into the zellij session before zellij actions", async () => {
+    const zellijSwitchSession = vi.fn().mockResolvedValue(undefined);
+    const { provider } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      zellijDiscoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
+      ]),
+      zellijListPanes: vi.fn().mockResolvedValue([]),
+      zellijListTabs: vi.fn().mockResolvedValue([
+        { index: 1, name: "main", isActive: true },
+      ]),
+      zellijSwitchSession,
+    });
+
+    const { messageHandler } = resolveProvider(provider);
+    await flushPromises();
+
+    await messageHandler({ action: "nextWindow", sessionId: "repo-a" });
+
+    expect(zellijSwitchSession).toHaveBeenCalledWith("repo-a");
+  });
+
   it("uses the active pane target when opening the AI selector and falls back gracefully on pane lookup errors", async () => {
     const showAiToolSelector = vi.fn();
     const terminalProvider = {
@@ -1156,6 +1183,27 @@ describe("TerminalDashboardProvider", () => {
         sessionId: "repo-a",
         targetPaneId: "%7",
       }),
+    );
+  });
+
+  it("falls back to terminal provider when dashboard webview postMessage returns false", async () => {
+    const terminalProvider = {
+      showAiToolSelector: vi.fn(),
+      launchAiTool: vi.fn(),
+    };
+    const { provider } = createProvider({ terminalProvider });
+
+    const { view } = resolveProvider(provider);
+    await flushPromises();
+    vi.mocked(view.webview.postMessage).mockResolvedValue(false);
+
+    await provider.showAiToolSelector("repo-a", "Repo A", true, "%1");
+
+    expect(terminalProvider.showAiToolSelector).toHaveBeenCalledWith(
+      "repo-a",
+      "Repo A",
+      true,
+      "%1",
     );
   });
 
@@ -2132,5 +2180,14 @@ describe("TerminalDashboardProvider", () => {
     (
       fresh.provider as unknown as { flushPendingMessage: () => void }
     ).flushPendingMessage();
+  });
+
+  it("ensureZellijSession is a no-op when zellijSessionManager is not available", async () => {
+    const { provider } = createProvider({ zellijDiscoverSessions: undefined });
+    await (
+      provider as unknown as {
+        ensureZellijSession: (id: string) => Promise<void>;
+      }
+    ).ensureZellijSession("missing-session");
   });
 });
