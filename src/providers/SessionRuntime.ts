@@ -166,7 +166,9 @@ export class SessionRuntime {
     if (resolved === "tmux") {
       const sessionId = await this.ensureTmuxBackendSession();
       if (sessionId) {
-        await this.switchToTmuxSessionWithTool(sessionId);
+        await this.switchToTmuxSessionWithTool(sessionId, undefined, {
+          forceToolPrompt: true,
+        });
         return;
       }
       void vscode.window.showWarningMessage(

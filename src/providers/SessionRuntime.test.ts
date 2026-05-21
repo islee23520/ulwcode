@@ -2895,7 +2895,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
       await sessionRuntime.selectTerminalBackend("tmux");
 
-      expect(switchSpy).toHaveBeenCalledWith("project-a");
+      expect(switchSpy).toHaveBeenCalledWith("project-a", undefined, {
+        forceToolPrompt: true,
+      });
     });
 
     it("starts with an existing valid stored zellij session", async () => {
