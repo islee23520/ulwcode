@@ -342,6 +342,7 @@ describe("MessageRouter", () => {
       "claude",
       true,
       "%1",
+      "tmux",
     );
     expect(provider.showAiToolSelector).toHaveBeenCalledWith(
       "tmux-selected",

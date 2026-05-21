@@ -60,21 +60,25 @@ describe("createKeyboardHandler", () => {
       }, false, false);
     });
 
-    it("keeps Cmd+V with the terminal for native paste", () => {
-      expectKeyboardHandling(makeKeyboard(), {
+    it("requests host paste on Cmd+V", () => {
+      const requestPaste = vi.fn();
+      expectKeyboardHandling(createKeyboardHandler({ isMac: true, requestPaste }), {
         metaKey: true,
         key: "v",
         code: "KeyV",
-      }, true, false);
+      }, false, true);
+      expect(requestPaste).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps Cmd+Shift+V with the terminal for native paste", () => {
-      expectKeyboardHandling(makeKeyboard(), {
+    it("requests host paste on Cmd+Shift+V", () => {
+      const requestPaste = vi.fn();
+      expectKeyboardHandling(createKeyboardHandler({ isMac: true, requestPaste }), {
         metaKey: true,
         shiftKey: true,
         key: "V",
         code: "KeyV",
-      }, true, false);
+      }, false, true);
+      expect(requestPaste).toHaveBeenCalledTimes(1);
     });
 
     it("keeps Ctrl+letter chords with xterm for terminal control characters", () => {
@@ -83,6 +87,20 @@ describe("createKeyboardHandler", () => {
         key: "c",
         code: "KeyC",
       }, true, true);
+    });
+
+    it("copies terminal selection on Cmd+C", () => {
+      const copySelection = vi.fn();
+      expectKeyboardHandling(createKeyboardHandler({
+        isMac: true,
+        hasSelection: () => true,
+        copySelection,
+      }), {
+        metaKey: true,
+        key: "c",
+        code: "KeyC",
+      }, false, true);
+      expect(copySelection).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -130,21 +148,39 @@ describe("createKeyboardHandler", () => {
       }, true, true);
     });
 
-    it("keeps Ctrl+V with the terminal for native paste", () => {
-      expectKeyboardHandling(makeKeyboard(), {
+    it("copies terminal selection on Ctrl+C", () => {
+      const copySelection = vi.fn();
+      expectKeyboardHandling(createKeyboardHandler({
+        isMac: false,
+        hasSelection: () => true,
+        copySelection,
+      }), {
+        ctrlKey: true,
+        key: "c",
+        code: "KeyC",
+      }, false, true);
+      expect(copySelection).toHaveBeenCalledTimes(1);
+    });
+
+    it("requests host paste on Ctrl+V", () => {
+      const requestPaste = vi.fn();
+      expectKeyboardHandling(createKeyboardHandler({ isMac: false, requestPaste }), {
         ctrlKey: true,
         key: "v",
         code: "KeyV",
-      }, true, false);
+      }, false, true);
+      expect(requestPaste).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps Ctrl+Shift+V with the terminal for native paste", () => {
-      expectKeyboardHandling(makeKeyboard(), {
+    it("requests host paste on Ctrl+Shift+V", () => {
+      const requestPaste = vi.fn();
+      expectKeyboardHandling(createKeyboardHandler({ isMac: false, requestPaste }), {
         ctrlKey: true,
         shiftKey: true,
         key: "V",
         code: "KeyV",
-      }, true, false);
+      }, false, true);
+      expect(requestPaste).toHaveBeenCalledTimes(1);
     });
 
     it("keeps stray Cmd+letter chords with xterm", () => {

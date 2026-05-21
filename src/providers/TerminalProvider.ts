@@ -37,6 +37,8 @@ export class TerminalProvider
   private readonly aiToolRegistry: AiToolOperatorRegistry;
   private readonly sessionRuntime: SessionRuntime;
   private readonly messageRouter: MessageRouter;
+  private readonly pendingWebviewMessages: HostMessage[] = [];
+  private pendingQueueablePostChecks = 0;
 
   public constructor(
     private readonly context: vscode.ExtensionContext,
@@ -196,9 +198,39 @@ export class TerminalProvider
 
     this.postTerminalConfig();
     this.postCurrentSessionState(webviewView.webview);
+    this.flushPendingWebviewMessages(webviewView.webview);
 
     const config = vscode.workspace.getConfiguration("opencodeTui");
     const autoStartOnOpen = config.get<boolean>("autoStartOnOpen", true);
+    const visibilityListener = webviewView.onDidChangeVisibility(() => {
+      if (!webviewView.visible) {
+        return;
+      }
+
+      const hadPendingMessages =
+        this.pendingWebviewMessages.length > 0 ||
+        this.pendingQueueablePostChecks > 0;
+      this.flushPendingWebviewMessages(webviewView.webview);
+      if (!hadPendingMessages) {
+        this.postWebviewMessage({ type: "webviewVisible" });
+        this.postTerminalConfig();
+      }
+
+      if (autoStartOnOpen && !this.isStarted()) {
+        if (this.getNativeRestoreRecord()) {
+          void this.promptNativeRestore().then((restored) => {
+            if (!restored) {
+              void this.startOpenCode();
+            }
+          });
+        } else {
+          void this.startOpenCode();
+        }
+        visibilityListener.dispose();
+      }
+    });
+    webviewView.onDidDispose(() => visibilityListener.dispose());
+
     if (autoStartOnOpen) {
       if (webviewView.visible) {
         if (!this.isStarted()) {
@@ -212,27 +244,6 @@ export class TerminalProvider
             void this.startOpenCode();
           }
         }
-      } else {
-        const visibilityListener = webviewView.onDidChangeVisibility(() => {
-          if (webviewView.visible) {
-            this.postWebviewMessage({ type: "webviewVisible" });
-            this.postTerminalConfig();
-            if (!this.isStarted()) {
-              if (this.getNativeRestoreRecord()) {
-                void this.promptNativeRestore().then((restored) => {
-                  if (!restored) {
-                    void this.startOpenCode();
-                  }
-                });
-              } else {
-                void this.startOpenCode();
-              }
-              visibilityListener.dispose();
-            }
-          }
-        });
-
-        webviewView.onDidDispose(() => visibilityListener.dispose());
       }
     } else if (webviewView.visible && !this.isStarted()) {
       void this.promptNativeRestore();
@@ -443,6 +454,7 @@ export class TerminalProvider
     toolName: string,
     savePreference: boolean,
     targetPaneId?: string,
+    backendHint?: TerminalBackendType,
   ): Promise<void> {
     if (savePreference) {
       const config = vscode.workspace.getConfiguration("opencodeTui");
@@ -464,15 +476,29 @@ export class TerminalProvider
 
     const operator = this.aiToolRegistry.getForConfig(tool);
     const launchCommand = operator.getLaunchCommand(tool);
+    const instance = this.instanceStore?.get(instanceId);
     const activeBackend = this.sessionRuntime.getActiveBackend();
+    const effectiveBackend: TerminalBackendType = backendHint
+      ? backendHint
+      : instance?.runtime.tmuxSessionId
+        ? "tmux"
+        : instance?.runtime.zellijSessionId
+          ? "zellij"
+          : activeBackend;
 
     try {
-      if (activeBackend === "zellij") {
+      if (effectiveBackend === "zellij") {
         if (!this.zellijSessionManager) {
           this.logger.warn(
             "[TerminalProvider] launchAiTool skipped: zellij manager unavailable",
           );
           return;
+        }
+        const effectiveZellijSessionId =
+          this.sessionRuntime.resolveZellijSessionIdForInstance(instanceId) ??
+          sessionId;
+        if (typeof this.zellijSessionManager.switchSession === "function") {
+          await this.zellijSessionManager.switchSession(effectiveZellijSessionId);
         }
         if (targetPaneId) {
           await this.zellijSessionManager.selectPane(targetPaneId);
@@ -483,9 +509,9 @@ export class TerminalProvider
         return;
       }
 
-      if (activeBackend !== "tmux" || !this.tmuxSessionManager) {
+      if (effectiveBackend !== "tmux" || !this.tmuxSessionManager) {
         this.logger.warn(
-          `[TerminalProvider] launchAiTool skipped: backend ${activeBackend} does not support pane targeting`,
+          `[TerminalProvider] launchAiTool skipped: backend ${effectiveBackend} does not support pane targeting`,
         );
         return;
       }
@@ -583,6 +609,9 @@ export class TerminalProvider
     targetPaneId?: string,
   ): void {
     const config = vscode.workspace.getConfiguration("opencodeTui");
+    if (forceShow && !config.get<boolean>("promptAiToolOnSession", true)) {
+      return;
+    }
     const instanceId =
       this.sessionRuntime.resolveInstanceIdFromSessionId(sessionId);
     const effectiveSessionId =
@@ -698,7 +727,91 @@ export class TerminalProvider
 
   private postWebviewMessage(message: unknown): void {
     const webview = this._panel?.webview ?? this._view?.webview;
-    webview?.postMessage(message);
+    if (webview) {
+      const postResult = webview.postMessage(message) as
+        | boolean
+        | Thenable<boolean>;
+      if (this.isThenablePostResult(postResult)) {
+        if (this.isQueueableHostMessage(message)) {
+          this.pendingQueueablePostChecks += 1;
+        }
+        void postResult.then((delivered) => {
+          if (this.isQueueableHostMessage(message)) {
+            this.pendingQueueablePostChecks = Math.max(
+              0,
+              this.pendingQueueablePostChecks - 1,
+            );
+          }
+          if (!delivered && this.isQueueableHostMessage(message)) {
+            this.replacePendingWebviewMessage(message);
+            if (this.isWebviewVisible()) {
+              this.flushPendingWebviewMessages(webview);
+            }
+          }
+        });
+        return;
+      }
+
+      if (!postResult && this.isQueueableHostMessage(message)) {
+        this.replacePendingWebviewMessage(message);
+      }
+      return;
+    }
+
+    if (this.isQueueableHostMessage(message)) {
+      this.replacePendingWebviewMessage(message);
+    }
+  }
+
+  private isWebviewVisible(): boolean {
+    return this._panel?.visible === true || this._view?.visible === true;
+  }
+
+  private isThenablePostResult(
+    value: boolean | Thenable<boolean>,
+  ): value is Thenable<boolean> {
+    return typeof value === "object" && value !== null && "then" in value;
+  }
+
+  private isQueueableHostMessage(
+    message: unknown,
+  ): message is Extract<HostMessage, { type: "showAiToolSelector" }> {
+    return (
+      typeof message === "object" &&
+      message !== null &&
+      "type" in message &&
+      message.type === "showAiToolSelector"
+    );
+  }
+
+  private replacePendingWebviewMessage(message: HostMessage): void {
+    const existingIndex = this.pendingWebviewMessages.findIndex(
+      (pendingMessage) => pendingMessage.type === message.type,
+    );
+    if (existingIndex >= 0) {
+      this.pendingWebviewMessages.splice(existingIndex, 1, message);
+      return;
+    }
+
+    this.pendingWebviewMessages.push(message);
+  }
+
+  private flushPendingWebviewMessages(webview: vscode.Webview): void {
+    const messages = this.pendingWebviewMessages.splice(0);
+    for (const message of messages) {
+      const postResult = webview.postMessage(message) as
+        | boolean
+        | Thenable<boolean>;
+      if (this.isThenablePostResult(postResult)) {
+        void postResult.then((delivered) => {
+          if (!delivered && this.isQueueableHostMessage(message)) {
+            this.replacePendingWebviewMessage(message);
+          }
+        });
+      } else if (!postResult && this.isQueueableHostMessage(message)) {
+        this.replacePendingWebviewMessage(message);
+      }
+    }
   }
 
   private postCurrentSessionState(webview: vscode.Webview): void {
@@ -763,6 +876,7 @@ export class TerminalProvider
 
     this.postTerminalConfig();
     this.postCurrentSessionState(panel.webview);
+    this.flushPendingWebviewMessages(panel.webview);
 
     panel.onDidDispose(() => {
       if (this._panel === panel) {
@@ -781,7 +895,6 @@ export class TerminalProvider
         "workbench.view.extension.opencodeTuiContainer",
       );
     } catch {
-      // Best-effort reveal; fall through to showing the specific view when available.
     }
 
     this._view?.show?.(true);
@@ -817,6 +930,10 @@ export class TerminalProvider
         "sendKeybindingsToShell",
         true,
       ),
+      showTmuxWindowControls: config.get<boolean>(
+        "showTmuxWindowControls",
+        true,
+      ),
     };
   }
 
@@ -846,6 +963,7 @@ export class TerminalProvider
       cursorStyle: terminalConfig.cursorStyle,
       scrollback: String(terminalConfig.scrollback),
       sendKeybindingsToShell: String(terminalConfig.sendKeybindingsToShell),
+      showTmuxWindowControls: String(terminalConfig.showTmuxWindowControls),
     });
   }
 

@@ -43,15 +43,17 @@ export function registerTerminalCommands(
     "opencodeTui.sendToTerminal",
     () => {
       const editor = vscode.window.activeTextEditor;
-      if (editor && !editor.selection.isEmpty) {
-        const selectedText = editor.document.getText(editor.selection);
-        const terminalId = deps.getActiveTerminalId();
-        deps.outputChannel?.info(
-          `[DIAG:sendToTerminal] terminalId="${terminalId}" textLength=${selectedText.length}`,
-        );
-        void deps.sendPrompt(selectedText + "\n");
-        focusSidebarIfConfigured(deps.provider);
+      if (!editor || editor.selection.isEmpty) {
+        return;
       }
+
+      const selectedText = editor.document.getText(editor.selection);
+      const terminalId = deps.getActiveTerminalId();
+      deps.outputChannel?.info(
+        `[DIAG:sendToTerminal] terminalId="${terminalId}" textLength=${selectedText.length}`,
+      );
+      void deps.sendPrompt(selectedText + "\n");
+      focusSidebarIfConfigured(deps.provider);
     },
   );
 
@@ -59,27 +61,27 @@ export function registerTerminalCommands(
     "opencodeTui.sendAtMention",
     () => {
       const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        const fileRef = deps.provider?.formatEditorReference(editor);
-        if (!fileRef) {
-          deps.outputChannel?.warn(
-            `[DIAG:sendAtMention] skipped — provider=${!!deps.provider} editor=${!!editor}`,
-          );
-          deps.sendTerminalCwd();
-          return;
-        }
-        const terminalId = deps.getActiveTerminalId();
-        deps.outputChannel?.info(
-          `[DIAG:sendAtMention] terminalId="${terminalId}" fileRef="${fileRef}"`,
-        );
-        void deps.sendPrompt(fileRef + " ");
-        focusSidebarIfConfigured(deps.provider);
-      } else {
+      if (!editor) {
+        deps.outputChannel?.warn("[DIAG:sendAtMention] skipped — editor missing");
+        deps.sendTerminalCwd();
+        return;
+      }
+
+      const fileRef = deps.provider?.formatEditorReference(editor);
+      if (!fileRef) {
         deps.outputChannel?.warn(
-          `[DIAG:sendAtMention] skipped — editor=${!!editor} contextSharingService=${!!deps.contextSharingService}`,
+          `[DIAG:sendAtMention] skipped — provider=${!!deps.provider}`,
         );
         deps.sendTerminalCwd();
+        return;
       }
+
+      const terminalId = deps.getActiveTerminalId();
+      deps.outputChannel?.info(
+        `[DIAG:sendAtMention] terminalId="${terminalId}" fileRef="${fileRef}"`,
+      );
+      void deps.sendPrompt(fileRef + " ");
+      focusSidebarIfConfigured(deps.provider);
     },
   );
 
@@ -138,7 +140,8 @@ export function registerTerminalCommands(
           return;
         }
 
-        if (!deps.provider) {
+        const provider = deps.provider;
+        if (!provider) {
           fileSendAccumulator = [];
           return;
         }
@@ -150,7 +153,7 @@ export function registerTerminalCommands(
         ];
 
         const fileRefs = uniqueUris.map((u: vscode.Uri) =>
-          deps.provider!.formatUriReference(u),
+          provider.formatUriReference(u),
         );
         const allRefs = fileRefs.join(" ");
 
@@ -185,7 +188,10 @@ export function registerTerminalCommands(
   const focusCommand = vscode.commands.registerCommand(
     "opencodeTui.focus",
     () => {
-      vscode.commands.executeCommand("workbench.view.focus", "opencodeTui");
+      return vscode.commands.executeCommand(
+        "workbench.view.focus",
+        "opencodeTui",
+      );
     },
   );
 

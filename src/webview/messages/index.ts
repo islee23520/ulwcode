@@ -92,6 +92,9 @@ export function createMessageHandler(
           break;
 
         case "terminalConfig":
+          setTmuxWindowControlsVisibility(
+            message.showTmuxWindowControls !== false,
+          );
           if (terminal) {
             terminal.options.fontSize = message.fontSize;
             terminal.options.fontFamily = message.fontFamily;
@@ -134,4 +137,12 @@ export function createMessageHandler(
   };
 
   return state;
+}
+
+function setTmuxWindowControlsVisibility(visible: boolean): void {
+  document.querySelectorAll("[data-tmux-window-controls]").forEach((element) => {
+    if (element instanceof HTMLElement) {
+      element.classList.toggle("hidden", !visible);
+    }
+  });
 }

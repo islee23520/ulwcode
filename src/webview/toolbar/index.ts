@@ -1,5 +1,9 @@
 import { postMessage } from "../shared/vscode-api";
-import { TerminalBackendAvailability, TerminalBackendType } from "../../types";
+import {
+  TerminalBackendAvailability,
+  TerminalBackendType,
+  TmuxWebviewCommandId,
+} from "../../types";
 
 import * as TmuxCmd from "../tmux-command-dropdown";
 
@@ -24,10 +28,31 @@ export function setupBackendToggleButton(
   });
 }
 
+export function setupTmuxWindowButtons(): void {
+  bindTmuxCommandButton(
+    "btn-tmux-new-session",
+    "opencodeTui.createTmuxSession",
+  );
+  bindTmuxCommandButton("btn-tmux-prev-window", "opencodeTui.tmuxPrevWindow");
+  bindTmuxCommandButton("btn-tmux-new-window", "opencodeTui.tmuxCreateWindow");
+  bindTmuxCommandButton("btn-tmux-next-window", "opencodeTui.tmuxNextWindow");
+}
+
+function bindTmuxCommandButton(
+  elementId: string,
+  commandId: TmuxWebviewCommandId,
+): void {
+  document.getElementById(elementId)?.addEventListener("click", () => {
+    postMessage({ type: "executeTmuxCommand", commandId });
+  });
+}
+
 export function updateBackendToggleButtonState(
   activeBackend: TerminalBackendType,
   availability: TerminalBackendAvailability,
 ): void {
+  updateTmuxWindowButtonState(activeBackend, availability);
+
   const btn = document.getElementById(
     "btn-toggle-backend",
   ) as HTMLButtonElement | null;
@@ -39,6 +64,39 @@ export function updateBackendToggleButtonState(
     ? "No other terminal backend is available"
     : `Switch to ${backendLabel(next)}`;
   btn.textContent = backendGlyph(activeBackend);
+}
+
+function updateTmuxWindowButtonState(
+  activeBackend: TerminalBackendType,
+  availability: TerminalBackendAvailability,
+): void {
+  const sessionButton = document.getElementById(
+    "btn-tmux-new-session",
+  ) as HTMLButtonElement | null;
+  if (sessionButton) {
+    sessionButton.disabled = !availability.tmux;
+    sessionButton.title = availability.tmux
+      ? "New tmux session"
+      : "tmux is not available";
+  }
+
+  const windowButtons = [
+    ["btn-tmux-prev-window", "Previous tmux window"],
+    ["btn-tmux-new-window", "New tmux window"],
+    ["btn-tmux-next-window", "Next tmux window"],
+  ] as const;
+
+  const isTmuxActive = activeBackend === "tmux" && availability.tmux;
+  windowButtons.forEach(([id, activeTitle]) => {
+    const button = document.getElementById(id) as HTMLButtonElement | null;
+    if (!button) return;
+    button.disabled = !isTmuxActive;
+    button.title = isTmuxActive
+      ? activeTitle
+      : activeBackend === "zellij"
+        ? "Use tab controls from commands"
+        : "Switch to tmux to manage windows";
+  });
 }
 
 function nextAvailableBackend(

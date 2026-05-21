@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   setupTmuxCommandButton,
   setupBackendToggleButton,
+  setupTmuxWindowButtons,
   updateBackendToggleButtonState,
 } from "./index";
 import { resetVsCodeApi } from "../shared/vscode-api";
@@ -72,5 +73,70 @@ describe("toolbar backend toggle", () => {
     const listText = document.getElementById("tmux-command-list")?.textContent ?? "";
     expect(listText).toContain("New Tab");
     expect(listText).not.toContain("Swap Pane");
+  });
+
+  it("dispatches direct tmux session and window commands from toolbar buttons", () => {
+    document.body.innerHTML = `
+      <button id="btn-tmux-new-session"></button>
+      <button id="btn-tmux-prev-window"></button>
+      <button id="btn-tmux-new-window"></button>
+      <button id="btn-tmux-next-window"></button>
+    `;
+
+    setupTmuxWindowButtons();
+
+    document.getElementById("btn-tmux-new-session")?.click();
+    document.getElementById("btn-tmux-prev-window")?.click();
+    document.getElementById("btn-tmux-new-window")?.click();
+    document.getElementById("btn-tmux-next-window")?.click();
+
+    expect(postMessageMock).toHaveBeenNthCalledWith(1, {
+      type: "executeTmuxCommand",
+      commandId: "opencodeTui.createTmuxSession",
+    });
+    expect(postMessageMock).toHaveBeenNthCalledWith(2, {
+      type: "executeTmuxCommand",
+      commandId: "opencodeTui.tmuxPrevWindow",
+    });
+    expect(postMessageMock).toHaveBeenNthCalledWith(3, {
+      type: "executeTmuxCommand",
+      commandId: "opencodeTui.tmuxCreateWindow",
+    });
+    expect(postMessageMock).toHaveBeenNthCalledWith(4, {
+      type: "executeTmuxCommand",
+      commandId: "opencodeTui.tmuxNextWindow",
+    });
+  });
+
+  it("disables direct tmux window movement outside the tmux backend", () => {
+    document.body.innerHTML = `
+      <button id="btn-tmux-new-session"></button>
+      <button id="btn-tmux-prev-window" title="Previous tmux window"></button>
+      <button id="btn-tmux-new-window" title="New tmux window"></button>
+      <button id="btn-tmux-next-window" title="Next tmux window"></button>
+    `;
+
+    updateBackendToggleButtonState("native", {
+      native: true,
+      tmux: true,
+      zellij: false,
+    });
+
+    expect(
+      (document.getElementById("btn-tmux-new-session") as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    expect(
+      (document.getElementById("btn-tmux-prev-window") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (document.getElementById("btn-tmux-new-window") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (document.getElementById("btn-tmux-next-window") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
   });
 });

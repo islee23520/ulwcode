@@ -15,6 +15,7 @@ import {
   setupEditorAttachmentButton,
   setupReloadButton,
   setupTmuxCommandButton,
+  setupTmuxWindowButtons,
   setupBackendToggleButton,
   updateBackendToggleButtonState,
 } from "./toolbar";
@@ -179,6 +180,7 @@ function initApp(): void {
   setupReloadButton();
   setupEditorAttachmentButton();
   setupTmuxCommandButton(() => currentSessionId, () => activeBackend);
+  setupTmuxWindowButtons();
   setupBackendToggleButton(() => activeBackend);
 
   window.addEventListener("message", (event: MessageEvent) => {

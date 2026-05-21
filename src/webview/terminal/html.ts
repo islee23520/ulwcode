@@ -24,6 +24,7 @@ export function renderTerminalHtml({
   cursorStyle,
   scrollback,
   sendKeybindingsToShell,
+  showTmuxWindowControls,
 }: TerminalHtmlParams): string {
   return `<!doctype html>
 <html lang="en">
@@ -38,7 +39,7 @@ export function renderTerminalHtml({
     <link rel="stylesheet" href="${cssUri}" />
   </head>
   <body>
-    ${renderTmuxToolbar()}
+    ${renderTmuxToolbar(showTmuxWindowControls !== "false")}
     ${renderTerminalContainer({
       fontSize,
       fontFamily,

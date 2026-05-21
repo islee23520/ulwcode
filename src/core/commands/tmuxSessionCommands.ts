@@ -168,8 +168,8 @@ export function registerTmuxSessionCommands(
         return;
       }
 
-      await deps.provider.switchToTmuxSession(sessionId);
       await vscode.commands.executeCommand("opencodeTui.focus");
+      await deps.provider.switchToTmuxSession(sessionId);
     },
   );
 
@@ -180,6 +180,7 @@ export function registerTmuxSessionCommands(
         return;
       }
 
+      await vscode.commands.executeCommand("opencodeTui.focus");
       return deps.provider.createTmuxSession();
     },
   );
@@ -265,12 +266,12 @@ export function registerTmuxSessionCommands(
           return;
         }
 
+        await vscode.commands.executeCommand("opencodeTui.focus");
         if (activeBackend === "zellij") {
           await deps.provider.switchToZellijSession(picked.session.id);
         } else {
           await deps.provider.switchToTmuxSession(picked.session.id);
         }
-        await vscode.commands.executeCommand("opencodeTui.focus");
       } catch (error) {
         deps.outputChannel?.error(
           `Failed to browse tmux sessions: ${error instanceof Error ? error.message : String(error)}`,

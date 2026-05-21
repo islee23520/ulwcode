@@ -632,6 +632,11 @@ describe("registerTmuxSessionCommands", () => {
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "opencodeTui.focus",
     );
+    expect(
+      vi.mocked(vscode.commands.executeCommand).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(provider.switchToTmuxSession).mock.invocationCallOrder[0],
+    );
   });
 
   it("ignores switchTmuxSession and killTmuxSession when required inputs are missing", async () => {
@@ -690,6 +695,14 @@ describe("registerTmuxSessionCommands", () => {
     await handlers.killTmuxSession("tmux-2");
 
     expect(provider.createTmuxSession).toHaveBeenCalledTimes(1);
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "opencodeTui.focus",
+    );
+    expect(
+      vi.mocked(vscode.commands.executeCommand).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(provider.createTmuxSession).mock.invocationCallOrder[0],
+    );
     expect(provider.killTmuxSession).toHaveBeenCalledWith("tmux-2");
   });
 
@@ -917,6 +930,11 @@ describe("registerTmuxSessionCommands", () => {
     expect(provider.switchToTmuxSession).toHaveBeenCalledWith("tmux-b");
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "opencodeTui.focus",
+    );
+    expect(
+      vi.mocked(vscode.commands.executeCommand).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(provider.switchToTmuxSession).mock.invocationCallOrder[0],
     );
   });
 

@@ -380,7 +380,7 @@
         },
         "opencodeTui.autoStartOnOpen": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Automatically start the AI tool when the sidebar is opened. When false, shows a tool selector each time."
         },
         "opencodeTui.shellPath": {
@@ -400,6 +400,11 @@
           "type": "boolean",
           "default": true,
           "description": "Send Ctrl/Cmd + letter shortcuts (including Ctrl+P) directly to the sidebar terminal instead of letting VS Code intercept them. This extension's main purpose is running opencode (a TUI with its own keybindings), so the default is ON. You can turn it off if you prefer normal IDE shortcuts even when the sidebar terminal is focused. Control keys like Ctrl+C are always sent to the terminal."
+        },
+        "opencodeTui.showTmuxWindowControls": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show direct tmux session and window controls (+S, previous window, +W, next window) in the terminal toolbar. Turn this off to keep only the tmux command menu."
         },
         "opencodeTui.autoShareContext": {
           "type": "boolean",
@@ -566,8 +571,13 @@
         },
         "opencodeTui.defaultAiTool": {
           "type": "string",
-          "default": "",
+          "default": "opencode",
           "description": "Name of the default AI tool to launch when creating a new terminal session"
+        },
+        "opencodeTui.promptAiToolOnSession": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the AI tool selector popup when attaching to or creating a tmux/zellij session"
         }
       }
     }

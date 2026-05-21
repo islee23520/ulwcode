@@ -105,7 +105,7 @@ npx @vscode/vsce package
 ## Usage
 
 1. Click the OpenCode icon in the Activity Bar (sidebar) to open Terminal Managers
-2. The Open Sidebar Terminal terminal is available in the secondary sidebar
+2. The Open Sidebar Terminal is available in the secondary sidebar
 3. Open Sidebar Terminal automatically starts when the terminal view is activated
 4. Interact with OpenCode directly in the sidebar
 
@@ -269,6 +269,7 @@ Available settings in VS Code settings (`Cmd+,` / `Ctrl+,`):
 | -------------------------------- | ------ | ------- | ------------------------------------------------------------------------ |
 | `opencodeTui.nativeShellDefault` | string | `""`    | Default behavior for native shell switch (`""`, `"opencode"`, `"shell"`) |
 | `opencodeTui.tmuxSessionDefault` | string | `""`    | Default behavior for new tmux sessions (`""`, `"opencode"`, `"shell"`)   |
+| `opencodeTui.showTmuxWindowControls` | boolean | `true` | Show direct tmux session/window controls in the terminal toolbar          |
 
 ### Advanced Settings
 
@@ -377,7 +378,7 @@ src/
 
 ## Implementation Details
 
-Based on the excellent [vscode-sidebar-terminal](https://github.com/s-hiraoku/vscode-sidebar-terminal) extension, streamlined specifically for Open Sidebar Terminal:
+Based on the [vscode-sidebar-terminal](https://github.com/s-hiraoku/vscode-sidebar-terminal) extension, streamlined specifically for Open Sidebar Terminal:
 
 - **Terminal Backend**: node-pty for PTY support
 - **Terminal Frontend**: xterm.js with WebGL rendering

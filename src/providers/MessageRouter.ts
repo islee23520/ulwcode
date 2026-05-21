@@ -55,6 +55,7 @@ export interface MessageRouterProviderBridge {
     toolName: string,
     savePreference: boolean,
     targetPaneId?: string,
+    backendHint?: TerminalBackendType,
   ): Promise<void>;
   showAiToolSelector(
     sessionId: string,
@@ -163,14 +164,17 @@ export class MessageRouter {
           void this.provider.createTmuxSession();
         }
         break;
-      case "launchAiTool":
+      case "launchAiTool": {
+        const backendHint = this.provider.getActiveBackend();
         void this.provider.launchAiTool(
           message.sessionId,
           message.tool,
           message.savePreference,
           message.targetPaneId,
+          backendHint,
         );
         break;
+      }
       case "zoomTmuxPane":
         try {
           await this.provider.zoomTmuxPane();
@@ -416,14 +420,10 @@ export class MessageRouter {
     );
 
     const normalizedFiles = files.map((file) => {
-      // Normalize any URI-scheme string (file://, vscode-file://, etc.) to a
-      // filesystem path using vscode.Uri.parse so that outside-workspace
-      // absolute paths are preserved correctly before asRelativePath is called.
       if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(file)) {
         try {
           return vscode.Uri.parse(file).fsPath;
         } catch {
-          // fall through to raw value
         }
       }
       return file;

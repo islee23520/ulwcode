@@ -385,6 +385,7 @@ export type HostMessage =
       cursorStyle: "block" | "underline" | "bar";
       scrollback: number;
       sendKeybindingsToShell?: boolean;
+      showTmuxWindowControls?: boolean;
     }
   | {
       type: "activeSession";
@@ -445,4 +446,5 @@ export interface ExtensionConfig {
   codeActionSeverities: DiagnosticSeverity[];
   collapseSecondaryBarOnEditorOpen: boolean;
   terminalBackend: TerminalBackendType;
+  showTmuxWindowControls: boolean;
 }

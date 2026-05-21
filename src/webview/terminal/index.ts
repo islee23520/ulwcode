@@ -4,6 +4,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { readTerminalConfig } from "./config";
 import { createKeyboardHandler } from "./keyboard";
+import { copySelectionToClipboard } from "../clipboard";
 import {
   setupResizeHandling,
   setupVisibilityHandling,
@@ -21,6 +22,10 @@ export interface TerminalInstance {
 
 const MOUSE_ENABLE = "\x1b[?1000h\x1b[?1002h\x1b[?1006h";
 const MOUSE_DISABLE = "\x1b[?1000l\x1b[?1002l\x1b[?1006l";
+
+const isWindowsPlatform = (): boolean =>
+  typeof navigator !== "undefined" &&
+  /Windows|Win32|Win64/i.test(navigator.userAgent ?? "");
 
 export function initTerminal(
   container: HTMLElement,
@@ -50,6 +55,15 @@ export function initTerminal(
 
   const keyboardHandler = createKeyboardHandler({
     sendInput: (data) => options.onData(data),
+    requestPaste: () => postMessage({ type: "triggerPaste" }),
+    hasSelection: () => terminal.hasSelection(),
+    copySelection: () => {
+      const selection = terminal.getSelection();
+      if (selection) {
+        copySelectionToClipboard(selection);
+        terminal.clearSelection();
+      }
+    },
     sendKeybindingsToShell: config.sendKeybindingsToShell,
   });
   terminal.attachCustomKeyEventHandler(keyboardHandler.handler);
@@ -87,6 +101,19 @@ export function initTerminal(
   const refreshTerminal = () => terminal.refresh(0, terminal.rows - 1);
   container.addEventListener("focusin", refreshTerminal);
   container.addEventListener("click", refreshTerminal);
+  const wheelHandler = (event: WheelEvent) => {
+    if (!isWindowsPlatform() || event.ctrlKey || event.deltaY === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    terminal.scrollLines(event.deltaY > 0 ? 3 : -3);
+  };
+  container.addEventListener("wheel", wheelHandler, {
+    capture: true,
+    passive: false,
+  });
 
   const cleanupVisibility = setupVisibilityHandling(
     terminal,
@@ -150,6 +177,7 @@ export function initTerminal(
     cleanupVisibility();
     container.removeEventListener("focusin", refreshTerminal);
     container.removeEventListener("click", refreshTerminal);
+    container.removeEventListener("wheel", wheelHandler, true);
     window.removeEventListener("dragover", dragOverHandler);
     window.removeEventListener("dragleave", dragLeaveHandler);
     window.removeEventListener("drop", dropHandler);

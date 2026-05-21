@@ -270,7 +270,7 @@ describe("registerTerminalCommands", () => {
     getCommand(noProviderCommands, "opencodeTui.sendAtMention")();
 
     expect(noProviderDeps.outputChannel?.warn).toHaveBeenCalledWith(
-      "[DIAG:sendAtMention] skipped — provider=false editor=true",
+      "[DIAG:sendAtMention] skipped — provider=false",
     );
     expect(noProviderDeps.sendTerminalCwd).toHaveBeenCalledTimes(1);
     expect(noProviderDeps.sendPrompt).not.toHaveBeenCalled();
@@ -285,7 +285,7 @@ describe("registerTerminalCommands", () => {
     getCommand(noEditorCommands, "opencodeTui.sendAtMention")();
 
     expect(noEditorDeps.outputChannel?.warn).toHaveBeenCalledWith(
-      "[DIAG:sendAtMention] skipped — editor=false contextSharingService=true",
+      "[DIAG:sendAtMention] skipped — editor missing",
     );
     expect(noEditorDeps.sendTerminalCwd).toHaveBeenCalledTimes(1);
     expect(noEditorDeps.sendPrompt).not.toHaveBeenCalled();
@@ -522,5 +522,19 @@ describe("registerTerminalCommands", () => {
     );
     expect(deps.provider?.openInEditorTab).toHaveBeenCalledTimes(1);
     expect(deps.provider?.toggleEditorAttachment).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the executeCommand promise from opencodeTui.focus", () => {
+    const deps = createDependencies();
+    const commands = registerAndGetCommands(deps);
+    const focusCommand = getCommand(commands, "opencodeTui.focus");
+
+    vi.mocked(vscode.commands.executeCommand).mockResolvedValueOnce(true);
+
+    const result = focusCommand();
+
+    expect(result).toBeDefined();
+    expect(result).toBe(vi.mocked(vscode.commands.executeCommand).mock.results[0]?.value);
+    expect(result).toHaveProperty("then");
   });
 });

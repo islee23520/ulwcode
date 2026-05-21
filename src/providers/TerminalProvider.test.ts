@@ -67,6 +67,7 @@ describe("TerminalProvider", () => {
     defaultAiTool?: string;
     aiTools?: readonly unknown[];
     collapseSecondaryBarOnEditorOpen?: boolean;
+    promptAiToolOnSession?: boolean;
   }) {
     const {
       autoStartOnOpen = false,
@@ -74,6 +75,7 @@ describe("TerminalProvider", () => {
       defaultAiTool = "opencode",
       aiTools = DEFAULT_AI_TOOLS,
       collapseSecondaryBarOnEditorOpen = false,
+      promptAiToolOnSession = true,
     } = options ?? {};
 
     const configuration = {
@@ -98,6 +100,9 @@ describe("TerminalProvider", () => {
         }
         if (key === "collapseSecondaryBarOnEditorOpen") {
           return collapseSecondaryBarOnEditorOpen;
+        }
+        if (key === "promptAiToolOnSession") {
+          return promptAiToolOnSession;
         }
         return defaultValue;
       }),
@@ -1481,6 +1486,451 @@ describe("TerminalProvider", () => {
     });
   });
 
+  it("returns early without showing selector when forceShow and promptAiToolOnSession is disabled", () => {
+    mockConfiguration({ promptAiToolOnSession: false });
+    provider = createProvider();
+    const { view } = resolveProvider(provider);
+
+    vi.mocked(view.webview.postMessage).mockClear();
+
+    provider.showAiToolSelector("session-disabled", "Session Disabled", true);
+
+    expect(view.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "showAiToolSelector",
+      }),
+    );
+  });
+
+  it("queues forced AI selector messages until the terminal webview resolves", () => {
+    mockConfiguration({ defaultAiTool: "opencode" });
+    const instanceStore = new InstanceStore();
+    instanceStore.upsert({
+      config: {
+        id: "workspace-pending-selector",
+        workspaceUri: "file:///workspaces/repo-pending-selector",
+        selectedAiTool: "codex",
+      },
+      runtime: {
+        terminalKey: "workspace-pending-selector",
+        tmuxSessionId: "tmux-pending-selector",
+      },
+      state: "connected",
+    });
+
+    provider = createProvider({ instanceStore });
+    const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
+
+    provider.showAiToolSelector(
+      "repo-pending-selector",
+      "Repo Pending Selector",
+      true,
+      "%4",
+    );
+
+    expect(launchSpy).not.toHaveBeenCalled();
+
+    const { view } = resolveProvider(provider);
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith({
+      type: "showAiToolSelector",
+      sessionId: "tmux-pending-selector",
+      sessionName: "Repo Pending Selector",
+      defaultTool: undefined,
+      tools: DEFAULT_AI_TOOLS,
+      targetPaneId: "%4",
+    });
+  });
+
+  it("requeues AI selector messages when postMessage reports the webview hidden", async () => {
+    mockConfiguration({ defaultAiTool: "opencode" });
+    const instanceStore = new InstanceStore();
+    instanceStore.upsert({
+      config: {
+        id: "workspace-hidden-selector",
+        workspaceUri: "file:///workspaces/repo-hidden-selector",
+        selectedAiTool: "codex",
+      },
+      runtime: {
+        terminalKey: "workspace-hidden-selector",
+        tmuxSessionId: "tmux-hidden-selector",
+      },
+      state: "connected",
+    });
+
+    provider = createProvider({ instanceStore });
+    const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
+    const { view } = resolveProvider(provider);
+    const selectorMessage = {
+      type: "showAiToolSelector",
+      sessionId: "tmux-hidden-selector",
+      sessionName: "Repo Hidden Selector",
+      defaultTool: undefined,
+      tools: DEFAULT_AI_TOOLS,
+      targetPaneId: "%5",
+    };
+    vi.mocked(view.webview.postMessage).mockClear();
+    vi.mocked(view.webview.postMessage).mockReturnValue(false);
+
+    provider.showAiToolSelector(
+      "repo-hidden-selector",
+      "Repo Hidden Selector",
+      true,
+      "%5",
+    );
+
+    expect(launchSpy).not.toHaveBeenCalled();
+    expect(view.webview.postMessage).toHaveBeenCalledWith(selectorMessage);
+
+    const visibilityListener = vi.mocked(view.onDidChangeVisibility).mock
+      .calls[0]?.[0] as (() => void) | undefined;
+    expect(visibilityListener).toBeDefined();
+    view.visible = true;
+    visibilityListener?.();
+    await Promise.resolve();
+
+    expect(view.webview.postMessage).toHaveBeenCalledTimes(2);
+    expect(view.webview.postMessage).toHaveBeenLastCalledWith(selectorMessage);
+  });
+
+  it("requeues message when postMessage Thenable resolves to false", async () => {
+    mockConfiguration({ defaultAiTool: "opencode" });
+    const instanceStore = new InstanceStore();
+    instanceStore.upsert({
+      config: {
+        id: "workspace-thenable-selector",
+        workspaceUri: "file:///workspaces/repo-thenable-selector",
+        selectedAiTool: "codex",
+      },
+      runtime: {
+        terminalKey: "workspace-thenable-selector",
+        tmuxSessionId: "tmux-thenable-selector",
+      },
+      state: "connected",
+    });
+
+    provider = createProvider({ instanceStore });
+    const { view } = resolveProvider(provider);
+    view.visible = true;
+    const selectorMessage = {
+      type: "showAiToolSelector",
+      sessionId: "tmux-thenable-selector",
+      sessionName: "Repo Thenable Selector",
+      defaultTool: undefined,
+      tools: DEFAULT_AI_TOOLS,
+      targetPaneId: "%6",
+    };
+    vi.mocked(view.webview.postMessage).mockClear();
+    vi.mocked(view.webview.postMessage).mockResolvedValue(false);
+
+    provider.showAiToolSelector(
+      "repo-thenable-selector",
+      "Repo Thenable Selector",
+      true,
+      "%6",
+    );
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith(selectorMessage);
+    expect(provider["pendingWebviewMessages"]).toContainEqual(selectorMessage);
+  });
+
+  it("requeues Thenable selector messages without flushing when the webview is hidden", async () => {
+    mockConfiguration({ defaultAiTool: "opencode" });
+    const instanceStore = new InstanceStore();
+    instanceStore.upsert({
+      config: {
+        id: "workspace-thenable-hidden",
+        workspaceUri: "file:///workspaces/repo-thenable-hidden",
+        selectedAiTool: "codex",
+      },
+      runtime: {
+        terminalKey: "workspace-thenable-hidden",
+        tmuxSessionId: "tmux-thenable-hidden",
+      },
+      state: "connected",
+    });
+
+    provider = createProvider({ instanceStore });
+    const { view } = resolveProvider(provider);
+    view.visible = false;
+    const selectorMessage = {
+      type: "showAiToolSelector",
+      sessionId: "tmux-thenable-hidden",
+      sessionName: "Repo Thenable Hidden",
+      defaultTool: undefined,
+      tools: DEFAULT_AI_TOOLS,
+      targetPaneId: "%7",
+    };
+    vi.mocked(view.webview.postMessage).mockClear();
+    vi.mocked(view.webview.postMessage).mockReturnValue({
+      then: (resolve: (value: boolean) => void) => {
+        resolve(false);
+        return Promise.resolve(false);
+      },
+    } as Thenable<boolean>);
+
+    provider.showAiToolSelector(
+      "repo-thenable-hidden",
+      "Repo Thenable Hidden",
+      true,
+      "%7",
+    );
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith(selectorMessage);
+    expect(provider["pendingWebviewMessages"]).toContainEqual(selectorMessage);
+  });
+
+  it("flushes queued selector messages again when a boolean postMessage reports false", () => {
+    mockConfiguration({ defaultAiTool: "opencode" });
+    const instanceStore = new InstanceStore();
+    instanceStore.upsert({
+      config: {
+        id: "workspace-boolean-flush",
+        workspaceUri: "file:///workspaces/repo-boolean-flush",
+        selectedAiTool: "codex",
+      },
+      runtime: {
+        terminalKey: "workspace-boolean-flush",
+        tmuxSessionId: "tmux-boolean-flush",
+      },
+      state: "connected",
+    });
+
+    provider = createProvider({ instanceStore });
+    const { view } = resolveProvider(provider);
+    const selectorMessage: any = {
+      type: "showAiToolSelector",
+      sessionId: "tmux-boolean-flush",
+      sessionName: "Repo Boolean Flush",
+      defaultTool: undefined,
+      tools: DEFAULT_AI_TOOLS,
+      targetPaneId: "%8",
+    };
+    vi.mocked(view.webview.postMessage).mockClear();
+    vi.mocked(view.webview.postMessage).mockReturnValue(false);
+
+    provider["pendingWebviewMessages"].push(selectorMessage);
+    view.visible = true;
+
+    (provider as any).flushPendingWebviewMessages(view.webview);
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith(selectorMessage);
+    expect(provider["pendingWebviewMessages"]).toContainEqual(selectorMessage);
+  });
+
+  it("queues selector messages when no webview is attached", () => {
+    mockConfiguration({ defaultAiTool: "opencode" });
+    provider = createProvider();
+
+    (provider as any).postWebviewMessage({
+      type: "showAiToolSelector",
+      sessionId: "session-no-webview",
+      sessionName: "No Webview",
+      defaultTool: undefined,
+      tools: DEFAULT_AI_TOOLS,
+      targetPaneId: undefined,
+    });
+
+    expect(provider["pendingWebviewMessages"]).toContainEqual({
+      type: "showAiToolSelector",
+      sessionId: "session-no-webview",
+      sessionName: "No Webview",
+      defaultTool: undefined,
+      tools: DEFAULT_AI_TOOLS,
+      targetPaneId: undefined,
+    });
+  });
+
+  it("ignores non-selector messages when a boolean postMessage reports false", () => {
+    mockConfiguration();
+    provider = createProvider();
+    const { view } = resolveProvider(provider);
+    vi.mocked(view.webview.postMessage).mockReturnValue(false);
+
+    (provider as any).postWebviewMessage({ type: "output", text: "hello" });
+
+    expect(provider["pendingWebviewMessages"]).toHaveLength(0);
+  });
+
+  it("ignores non-selector messages when no webview is attached", () => {
+    mockConfiguration();
+    provider = createProvider();
+
+    (provider as any).postWebviewMessage({ type: "output", text: "hello" });
+
+    expect(provider["pendingWebviewMessages"]).toHaveLength(0);
+  });
+
+  it("ignores non-selector Thenable messages when the webview is hidden", () => {
+    mockConfiguration();
+    provider = createProvider();
+    const { view } = resolveProvider(provider);
+    view.visible = false;
+    vi.mocked(view.webview.postMessage).mockReturnValue({
+      then: (resolve: (value: boolean) => void) => {
+        resolve(false);
+        return Promise.resolve(false);
+      },
+    } as any);
+
+    (provider as any).postWebviewMessage({ type: "output", text: "hello" });
+
+    expect(provider["pendingWebviewMessages"]).toHaveLength(0);
+  });
+
+  it("ignores non-selector messages when flushing a false postMessage result", () => {
+    mockConfiguration();
+    provider = createProvider();
+    const { view } = resolveProvider(provider);
+    vi.mocked(view.webview.postMessage).mockReturnValue(false);
+
+    provider["pendingWebviewMessages"].push({ type: "output", text: "hello" } as any);
+    (provider as any).flushPendingWebviewMessages(view.webview);
+
+    expect(provider["pendingWebviewMessages"]).toHaveLength(0);
+  });
+
+  it("requeues selector messages again when flush sees a Thenable false result", () => {
+    mockConfiguration();
+    provider = createProvider();
+    const { view } = resolveProvider(provider);
+    const selectorMessage = {
+      type: "showAiToolSelector",
+      sessionId: "tmux-flush-thenable",
+      sessionName: "Flush Thenable",
+      defaultTool: undefined,
+      tools: DEFAULT_AI_TOOLS,
+      targetPaneId: "%10",
+    };
+    provider["pendingWebviewMessages"].push(selectorMessage as any);
+    vi.mocked(view.webview.postMessage).mockReturnValue({
+      then: (resolve: (value: boolean) => void) => {
+        resolve(false);
+        return Promise.resolve(false);
+      },
+    } as any);
+
+    (provider as any).flushPendingWebviewMessages(view.webview);
+
+    expect(provider["pendingWebviewMessages"]).toContainEqual(selectorMessage);
+  });
+
+  it("does not requeue selector messages when flush sees a Thenable true result", () => {
+    mockConfiguration();
+    provider = createProvider();
+    const { view } = resolveProvider(provider);
+    const selectorMessage = {
+      type: "showAiToolSelector",
+      sessionId: "tmux-flush-thenable-true",
+      sessionName: "Flush Thenable True",
+      defaultTool: undefined,
+      tools: DEFAULT_AI_TOOLS,
+      targetPaneId: "%11",
+    };
+    provider["pendingWebviewMessages"].push(selectorMessage as any);
+    vi.mocked(view.webview.postMessage).mockReturnValue({
+      then: (resolve: (value: boolean) => void) => {
+        resolve(true);
+        return Promise.resolve(true);
+      },
+    } as any);
+
+    (provider as any).flushPendingWebviewMessages(view.webview);
+
+    expect(provider["pendingWebviewMessages"]).toHaveLength(0);
+  });
+
+  it("routes AI tool launches to tmux when an instance is tmux mapped", async () => {
+    mockConfiguration();
+    const instanceStore = new InstanceStore();
+    instanceStore.upsert({
+      config: {
+        id: "workspace-tmux-launch-route",
+        workspaceUri: "file:///workspaces/repo-tmux-launch-route",
+      },
+      runtime: {
+        terminalKey: "workspace-tmux-launch-route",
+        tmuxSessionId: "tmux-session-x",
+      },
+      state: "connected",
+    });
+    const listPanes = vi
+      .fn()
+      .mockResolvedValue([{ paneId: "%42", isActive: true }]);
+    const sendTextToPane = vi.fn().mockResolvedValue(undefined);
+    const tmuxSessionManager = {
+      listPanes,
+      sendTextToPane,
+    } as unknown as TmuxSessionManager;
+    const zellijSessionManager = {
+      switchSession: vi.fn(),
+      selectPane: vi.fn(),
+      sendTextToPane: vi.fn(),
+    } as any;
+
+    provider = createProvider({
+      instanceStore,
+      tmuxSessionManager,
+      zellijSessionManager,
+    });
+
+    await provider.launchAiTool("tmux-session-x", "codex", false, "%42");
+
+    expect(sendTextToPane).toHaveBeenCalledWith("%42", "codex");
+    expect(zellijSessionManager.switchSession).not.toHaveBeenCalled();
+    expect(zellijSessionManager.selectPane).not.toHaveBeenCalled();
+    expect(zellijSessionManager.sendTextToPane).not.toHaveBeenCalled();
+  });
+
+  it("switches to the target zellij session before launching into a pane", async () => {
+    mockConfiguration();
+    const instanceStore = new InstanceStore();
+    instanceStore.upsert({
+      config: {
+        id: "workspace-zellij-launch-route",
+        workspaceUri: "file:///workspaces/repo-zellij-launch-route",
+      },
+      runtime: {
+        terminalKey: "workspace-zellij-launch-route",
+        zellijSessionId: "zellij-target",
+      },
+      state: "connected",
+    });
+    const switchSession = vi.fn().mockResolvedValue(undefined);
+    const selectPane = vi.fn().mockResolvedValue(undefined);
+    const sendTextToPane = vi.fn().mockResolvedValue(undefined);
+    const zellijSessionManager = {
+      isAvailable: vi.fn().mockResolvedValue(true),
+      switchSession,
+      selectPane,
+      sendTextToPane,
+    } as any;
+
+    provider = createProvider({ instanceStore, zellijSessionManager });
+    vi.spyOn((provider as any).sessionRuntime, "getActiveBackend").mockReturnValue("zellij");
+
+    await provider.launchAiTool("zellij-target", "opencode", false, "pane-7");
+
+    expect(switchSession).toHaveBeenCalledWith("zellij-target");
+    expect(selectPane).toHaveBeenCalledWith("pane-7");
+    expect(sendTextToPane).toHaveBeenCalledWith("opencode -c", {
+      submit: true,
+    });
+    expect(switchSession.mock.invocationCallOrder[0]).toBeLessThan(
+      selectPane.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+    expect(switchSession.mock.invocationCallOrder[0]).toBeLessThan(
+      sendTextToPane.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+  });
+
   it("launches AI tools against the normalized tmux session and active pane", async () => {
     const configuration = mockConfiguration();
     const instanceStore = new InstanceStore();
@@ -1647,6 +2097,24 @@ describe("TerminalProvider", () => {
 
     expect(zellijSelectPane).toHaveBeenCalledWith("terminal_5");
     expect(zellijSendTextToPane).toHaveBeenCalledWith("codex", { submit: true });
+  });
+
+  it("honors the explicit backendHint when launching an AI tool", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    const warnSpy = vi.spyOn((provider as any).logger, "warn");
+
+    await provider.launchAiTool(
+      "session-backend-hint",
+      "codex",
+      false,
+      undefined,
+      "native",
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("backend native does not support pane targeting"),
+    );
   });
 
   it("executeRawTmuxCommand rejects when active backend is not tmux", async () => {

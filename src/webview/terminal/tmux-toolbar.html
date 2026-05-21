@@ -1,6 +1,44 @@
 <div id="tmux-toolbar" class="tmux-toolbar hidden">
   <span id="tmux-session-label" class="tmux-session-label"></span>
   <div class="toolbar-controls">
+    <div class="tmux-window-controls" data-tmux-window-controls>
+      <button
+        type="button"
+        id="btn-tmux-new-session"
+        class="tmux-btn tmux-btn--primary"
+        aria-label="Create tmux session"
+        title="New tmux session"
+      >
+        +S
+      </button>
+      <button
+        type="button"
+        id="btn-tmux-prev-window"
+        class="tmux-btn"
+        aria-label="Previous tmux window"
+        title="Previous tmux window"
+      >
+        ‹
+      </button>
+      <button
+        type="button"
+        id="btn-tmux-new-window"
+        class="tmux-btn tmux-btn--primary"
+        aria-label="Create tmux window"
+        title="New tmux window"
+      >
+        +W
+      </button>
+      <button
+        type="button"
+        id="btn-tmux-next-window"
+        class="tmux-btn"
+        aria-label="Next tmux window"
+        title="Next tmux window"
+      >
+        ›
+      </button>
+    </div>
     <div class="tmux-command-menu">
       <button
         type="button"

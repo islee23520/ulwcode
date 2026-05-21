@@ -39,10 +39,21 @@ html {
   display: none;
   align-items: center;
   gap: 2px;
+  flex-shrink: 0;
 }
 
 .toolbar-controls:not(.hidden) {
   display: flex;
+}
+
+.tmux-window-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tmux-window-controls.hidden {
+  display: none;
 }
 
 .toolbar-right {
@@ -71,6 +82,11 @@ html {
 
 .tmux-btn:active {
   background: var(--vscode-toolbar-activeBackground, rgba(255, 255, 255, 0.12));
+}
+
+.tmux-btn--primary {
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 .tmux-btn:disabled {
