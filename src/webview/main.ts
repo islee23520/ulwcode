@@ -230,6 +230,11 @@ function initApp(): void {
         tabBar.addTab(paneId, `Terminal ${paneId}`);
       }
     }
+    if (msg && msg.type === "paneBackendChanged" && "paneId" in msg) {
+      const paneId = msg.paneId as string;
+      const backend = msg.backend as TerminalBackendType;
+      paneManager.setBackend(paneId, backend);
+    }
     if (msg && msg.type === "paneDelete" && "paneId" in msg) {
       const paneId = msg.paneId as string;
       paneManager.disposePane(paneId);
