@@ -19,7 +19,9 @@ export class TmuxPaneSyncService {
    */
   async listPanes(sessionId: string): Promise<TmuxPaneInfo[]> {
     const output = await this.tmux.executeRawCommand(
-      `list-panes -t ${sessionId} -F '#{pane_id}:#{pane_index}:#{pane_width}:#{pane_height}:#{pane_current_command}:#{pane_active}'`
+      sessionId,
+      "list-panes",
+      ["-F", "#{pane_id}:#{pane_index}:#{pane_width}:#{pane_height}:#{pane_current_command}:#{pane_active}"]
     );
     if (!output || output.trim() === "") {
       return [];
@@ -37,7 +39,9 @@ export class TmuxPaneSyncService {
   ): Promise<string> {
     const flag = direction === "horizontal" ? "-h" : "-v";
     const output = await this.tmux.executeRawCommand(
-      `split-pane ${flag} -P -F '#{pane_id}' -t ${tmuxPaneId}`
+      tmuxPaneId,
+      "split-pane",
+      [flag, "-P", "-F", "#{pane_id}"]
     );
     const newPaneId = output?.trim();
     if (!newPaneId) {
@@ -50,7 +54,7 @@ export class TmuxPaneSyncService {
    * Kill a tmux pane
    */
   async killPane(tmuxPaneId: string): Promise<void> {
-    await this.tmux.executeRawCommand(`kill-pane -t ${tmuxPaneId}`);
+    await this.tmux.executeRawCommand(tmuxPaneId, "kill-pane");
   }
 
   /**

@@ -35,7 +35,9 @@ describe("TmuxPaneSyncService", () => {
         { tmuxPaneId: "%1", index: 1, width: 80, height: 24, command: "vim", active: false },
       ]);
       expect(mockTmux.executeRawCommand).toHaveBeenCalledWith(
-        expect.stringContaining("list-panes -t my-session")
+        "my-session",
+        "list-panes",
+        expect.any(Array)
       );
     });
 
@@ -58,7 +60,9 @@ describe("TmuxPaneSyncService", () => {
       const newId = await service.splitPane("%0", "horizontal");
       expect(newId).toBe("%2");
       expect(mockTmux.executeRawCommand).toHaveBeenCalledWith(
-        expect.stringContaining("split-pane -h")
+        "%0",
+        "split-pane",
+        expect.arrayContaining(["-h"])
       );
     });
 
@@ -67,7 +71,9 @@ describe("TmuxPaneSyncService", () => {
       const newId = await service.splitPane("%1", "vertical");
       expect(newId).toBe("%3");
       expect(mockTmux.executeRawCommand).toHaveBeenCalledWith(
-        expect.stringContaining("split-pane -v")
+        "%1",
+        "split-pane",
+        expect.arrayContaining(["-v"])
       );
     });
 
@@ -84,7 +90,8 @@ describe("TmuxPaneSyncService", () => {
       mockTmux.executeRawCommand.mockResolvedValue("");
       await service.killPane("%1");
       expect(mockTmux.executeRawCommand).toHaveBeenCalledWith(
-        "kill-pane -t %1"
+        "%1",
+        "kill-pane"
       );
     });
   });

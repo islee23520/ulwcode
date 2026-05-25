@@ -29,6 +29,9 @@ const TMUX_RAW_ALLOWED_SUBCOMMANDS = [
   "move-pane",
   "respawn-pane",
   "choose-tree",
+  "list-panes",
+  "split-pane",
+  "kill-pane",
 ] as const;
 
 type TmuxRawAllowedSubcommand = (typeof TMUX_RAW_ALLOWED_SUBCOMMANDS)[number];
@@ -1197,6 +1200,11 @@ export class TmuxSessionManager {
       case "clear-history":
       case "detach-client":
       case "choose-tree":
+        return [tmuxSubcommand, "-t", sessionId];
+      case "list-panes":
+      case "split-pane":
+        return [tmuxSubcommand, "-t", sessionId, ...args];
+      case "kill-pane":
         return [tmuxSubcommand, "-t", sessionId];
     }
   }

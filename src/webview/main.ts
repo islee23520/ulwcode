@@ -154,7 +154,7 @@ function initApp(): void {
     messageHandler.fitAddon = instance.fitAddon;
   }
 
-  const multiPaneContainer = document.getElementById("multi-pane-container") ?? container;
+  const multiPaneContainer = document.getElementById("terminal-layout-root") ?? container;
   const paneManager = new PaneManager();
   paneManager.init(multiPaneContainer);
   const paneRouter = new PaneMessageRouter();
