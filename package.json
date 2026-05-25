@@ -578,6 +578,28 @@
           "type": "boolean",
           "default": true,
           "description": "Show the AI tool selector popup when attaching to or creating a tmux/zellij session"
+        },
+        "opencodeTui.pane.defaultSplitDirection": {
+          "type": "string",
+          "default": "horizontal",
+          "enum": ["horizontal", "vertical"],
+          "description": "Default direction when splitting a terminal pane"
+        },
+        "opencodeTui.pane.focusOnClick": {
+          "type": "boolean",
+          "default": true,
+          "description": "Focus a pane when clicking on it"
+        },
+        "opencodeTui.pane.showPaneActions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show pane action buttons (split, close) in the terminal"
+        },
+        "opencodeTui.pane.renderer": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["webgl", "canvas", "auto"],
+          "description": "Terminal renderer: webgl (fast), canvas (fallback), or auto (webgl up to 4 panes, then canvas)"
         }
       }
     }
