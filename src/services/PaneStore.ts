@@ -182,7 +182,6 @@ export class PaneStore extends EventEmitter {
       throw new Error(`Cannot activate pane: unknown id '${paneId}'`);
     }
 
-    const previousPaneId = this.activePaneId;
     const previousTabId = this.activeTabId;
 
     for (const pane of this.panes.values()) {

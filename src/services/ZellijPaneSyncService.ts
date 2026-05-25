@@ -3,6 +3,8 @@ import { promisify } from "node:util";
 
 const execAsync = promisify(exec);
 
+let paneIdCounter = 0;
+
 export interface ZellijPaneInfo {
   paneId: string;
   title: string;
@@ -11,8 +13,7 @@ export interface ZellijPaneInfo {
 }
 
 export class ZellijPaneSyncService {
-  dispose(): void {
-  }
+  dispose(): void { /* No-op: stateless service, child_process handles cleanup */ }
 
   /**
    * List zellij panes for a session using zellij CLI
@@ -23,7 +24,6 @@ export class ZellijPaneSyncService {
     try {
       // zellij doesn't have a direct "list-panes" command like tmux
       // We use `zellij action list-tabs` or parse the layout
-      // For now, use a simplified approach with zellij run --list-sessions
       const { stdout } = await execAsync("zellij list-sessions 2>/dev/null || echo ''");
       if (!stdout.trim()) {
         return [];
@@ -33,7 +33,6 @@ export class ZellijPaneSyncService {
         return [];
       }
       // Return a basic pane representation
-      // In production, this would use zellij plugin API or layout parsing
       return [{ paneId: "main", title: sessionName ?? "default", isFloating: false, isFullscreen: false }];
     } catch {
       return [];
@@ -50,7 +49,7 @@ export class ZellijPaneSyncService {
     if (stdout.includes("error")) {
       throw new Error("Failed to split zellij pane");
     }
-    return `pane-${Date.now()}`;
+    return `zellij-pane-${++paneIdCounter}`;
   }
 
   /**

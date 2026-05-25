@@ -64,6 +64,7 @@ export class TerminalProvider
     ]),
     private readonly nativeTerminalManager?: NativeTerminalManager,
     private readonly tmuxPaneSyncService?: TmuxPaneSyncService,
+    // zellijPaneSyncService: reserved for Phase 3 zellij pane sync operations
     private readonly zellijPaneSyncService?: ZellijPaneSyncService,
   ) {
     this.contextSharingService = new ContextSharingService();

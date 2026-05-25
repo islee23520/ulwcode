@@ -1,6 +1,5 @@
 // src/services/TmuxPaneSyncService.ts
 import type { TmuxSessionManager } from "./TmuxSessionManager";
-import type { TerminalBackendType } from "../types";
 
 export interface TmuxPaneInfo {
   tmuxPaneId: string; // e.g. "%0"
@@ -14,8 +13,7 @@ export interface TmuxPaneInfo {
 export class TmuxPaneSyncService {
   constructor(private readonly tmux: TmuxSessionManager) {}
 
-  dispose(): void {
-  }
+  dispose(): void { /* No-op: TmuxSessionManager owns its own lifecycle */ }
 
   /**
    * List tmux panes for a session, parsing tmux list-panes output

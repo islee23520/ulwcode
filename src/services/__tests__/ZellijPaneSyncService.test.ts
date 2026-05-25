@@ -66,7 +66,7 @@ describe("ZellijPaneSyncService", () => {
     it("splits horizontally", async () => {
       mockExecResult("ok");
       const paneId = await service.splitPane("horizontal");
-      expect(paneId).toMatch(/^pane-\d+$/);
+      expect(paneId).toMatch(/^zellij-pane-\d+$/);
       expect(mockExec).toHaveBeenCalledWith(
         expect.stringContaining("new-pane --right"),
         expect.any(Function)
@@ -76,7 +76,7 @@ describe("ZellijPaneSyncService", () => {
     it("splits vertically", async () => {
       mockExecResult("ok");
       const paneId = await service.splitPane("vertical");
-      expect(paneId).toMatch(/^pane-\d+$/);
+      expect(paneId).toMatch(/^zellij-pane-\d+$/);
       expect(mockExec).toHaveBeenCalledWith(
         expect.stringContaining("new-pane --down"),
         expect.any(Function)
