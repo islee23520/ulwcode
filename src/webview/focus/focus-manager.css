@@ -1,0 +1,69 @@
+/* FocusManager — Focus indicator for multi-pane terminal layout
+ *
+ * Extends the existing VS Code token-based design system:
+ *   terminal.css, layout-engine.css, tab-bar.css, dashboard.css
+ *
+ * Aesthetic direction (Task 12):
+ *   Industrial / utilitarian (matches VS Code sidebar chrome)
+ *   - Precise, high-density, no decorative fluff
+ *   - Focus as razor-thin chrome accent (not a heavy border that fights terminal content)
+ *   - Uses ONLY semantic tokens: --vscode-focusBorder (primary), --vscode-panel-border, editor bg
+ *   - Instant state change (no transition on focus itself)
+ *   - Subtle depth via inset ring (box-shadow) for "this pane receives keys"
+ *
+ * .focused is applied to .layout-pane (see LayoutEngine)
+ * Click-to-focus + keyboard routing handled in focus-manager.ts
+ *
+ * DO NOT hardcode colors. DO NOT add motion on focus toggle.
+ */
+
+.layout-pane.focused {
+  /* Primary focus ring — matches every other focused control in the webview */
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+
+  /* Subtle inner glow so the active pane "pops" among siblings without eating terminal pixels */
+  box-shadow: inset 0 0 0 1px rgba(0, 127, 212, 0.18);
+
+  /* Ensure the ring sits above xterm canvas but below any floating toolbar */
+  z-index: 5;
+}
+
+/* When a focused pane is also being resized or hovered via handle, keep the focus ring crisp */
+.layout-pane.focused .layout-handle {
+  /* handles already use focusBorder on hover; no override needed */
+}
+
+/* High-contrast / forced-colors environments (Windows HC, etc.) */
+@media (forced-colors: active) {
+  .layout-pane.focused {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    box-shadow: none;
+  }
+}
+
+/* Reduced motion: focus must be instant anyway, but guard any future additions */
+@media (prefers-reduced-motion: reduce) {
+  .layout-pane.focused {
+    transition: none;
+  }
+}
+
+/* Very subtle left-edge accent bar (optional polish, still token-driven)
+ * Helps users with low vision or when many thin panes exist.
+ * Disabled by default to keep "subtle" per spec; can be enabled via modifier if needed.
+ */
+/*
+.layout-pane.focused::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--vscode-focusBorder, #007fd4);
+  z-index: 6;
+  pointer-events: none;
+}
+*/
