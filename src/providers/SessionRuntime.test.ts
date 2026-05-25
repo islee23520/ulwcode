@@ -283,6 +283,34 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     ).activeBackend = backend;
   };
 
+  const registerDefaultSession = (overrides?: {
+    instanceId?: string;
+    terminalKey?: string;
+    tmuxSessionId?: string;
+    zellijSessionId?: string;
+    backend?: TerminalBackendType;
+  }): void => {
+    (
+      sessionRuntime as unknown as {
+        registerSession: (session: {
+          paneId: string;
+          instanceId: string;
+          terminalKey: string;
+          tmuxSessionId?: string;
+          zellijSessionId?: string;
+          backend: TerminalBackendType;
+        }) => void;
+      }
+    ).registerSession({
+      paneId: "default",
+      instanceId: overrides?.instanceId ?? "default",
+      terminalKey: overrides?.terminalKey ?? "default",
+      tmuxSessionId: overrides?.tmuxSessionId,
+      zellijSessionId: overrides?.zellijSessionId,
+      backend: overrides?.backend ?? "native",
+    });
+  };
+
   describe("checkPaneChanges", () => {
     it("falls back to discovered sessions and posts active session metadata", async () => {
       setActiveBackend("tmux");
@@ -451,6 +479,10 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       const switchSpy = vi
         .spyOn(sessionRuntime, "switchToTmuxSessionWithTool")
         .mockResolvedValue();
+      registerDefaultSession({
+        tmuxSessionId: "workspace-session",
+        backend: "tmux",
+      });
 
       sessionRuntime.reconnectListeners();
       expect(exitHandler).toBeDefined();
@@ -482,6 +514,10 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       const nativeShellSpy = vi
         .spyOn(sessionRuntime, "switchToNativeShell")
         .mockResolvedValue();
+      registerDefaultSession({
+        tmuxSessionId: "workspace-session",
+        backend: "tmux",
+      });
 
       sessionRuntime.reconnectListeners();
       expect(exitHandler).toBeDefined();
@@ -2330,6 +2366,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         dataHandler = handler;
         return { dispose: vi.fn() };
       });
+      registerDefaultSession();
 
       sessionRuntime.reconnectListeners();
       dataHandler?.({ id: "other", data: "ignored" });
@@ -2344,9 +2381,12 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     });
 
     it("restarts by killing the active terminal and requesting a fresh launch", () => {
+      registerDefaultSession();
+
       sessionRuntime.restart();
 
       expect(mockTerminalManager.killTerminal).toHaveBeenCalledWith("default");
+      expect(mockTerminalManager.killByInstance).toHaveBeenCalledWith("default");
       expect(postMessageMock).toHaveBeenCalledWith({ type: "clearTerminal" });
       expect(requestStartOpenCodeMock).toHaveBeenCalled();
     });
@@ -3346,6 +3386,10 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       vi.spyOn(sessionRuntime, "switchToNativeShell").mockRejectedValue(
         new Error("native failed"),
       );
+      registerDefaultSession({
+        tmuxSessionId: "workspace-session",
+        backend: "tmux",
+      });
 
       sessionRuntime.reconnectListeners();
       exitHandler?.("default");

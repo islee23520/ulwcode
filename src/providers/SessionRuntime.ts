@@ -9,6 +9,7 @@ import { OutputChannelService } from "../services/OutputChannelService";
 import { InstanceId, InstanceStore } from "../services/InstanceStore";
 import {
   AiToolConfig,
+  PaneConfig,
   resolveAiToolConfigs,
   TerminalBackendType,
 } from "../types";
@@ -21,7 +22,10 @@ import { TerminalManager } from "../terminals/TerminalManager";
 import { AiToolOperatorRegistry } from "../services/aiTools/AiToolOperatorRegistry";
 import { ZellijSessionManager } from "../services/ZellijSessionManager";
 import { TerminalBackendRegistry } from "../services/terminalBackends";
-import type { BackendLaunchPlan } from "../services/terminalBackends";
+import type {
+  BackendLaunchPlan,
+  BackendSessionState,
+} from "../services/terminalBackends";
 import { NativeTerminalManager } from "../services/NativeTerminalManager";
 
 interface StartupWorkspaceResolution {
@@ -40,8 +44,20 @@ interface SessionRuntimeCallbacks {
   ) => void;
 }
 
+export interface SessionState {
+  paneId: string;
+  instanceId: InstanceId;
+  terminalKey: string;
+  port?: number;
+  backendState?: BackendSessionState;
+  tmuxSessionId?: string;
+  zellijSessionId?: string;
+  backend: TerminalBackendType;
+}
+
 export class SessionRuntime {
   private static readonly LEGACY_TERMINAL_ID: InstanceId = "opencode-main";
+  private static readonly DEFAULT_PANE_ID = "default";
 
   private activeInstanceId: InstanceId = "default";
   private isStarted = false;
@@ -72,6 +88,7 @@ export class SessionRuntime {
   private externalChangeListener?: vscode.Disposable;
   private paneMonitorInterval?: ReturnType<typeof setInterval>;
   private readonly tmuxSessionsCreatedForStartup = new Set<string>();
+  private readonly sessions = new Map<string, SessionState>();
 
   public constructor(
     private readonly terminalManager: TerminalManager,
@@ -100,7 +117,10 @@ export class SessionRuntime {
   }
 
   public getActiveTerminalId(): string {
-    return this.resolveTerminalIdForInstance(this.activeInstanceId);
+    return (
+      this.sessions.get(SessionRuntime.DEFAULT_PANE_ID)?.terminalKey ??
+      this.resolveTerminalIdForInstance(this.activeInstanceId)
+    );
   }
 
   public getLastKnownTerminalSize(): { cols: number; rows: number } {
@@ -213,6 +233,128 @@ export class SessionRuntime {
     );
   }
 
+  public getSession(paneId: string): SessionState | undefined {
+    const session = this.sessions.get(this.normalizePaneId(paneId));
+    return session ? { ...session } : undefined;
+  }
+
+  public async createSession(
+    paneId: string,
+    config: PaneConfig,
+  ): Promise<SessionState | undefined> {
+    const normalizedPaneId = this.normalizePaneId(paneId);
+    if (normalizedPaneId === SessionRuntime.DEFAULT_PANE_ID) {
+      return this.startDefaultSession();
+    }
+
+    const existing = this.sessions.get(normalizedPaneId);
+    if (existing) {
+      return { ...existing };
+    }
+
+    const requestedBackend = config.backend ?? "native";
+    const backend = this.backendRegistry.resolveAvailable(requestedBackend);
+    if (backend !== "native") {
+      throw new Error(
+        `Multi-session is only supported for the native backend (pane=${normalizedPaneId}, backend=${backend})`,
+      );
+    }
+
+    const workspaceConfig = vscode.workspace.getConfiguration("opencodeTui");
+    const enableHttpApi = workspaceConfig.get<boolean>("enableHttpApi", true);
+    const workspacePath =
+      config.cwd ?? this.resolveStartupWorkspacePath().workspacePath;
+    const instanceId = this.createPaneInstanceId(normalizedPaneId);
+
+    const resolvedTool = this.activeTool ?? this.resolveStoredTool();
+    const operator = resolvedTool
+      ? this.aiToolRegistry.getForConfig(resolvedTool)
+      : undefined;
+    const command =
+      config.command ??
+      (resolvedTool && operator
+        ? operator.getLaunchCommand(resolvedTool)
+        : undefined);
+
+    let nativeLaunchPlan: BackendLaunchPlan | undefined;
+    if (this.nativeTerminalManager && command) {
+      nativeLaunchPlan = this.nativeTerminalManager.create(instanceId, {
+        command,
+        args: resolvedTool?.args,
+        cwd: workspacePath,
+      });
+    }
+
+    let port: number | undefined;
+    if (
+      enableHttpApi &&
+      command !== undefined &&
+      resolvedTool &&
+      operator?.supportsHttpApi(resolvedTool)
+    ) {
+      try {
+        port = this.portManager.assignPortToTerminal(instanceId);
+      } catch (error) {
+        this.logger.error(
+          `[TerminalProvider] Failed to assign port for pane ${normalizedPaneId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    this.terminalManager.createTerminal(
+      normalizedPaneId,
+      command,
+      port
+        ? {
+            _EXTENSION_OPENCODE_PORT: port.toString(),
+            OPENCODE_CALLER: "vscode",
+          }
+        : {},
+      port,
+      this.lastKnownCols || undefined,
+      this.lastKnownRows || undefined,
+      instanceId,
+      workspacePath,
+    );
+
+    const sessionState = this.registerSession({
+      paneId: normalizedPaneId,
+      instanceId,
+      terminalKey: normalizedPaneId,
+      port,
+      backendState: nativeLaunchPlan?.state,
+      backend,
+    });
+
+    if (!this.dataListener || !this.exitListener) {
+      this.reconnectListeners();
+    }
+
+    return sessionState;
+  }
+
+  public destroySession(paneId: string): void {
+    const normalizedPaneId = this.normalizePaneId(paneId);
+    const session = this.sessions.get(normalizedPaneId);
+    if (!session) {
+      return;
+    }
+
+    this.terminalManager.killByInstance(session.instanceId);
+    this.terminalManager.killTerminal(session.terminalKey);
+    this.removeSessionState(session, true);
+
+    if (normalizedPaneId === SessionRuntime.DEFAULT_PANE_ID) {
+      this.disposeListeners();
+      this.isStarted = false;
+      this.isStarting = false;
+      this.httpAvailable = false;
+      this.apiClient = undefined;
+      this.activeTool = undefined;
+      this.autoContextSent = false;
+    }
+  }
+
   public async switchToInstance(
     instanceId: InstanceId,
     options?: { forceRestart?: boolean; preferredToolName?: string },
@@ -283,8 +425,22 @@ export class SessionRuntime {
   }
 
   public async startOpenCode(): Promise<void> {
+    await this.createSession(SessionRuntime.DEFAULT_PANE_ID, {
+      paneId: SessionRuntime.DEFAULT_PANE_ID,
+      backend: this.activeBackend,
+    });
+  }
+
+  private async startDefaultSession(): Promise<SessionState | undefined> {
     if (this.isStarted || this.isStarting) {
-      return;
+      return (
+        this.getSession(SessionRuntime.DEFAULT_PANE_ID) ?? {
+          paneId: SessionRuntime.DEFAULT_PANE_ID,
+          instanceId: this.activeInstanceId,
+          terminalKey: this.getActiveTerminalId(),
+          backend: this.activeBackend,
+        }
+      );
     }
 
     this.isStarting = true;
@@ -501,6 +657,17 @@ export class SessionRuntime {
         workspacePath,
       );
 
+      const sessionState = this.registerSession({
+        paneId: SessionRuntime.DEFAULT_PANE_ID,
+        instanceId: this.activeInstanceId,
+        terminalKey: this.activeInstanceId,
+        port,
+        backendState: nativeLaunchPlan?.state,
+        tmuxSessionId,
+        zellijSessionId,
+        backend: this.activeBackend,
+      });
+
       if (this.instanceStore) {
         try {
           const existing = this.instanceStore.get(this.activeInstanceId);
@@ -572,6 +739,8 @@ export class SessionRuntime {
         );
         this.httpAvailable = false;
       }
+
+      return sessionState;
     } finally {
       this.isStarting = false;
     }
@@ -602,7 +771,7 @@ export class SessionRuntime {
 
   public restart(): void {
     this.disposeListeners();
-    this.terminalManager.killTerminal(this.getActiveTerminalId());
+    this.destroySession(SessionRuntime.DEFAULT_PANE_ID);
     this.resetState();
 
     this.callbacks.postMessage({ type: "clearTerminal" });
@@ -617,9 +786,11 @@ export class SessionRuntime {
     this.apiClient = undefined;
     this.activeTool = undefined;
     this.autoContextSent = false;
-    if (releasePorts) {
-      this.portManager.releaseTerminalPorts(this.activeInstanceId);
+    const defaultSession = this.sessions.get(SessionRuntime.DEFAULT_PANE_ID);
+    if (releasePorts && defaultSession) {
+      this.portManager.releaseTerminalPorts(defaultSession.instanceId);
     }
+    this.sessions.delete(SessionRuntime.DEFAULT_PANE_ID);
   }
 
   public disposeListeners(): void {
@@ -637,19 +808,31 @@ export class SessionRuntime {
     this.disposeListeners();
 
     this.dataListener = this.terminalManager.onData((event) => {
-      if (event.id === this.activeInstanceId) {
-        this.callbacks.postMessage({
-          type: "terminalOutput",
-          data: event.data,
-        });
+      const session = this.findSessionByTerminalKey(event.id);
+      if (!session) {
+        return;
       }
+      this.callbacks.postMessage(
+        this.withPaneId(
+          {
+            type: "terminalOutput",
+            data: event.data,
+          },
+          session.paneId,
+        ),
+      );
     });
 
     this.exitListener = this.terminalManager.onExit((id) => {
-      if (id === this.activeInstanceId) {
+      const session = this.findSessionByTerminalKey(id);
+      if (!session) {
+        return;
+      }
+
+      if (session.paneId === SessionRuntime.DEFAULT_PANE_ID) {
         const exitedTmuxSessionId =
           this.selectedTmuxSessionId ??
-          this.resolveTmuxSessionIdForInstance(this.activeInstanceId);
+          this.resolveTmuxSessionIdForInstance(session.instanceId);
 
         if (exitedTmuxSessionId && this.isStarted) {
           void this.restoreAfterAttachedTmuxSessionExit(exitedTmuxSessionId);
@@ -660,7 +843,13 @@ export class SessionRuntime {
         this.callbacks.postMessage({
           type: "terminalExited",
         });
+        return;
       }
+
+      this.removeSessionState(session, true);
+      this.callbacks.postMessage(
+        this.withPaneId({ type: "terminalExited" }, session.paneId),
+      );
     });
   }
 
@@ -1879,9 +2068,61 @@ export class SessionRuntime {
     this.disposeListeners();
     this.activeInstanceSubscription?.dispose();
     this.activeInstanceSubscription = undefined;
-    if (this.isStarted) {
-      this.terminalManager.killTerminal(this.getActiveTerminalId());
+    for (const session of this.sessions.values()) {
+      this.terminalManager.killByInstance(session.instanceId);
+      this.terminalManager.killTerminal(session.terminalKey);
+      this.portManager.releaseTerminalPorts(session.instanceId);
     }
+    this.sessions.clear();
+  }
+
+  private normalizePaneId(paneId: string | undefined): string {
+    return paneId || SessionRuntime.DEFAULT_PANE_ID;
+  }
+
+  private createPaneInstanceId(paneId: string): InstanceId {
+    if (paneId === SessionRuntime.DEFAULT_PANE_ID) {
+      return this.activeInstanceId;
+    }
+    return `${this.activeInstanceId}::${paneId}`;
+  }
+
+  private registerSession(session: SessionState): SessionState {
+    const snapshot = { ...session };
+    this.sessions.set(session.paneId, snapshot);
+    return { ...snapshot };
+  }
+
+  private findSessionByTerminalKey(terminalKey: string): SessionState | undefined {
+    for (const session of this.sessions.values()) {
+      if (session.terminalKey === terminalKey) {
+        return session;
+      }
+    }
+    return undefined;
+  }
+
+  private removeSessionState(
+    session: SessionState,
+    releasePort: boolean,
+  ): void {
+    this.sessions.delete(session.paneId);
+    if (releasePort) {
+      this.portManager.releaseTerminalPorts(session.instanceId);
+    }
+  }
+
+  private withPaneId<T extends object>(
+    message: T,
+    paneId: string,
+  ): T & { paneId?: string } {
+    if (paneId === SessionRuntime.DEFAULT_PANE_ID) {
+      return message;
+    }
+    return {
+      ...message,
+      paneId,
+    };
   }
 
   private resolveTerminalIdForInstance(instanceId: InstanceId): string {
