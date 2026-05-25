@@ -1,0 +1,82 @@
+/* Pane Actions Toolbar — VS Code sidebar aesthetic
+ * Follows exact patterns from terminal.css + tab-bar.css + layout-engine.css
+ * - Uses --vscode-* tokens exclusively (no hardcoded colors)
+ * - Tight utilitarian spacing (2-4px gaps, 1-5px padding)
+ * - Flat buttons, 3px border-radius, opacity transitions
+ * - Danger variant for close matches .pane-btn--danger
+ */
+
+.pane-actions-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  background: var(--vscode-editorGroupHeader-tabsBackground, #252526);
+  border-bottom: 1px solid var(--vscode-panel-border, #474747);
+  font-family: var(--vscode-font-family);
+  font-size: 12px;
+  color: var(--vscode-foreground, #cccccc);
+  user-select: none;
+  flex-shrink: 0;
+  z-index: 550;
+}
+
+.pane-actions-toolbar.hidden {
+  display: none;
+}
+
+.pane-action-btn {
+  background: none;
+  border: none;
+  color: var(--vscode-foreground, #cccccc);
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.75;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+}
+
+.pane-action-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
+  opacity: 1;
+}
+
+.pane-action-btn:active {
+  background: var(--vscode-toolbar-activeBackground, rgba(255, 255, 255, 0.14));
+}
+
+.pane-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Danger variant for close button (matches .pane-btn--danger) */
+.pane-action-btn--danger:hover {
+  background: rgba(220, 60, 60, 0.25);
+  color: var(--vscode-errorForeground, #f48771);
+  opacity: 1;
+}
+
+.pane-action-btn--danger:active {
+  background: rgba(220, 60, 60, 0.35);
+}
+
+/* Icon sizing for split/close glyphs */
+.pane-action-btn .icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .pane-action-btn {
+    transition: none;
+  }
+}
