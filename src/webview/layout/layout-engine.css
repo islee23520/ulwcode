@@ -1,0 +1,112 @@
+/* Layout Engine — CSS Grid split pane system
+ * Pure CSS Grid + pointer events (no external libs)
+ * Follows existing terminal.css conventions: VS Code theme tokens, subtle hovers, thin borders
+ */
+
+/* Root container for the entire layout tree */
+.layout-root {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--vscode-editor-background, #1e1e1e);
+  /* Ensure children can shrink below content size */
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Individual pane (leaf node) */
+.layout-pane {
+  position: relative;
+  overflow: hidden;
+  min-width: 100px;
+  min-height: 100px;
+  background: var(--vscode-editor-background, #1e1e1e);
+  /* Terminal content will be absolutely positioned or flex inside */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Nested split container (replaces a pane when split) */
+.layout-split {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+  /* grid-template-* is set dynamically via JS based on split direction + sizes */
+}
+
+/* Resize handle — thin, high-contrast, industrial */
+.layout-handle {
+  background: var(--vscode-panel-border, #474747);
+  position: relative;
+  z-index: 10;
+  transition: background-color 0.1s ease;
+  user-select: none;
+  touch-action: none;
+}
+
+/* Horizontal split → vertical handle (drag left/right) */
+.layout-handle.horizontal {
+  cursor: col-resize;
+  width: 4px;
+  height: 100%;
+  margin: 0 -2px; /* overlap slightly for easier hit target */
+}
+
+/* Vertical split → horizontal handle (drag up/down) */
+.layout-handle.vertical {
+  cursor: row-resize;
+  height: 4px;
+  width: 100%;
+  margin: -2px 0;
+}
+
+/* Hover / active states — subtle accent, matches terminal toolbar hover */
+.layout-handle:hover {
+  background: var(--vscode-focusBorder, #007fd4);
+}
+
+.layout-handle:active {
+  background: var(--vscode-focusBorder, #007fd4);
+  /* Slightly thicker visual feedback during drag */
+  box-shadow: 0 0 0 1px rgba(0, 127, 212, 0.3);
+}
+
+/* When handle is being dragged, we want it to feel "captured" */
+.layout-handle.dragging {
+  background: var(--vscode-focusBorder, #007fd4);
+  z-index: 100;
+}
+
+/* Ensure pane content (terminals) fill the pane area */
+.layout-pane > .terminal-container,
+.layout-pane > div[id^="terminal-"] {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Optional: subtle inset border for visual separation when many panes */
+.layout-pane:not(:first-child) {
+  /* Handled by the grid gap / handles instead */
+}
+
+/* Accessibility / reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .layout-handle {
+    transition: none;
+  }
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+  .layout-handle {
+    background: CanvasText;
+  }
+  .layout-handle:hover {
+    background: Highlight;
+  }
+}
