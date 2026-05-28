@@ -384,17 +384,16 @@ export class TerminalDashboardProvider
         this.showAllSessions = !this.showAllSessions;
         await this.postSessionsToWebview();
         return;
-      case "activate":
-        if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
-          await this.terminalProvider?.switchToZellijSession(message.sessionId);
-        } else {
-          await vscode.commands.executeCommand(
-            "opencodeTui.switchTmuxSession",
-            message.sessionId,
-          );
-        }
+      case "activate": {
+        const backend = await this.getSessionBackend(message.sessionId);
+        await vscode.commands.executeCommand(
+          "opencodeTui.openSessionInNewWindow",
+          message.sessionId,
+          backend,
+        );
         await this.postSessionsToWebview();
         return;
+      }
       case "create":
         await vscode.commands.executeCommand("opencodeTui.createTmuxSession");
         await this.postSessionsToWebview();

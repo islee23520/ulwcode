@@ -139,28 +139,24 @@ describe("registerTmuxSessionCommands", () => {
   });
 
   it("registers all 9 tmux session commands", () => {
-    const disposables = registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    const disposables = registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
-    expect(disposables).toHaveLength(9);
-    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(9);
+    expect(disposables).toHaveLength(10);
+    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(10);
   });
 
   it("shows an error when openInNewWindow runs without an instance store", async () => {
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().openInNewWindow();
 
@@ -183,14 +179,12 @@ describe("registerTmuxSessionCommands", () => {
       },
     ]);
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().openInNewWindow();
 
@@ -229,14 +223,12 @@ describe("registerTmuxSessionCommands", () => {
       },
     ]);
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().openInNewWindow();
 
@@ -265,14 +257,12 @@ describe("registerTmuxSessionCommands", () => {
       throw new Error("boom");
     });
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().openInNewWindow();
 
@@ -291,14 +281,12 @@ describe("registerTmuxSessionCommands", () => {
       throw "boom-string";
     });
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().openInNewWindow();
 
@@ -311,14 +299,12 @@ describe("registerTmuxSessionCommands", () => {
   });
 
   it("shows an error when spawnForWorkspace runs without an instance store", async () => {
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace();
 
@@ -330,14 +316,12 @@ describe("registerTmuxSessionCommands", () => {
   it("warns when spawnForWorkspace has no workspace available", async () => {
     const instanceStore = createInstanceStore();
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace();
 
@@ -360,14 +344,12 @@ describe("registerTmuxSessionCommands", () => {
     ]);
     const instanceController = createInstanceController();
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace({
       toString: () => "file:///workspace/reused",
@@ -394,14 +376,12 @@ describe("registerTmuxSessionCommands", () => {
         state: "connected",
       },
     ]);
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore: reusableStore,
-      instanceController: createInstanceController(),
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore: reusableStore,
+    instanceController: createInstanceController(),
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace({
       toString: () => "file:///workspace/reused-id",
@@ -422,14 +402,12 @@ describe("registerTmuxSessionCommands", () => {
         state: "disconnected",
       },
     ]);
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore: stoppedStore,
-      instanceController: createInstanceController(),
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore: stoppedStore,
+    instanceController: createInstanceController(),
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace({
       toString: () => "file:///workspace/stopped-id",
@@ -454,14 +432,12 @@ describe("registerTmuxSessionCommands", () => {
     ]);
     const instanceController = createInstanceController();
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace({
       toString: () => "file:///workspace/stopped",
@@ -479,14 +455,12 @@ describe("registerTmuxSessionCommands", () => {
     const instanceController = createInstanceController();
     Reflect.set(vscode.workspace, "name", "Project Alpha");
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace({
       toString: () => "file:///workspace/new",
@@ -517,14 +491,12 @@ describe("registerTmuxSessionCommands", () => {
       { uri: { toString: () => "file:///workspace/folder" } },
     ];
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace();
 
@@ -544,14 +516,12 @@ describe("registerTmuxSessionCommands", () => {
     );
     const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(90001);
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace({
       toString: () => "file:///workspace/error",
@@ -574,14 +544,12 @@ describe("registerTmuxSessionCommands", () => {
     vi.mocked(instanceController.spawn).mockRejectedValue("spawn string failed");
     const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(90002);
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().spawnForWorkspace({
       toString: () => "file:///workspace/string-error",
@@ -600,14 +568,12 @@ describe("registerTmuxSessionCommands", () => {
   it("shows the instance picker when selectInstance is invoked", () => {
     const instanceQuickPick = createInstanceQuickPick();
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     getCommandHandlers().selectInstance();
 
@@ -617,14 +583,12 @@ describe("registerTmuxSessionCommands", () => {
   it("switches tmux sessions and focuses the terminal", async () => {
     const provider = createProvider();
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().switchTmuxSession("tmux-1");
 
@@ -642,14 +606,12 @@ describe("registerTmuxSessionCommands", () => {
   it("ignores switchTmuxSession and killTmuxSession when required inputs are missing", async () => {
     const provider = createProvider();
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     const handlers = getCommandHandlers();
     await handlers.switchTmuxSession();
@@ -660,14 +622,12 @@ describe("registerTmuxSessionCommands", () => {
   });
 
   it("ignores provider-backed commands when provider is missing", async () => {
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     const handlers = getCommandHandlers();
     await handlers.switchTmuxSession("tmux-1");
@@ -681,14 +641,12 @@ describe("registerTmuxSessionCommands", () => {
   it("creates and kills tmux sessions through the provider", async () => {
     const provider = createProvider();
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     const handlers = getCommandHandlers();
     await handlers.createTmuxSession();
@@ -709,14 +667,12 @@ describe("registerTmuxSessionCommands", () => {
   it("switches to the native shell when a provider is available", async () => {
     const provider = createProvider();
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().switchNativeShell();
 
@@ -724,14 +680,12 @@ describe("registerTmuxSessionCommands", () => {
   });
 
   it("warns when browseTmuxSessions has no tmux manager or provider", async () => {
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -760,14 +714,12 @@ describe("registerTmuxSessionCommands", () => {
       .mockImplementation(() => activeRecord);
     vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -790,15 +742,13 @@ describe("registerTmuxSessionCommands", () => {
       },
     ]);
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: createTmuxManager(),
-      zellijManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: createTmuxManager(),
+    zellijManager: undefined, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -811,14 +761,12 @@ describe("registerTmuxSessionCommands", () => {
     const provider = createProvider();
     const tmuxManager = createTmuxManager([]);
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -834,14 +782,12 @@ describe("registerTmuxSessionCommands", () => {
     ]);
     vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -875,14 +821,12 @@ describe("registerTmuxSessionCommands", () => {
       return quickPickItems[0];
     });
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -916,14 +860,12 @@ describe("registerTmuxSessionCommands", () => {
       return quickPickItems[1];
     });
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -969,15 +911,13 @@ describe("registerTmuxSessionCommands", () => {
       return quickPickItems[1];
     });
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager,
-      zellijManager,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager,
+    zellijManager, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -995,14 +935,12 @@ describe("registerTmuxSessionCommands", () => {
       new Error("tmux failed"),
     );
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel,
-      tmuxManager,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel,
+    tmuxManager, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -1020,14 +958,12 @@ describe("registerTmuxSessionCommands", () => {
     const tmuxManager = createTmuxManager();
     vi.mocked(tmuxManager.discoverSessions).mockRejectedValue("tmux string failed");
 
-    registerTmuxSessionCommands({
-      provider,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel,
-      tmuxManager,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel,
+    tmuxManager, });
 
     await getCommandHandlers().browseTmuxSessions();
 
@@ -1050,14 +986,12 @@ describe("registerTmuxSessionCommands", () => {
     ]);
     const setActive = vi.spyOn(instanceStore, "setActive");
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().killNativeShell("native-1");
 
@@ -1081,14 +1015,12 @@ describe("registerTmuxSessionCommands", () => {
       },
     ]);
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().killNativeShell("native-1");
 
@@ -1113,14 +1045,12 @@ describe("registerTmuxSessionCommands", () => {
     ]);
     instanceStore.setActive("native-2");
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().killNativeShell("native-1");
 
@@ -1129,14 +1059,12 @@ describe("registerTmuxSessionCommands", () => {
   });
 
   it("ignores killNativeShell when required dependencies are missing", async () => {
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore: undefined,
-      instanceController: undefined,
-      instanceQuickPick: undefined,
-      outputChannel: undefined,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().killNativeShell("native-1");
 
@@ -1157,14 +1085,12 @@ describe("registerTmuxSessionCommands", () => {
       },
     ]);
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().killNativeShell("native-1");
 
@@ -1185,14 +1111,12 @@ describe("registerTmuxSessionCommands", () => {
       },
     ]);
 
-    registerTmuxSessionCommands({
-      provider: undefined,
-      instanceStore,
-      instanceController,
-      instanceQuickPick: undefined,
-      outputChannel,
-      tmuxManager: undefined,
-    });
+    registerTmuxSessionCommands({ context: undefined, provider: undefined,
+    instanceStore,
+    instanceController,
+    instanceQuickPick: undefined,
+    outputChannel,
+    tmuxManager: undefined, });
 
     await getCommandHandlers().killNativeShell("native-1");
 

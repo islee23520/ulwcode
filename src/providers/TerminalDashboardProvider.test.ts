@@ -355,8 +355,9 @@ describe("TerminalDashboardProvider", () => {
     await flushPromises();
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.switchTmuxSession",
+      "opencodeTui.openSessionInNewWindow",
       "repo-a",
+      "tmux",
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "opencodeTui.createTmuxSession",
@@ -1050,7 +1051,11 @@ describe("TerminalDashboardProvider", () => {
       paneId: "terminal_1",
     });
 
-    expect(terminalProvider.switchToZellijSession).toHaveBeenCalledWith("repo-a");
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "opencodeTui.openSessionInNewWindow",
+      "repo-a",
+      "zellij",
+    );
     expect(zellijSessionManager?.createTab).toHaveBeenCalledWith({
       workingDirectory: "/workspaces/repo-a",
     });

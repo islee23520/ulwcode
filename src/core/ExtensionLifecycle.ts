@@ -12,6 +12,7 @@ import { InstanceStore } from "../services/InstanceStore";
 import { InstanceRegistry } from "../services/InstanceRegistry";
 import { InstanceQuickPick } from "../services/InstanceQuickPick";
 import { InstanceController } from "../services/InstanceController";
+import { SessionWindowHandoffService } from "../services/SessionWindowHandoffService";
 import { NativeTerminalManager } from "../services/NativeTerminalManager";
 import { PortManager } from "../services/PortManager";
 import { ConnectionResolver } from "../services/ConnectionResolver";
@@ -258,6 +259,9 @@ export class ExtensionLifecycle {
 
       this.registerCommands(context);
 
+      // Consume pending session window handoff (from dashboard "open in new window")
+      await this.consumeSessionHandoff(context);
+
       this.codeActionProvider = new OpenCodeCodeActionProvider(
         this.contextManager,
         (prompt) => this.sendPromptToOpenCode(prompt),
@@ -294,6 +298,9 @@ export class ExtensionLifecycle {
   private getCommandDependencies(): RegisterCommandDependencies {
     const self = this;
     return {
+      get context() {
+        return self.context;
+      },
       get provider() {
         return self.tuiProvider;
       },
@@ -338,6 +345,53 @@ export class ExtensionLifecycle {
 
   private registerCommands(context: vscode.ExtensionContext): void {
     registerAllCommands(context, this.getCommandDependencies());
+  }
+
+  private async consumeSessionHandoff(
+    context: vscode.ExtensionContext,
+  ): Promise<void> {
+    const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri.toString();
+    if (!workspaceUri || !this.instanceStore) {
+      return;
+    }
+
+    const handoffService = new SessionWindowHandoffService(context);
+    const handoff = await handoffService.consumeHandoff(workspaceUri);
+    if (!handoff) {
+      return;
+    }
+
+    const logger = this.outputChannelService ?? OutputChannelService.getInstance();
+    logger.info(
+      `[ExtensionLifecycle] Consuming session handoff: sessionId=${handoff.sessionId} backend=${handoff.backend}`,
+    );
+
+    const instanceId = `window-${Date.now()}-${handoff.backend}-${handoff.sessionId}`;
+    this.instanceStore.upsert({
+      config: {
+        id: instanceId,
+        workspaceUri: handoff.workspaceUri,
+        label: handoff.label ?? `${handoff.sessionId} (${handoff.backend})`,
+        terminalBackend: handoff.backend,
+      },
+      runtime: {
+        terminalBackend: handoff.backend,
+        tmuxSessionId: handoff.backend === "tmux" ? handoff.sessionId : undefined,
+        zellijSessionId:
+          handoff.backend === "zellij" ? handoff.sessionId : undefined,
+      },
+      state: "disconnected",
+    });
+    this.instanceStore.setActive(instanceId);
+
+    // Trigger sidebar view — auto-start flow will pick up the active instance
+    void Promise.resolve(vscode.commands.executeCommand("opencodeTui.focus")).catch(
+      (error: unknown) => {
+        logger.warn(
+          `[ExtensionLifecycle] Focus after handoff failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      },
+    );
   }
 
   private async sendPromptToOpenCode(prompt: string): Promise<void> {

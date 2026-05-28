@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Updated:** 2026-04-20 Asia/Seoul
-**Commit:** 00cab61 | **Branch:** improve/windows-compatibility
+**Updated:** 2026-05-28 Asia/Seoul
+**Commit:** 7f04ae2 | **Branch:** feat/dashboard-open-in-new-window
 
 ## OVERVIEW
 
@@ -50,12 +50,13 @@ extension.ts → ExtensionLifecycle.activate()
 
 | Task                  | Location                                         | Notes                                                     |
 | --------------------- | ------------------------------------------------ | --------------------------------------------------------- |
-| Activation / wiring   | `src/core/ExtensionLifecycle.ts`                 | service creation + provider registration      |
+| Activation / wiring   | `src/core/ExtensionLifecycle.ts`                 | service creation + provider registration + handoff consumption |
 | Command registration  | `src/core/commands/`                             | terminalCommands, tmuxSessionCommands, tmuxPaneCommands, dashboardCommands |
 | Main sidebar terminal | `src/providers/TerminalProvider.ts`              | Shell + MessageRouter + SessionRuntime                    |
 | Terminal dashboard    | `src/providers/TerminalDashboardProvider.ts`     | Terminal Manager dashboard (inline HTML)                  |
 | Instance state        | `src/services/InstanceStore.ts`                  | EventEmitter hub, all services depend here                |
 | Tmux CLI wrapper      | `src/services/TmuxSessionManager.ts`             | Standalone, used by both providers                        |
+| Cross-window handoff  | `src/services/SessionWindowHandoffService.ts`    | globalState-based session handoff between VS Code windows |
 | HTTP API              | `src/services/OpenCodeApiClient.ts`              | Retry/backoff, prompt append                              |
 | Browser terminal UI   | `src/webview/main.ts`                            | xterm.js + drag/drop + links                   |
 | Shared contracts      | `src/types.ts`                                   | Message types, DTOs, ExtensionConfig                      |
@@ -66,10 +67,12 @@ extension.ts → ExtensionLifecycle.activate()
 | Symbol                 | Type     | Location                               | Role                                   |
 | ---------------------- | -------- | -------------------------------------- | -------------------------------------- |
 | `activate`             | function | `src/extension.ts`                     | VS Code extension entry                |
-| `ExtensionLifecycle`   | class    | `src/core/ExtensionLifecycle.ts`       | Service creation, command registration |
+| `ExtensionLifecycle`   | class    | `src/core/ExtensionLifecycle.ts`       | Service creation, command registration, handoff consumption |
 | `TerminalProvider`     | class    | `src/providers/TerminalProvider.ts`    | Main sidebar webview provider          |
+| `SessionRuntime`       | class    | `src/providers/SessionRuntime.ts`      | Start/restart/tmux/instance switching  |
 | `TmuxSessionManager`   | class    | `src/services/TmuxSessionManager.ts`   | tmux CLI: sessions, panes, attach      |
 | `InstanceStore`        | class    | `src/services/InstanceStore.ts`        | In-memory instance state + events      |
+| `SessionWindowHandoffService` | class | `src/services/SessionWindowHandoffService.ts` | Cross-window session handoff (globalState) |
 | `TerminalManager`      | class    | `src/terminals/TerminalManager.ts`     | node-pty process lifecycle             |
 | `OutputChannelService` | class    | `src/services/OutputChannelService.ts` | Singleton logger (`getInstance()`)     |
 
@@ -106,6 +109,20 @@ extension.ts → ExtensionLifecycle.activate()
 - `TerminalDashboardProvider.ts` — inline HTML, needs split
 - `PortManager` — created separately in provider and lifecycle (needs singleton consolidation)
 
+## RECENT CHANGES
+
+### Terminal half-rendering fix (branch: `fix/terminal-half-rendering`)
+- `src/webview/terminal.css`: `#terminal-container` flex fix (`flex: 1 1 auto; height: auto`)
+- `src/webview/layout/layout-engine.css`: `.layout-root` flex fix
+- `src/webview/terminal/resize.ts`: double-rAF for initial fit timing
+
+### Dashboard open-in-new-window (branch: `feat/dashboard-open-in-new-window`)
+- `src/services/SessionWindowHandoffService.ts`: NEW — globalState-based cross-window handoff (async, TTL 2min)
+- `src/core/commands/tmuxSessionCommands.ts`: `opencodeTui.openSessionInNewWindow` command
+- `src/providers/TerminalDashboardProvider.ts`: activate → open in new window
+- `src/core/ExtensionLifecycle.ts`: `consumeSessionHandoff()` on activation → focus sidebar
+- `src/providers/SessionRuntime.ts`: backend resolution checks InstanceStore active instance runtime.terminalBackend
+
 ## BUILD & TEST
 
 ```bash
@@ -114,7 +131,7 @@ npm run watch            # watch mode
 npm run package          # production build (--mode production)
 npm run test             # vitest
 npm run test:coverage    # vitest + coverage (80/80/70/80 thresholds)
-npm run build-and-install # package → install to VS Code
+- `npm run build-and-install` or `bash dev-install.sh` — build → package → install to VS Code
 ```
 
 **Coverage:** lines 80%, functions 80%, branches 70%, statements 80%

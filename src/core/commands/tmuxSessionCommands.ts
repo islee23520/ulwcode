@@ -4,11 +4,13 @@ import type { InstanceController } from "../../services/InstanceController";
 import type { InstanceQuickPick } from "../../services/InstanceQuickPick";
 import type { InstanceStore } from "../../services/InstanceStore";
 import type { OutputChannelService } from "../../services/OutputChannelService";
+import { SessionWindowHandoffService } from "../../services/SessionWindowHandoffService";
 import type { TmuxSessionManager } from "../../services/TmuxSessionManager";
 import type { ZellijSessionManager } from "../../services/ZellijSessionManager";
 import type { TerminalBackendType } from "../../types";
 
 export interface TmuxSessionCommandDependencies {
+  context: vscode.ExtensionContext | undefined;
   provider: TerminalProvider | undefined;
   instanceStore: InstanceStore | undefined;
   instanceController: InstanceController | undefined;
@@ -151,6 +153,41 @@ export function registerTmuxSessionCommands(
           `Failed to spawn for workspace: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
+    },
+  );
+
+  const openSessionInNewWindowCommand = vscode.commands.registerCommand(
+    "opencodeTui.openSessionInNewWindow",
+    async (sessionId?: string, backend?: "tmux" | "zellij") => {
+      if (!deps.context) {
+        vscode.window.showErrorMessage("Extension context not available");
+        return;
+      }
+      if (!sessionId) {
+        vscode.window.showWarningMessage("No session specified");
+        return;
+      }
+
+      const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri.toString();
+      if (!workspaceUri) {
+        vscode.window.showWarningMessage("No workspace folder available");
+        return;
+      }
+
+      const effectiveBackend = backend ?? "tmux";
+      const handoffService = new SessionWindowHandoffService(deps.context);
+      await handoffService.writeHandoff({
+        workspaceUri,
+        sessionId,
+        backend: effectiveBackend,
+        label: `${sessionId} (${effectiveBackend})`,
+      });
+
+      vscode.commands.executeCommand(
+        "vscode.openFolder",
+        vscode.Uri.parse(workspaceUri),
+        true,
+      );
     },
   );
 
@@ -314,6 +351,7 @@ export function registerTmuxSessionCommands(
   return [
     openInNewWindowCommand,
     spawnForWorkspaceCommand,
+    openSessionInNewWindowCommand,
     selectInstanceCommand,
     switchTmuxSessionCommand,
     createTmuxSessionCommand,

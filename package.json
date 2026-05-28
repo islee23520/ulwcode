@@ -1,14 +1,17 @@
 {
-  "name": "opencode-sidebar-tui",
-  "displayName": "Opencode Sidebar Terminal",
-  "description": "Automatically render Opencode Sidebar Terminal in VS Code sidebar with full terminal support",
-  "version": "1.9.0",
+  "name": "oh-my-code",
+  "displayName": "Oh My Code",
+  "description": "Terminal in chat for VS Code",
+  "version": "0.1.0",
   "publisher": "islee23520",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.106.0",
     "node": ">=20.0.0"
   },
+  "enabledApiProposals": [
+    "chatParticipantAdditions"
+  ],
   "categories": [
     "Other"
   ],
@@ -29,6 +32,14 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "oh-my-code.terminal",
+        "name": "terminal",
+        "description": "Terminal in chat",
+        "isDefault": true
+      }
+    ],
     "viewsContainers": {
       "secondarySidebar": [
         {
@@ -88,6 +99,12 @@
       {
         "command": "opencode.openInNewWindow",
         "title": "Open Tmux Session in New Window",
+        "category": "Open Sidebar Terminal",
+        "icon": "$(empty-window)"
+      },
+      {
+        "command": "opencodeTui.openSessionInNewWindow",
+        "title": "Open Session in New Window",
         "category": "Open Sidebar Terminal",
         "icon": "$(empty-window)"
       },
@@ -259,6 +276,11 @@
         "title": "Refresh Terminal Manager",
         "category": "Open Sidebar Terminal",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "oh-my-code.fallback",
+        "title": "Fallback Command",
+        "category": "Oh My Code"
       }
     ],
     "menus": {
