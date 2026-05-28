@@ -66,14 +66,16 @@ export function performInitialFit(
   fitAddon: FitAddon,
 ): void {
   requestAnimationFrame(() => {
-    if (fitAddon && terminal) {
-      fitAddon.fit();
-      postMessage({
-        type: "ready",
-        cols: terminal.cols,
-        rows: terminal.rows,
-      });
-    }
+    requestAnimationFrame(() => {
+      if (fitAddon && terminal) {
+        fitAddon.fit();
+        postMessage({
+          type: "ready",
+          cols: terminal.cols,
+          rows: terminal.rows,
+        });
+      }
+    });
   });
 
   setTimeout(() => {
