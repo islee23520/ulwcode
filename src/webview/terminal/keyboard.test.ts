@@ -172,6 +172,42 @@ describe("createKeyboardHandler", () => {
       expect(requestPaste).toHaveBeenCalledTimes(1);
     });
 
+    it("requests host paste for Ctrl+V even when sendKeybindingsToShell is enabled", () => {
+      const requestPaste = vi.fn();
+      expectKeyboardHandling(createKeyboardHandler({
+        isMac: false,
+        requestPaste,
+        sendKeybindingsToShell: true,
+      }), {
+        ctrlKey: true,
+        key: "v",
+        code: "KeyV",
+      }, false, true);
+      expect(requestPaste).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps Ctrl+P with xterm when sendKeybindingsToShell is enabled", () => {
+      expectKeyboardHandling(createKeyboardHandler({
+        isMac: false,
+        sendKeybindingsToShell: true,
+      }), {
+        ctrlKey: true,
+        key: "p",
+        code: "KeyP",
+      }, true, true);
+    });
+
+    it("lets VS Code handle Ctrl+P when sendKeybindingsToShell is disabled", () => {
+      expectKeyboardHandling(createKeyboardHandler({
+        isMac: false,
+        sendKeybindingsToShell: false,
+      }), {
+        ctrlKey: true,
+        key: "p",
+        code: "KeyP",
+      }, false, false);
+    });
+
     it("requests host paste on Ctrl+Shift+V", () => {
       const requestPaste = vi.fn();
       expectKeyboardHandling(createKeyboardHandler({ isMac: false, requestPaste }), {

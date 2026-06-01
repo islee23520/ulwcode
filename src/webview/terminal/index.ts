@@ -30,6 +30,20 @@ export interface WheelHandlerOptions {
   scrollLines: (count: number) => void;
 }
 
+export interface ContextMenuPasteHandlerOptions {
+  requestPaste: () => void;
+}
+
+export function createContextMenuPasteHandler(
+  options: ContextMenuPasteHandlerOptions,
+) {
+  return (event: MouseEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    options.requestPaste();
+  };
+}
+
 export function createWheelHandler(options: WheelHandlerOptions) {
   return (event: WheelEvent): void => {
     if (!options.isWindows() || event.ctrlKey || event.deltaY === 0) {
@@ -59,9 +73,11 @@ export function initTerminal(
 ): TerminalInstance | null {
   const config = readTerminalConfig(container);
 
-  container.addEventListener("contextmenu", (event) => {
-    event.preventDefault();
+  const requestPaste = () => postMessage({ type: "triggerPaste" });
+  const contextMenuHandler = createContextMenuPasteHandler({
+    requestPaste,
   });
+  container.addEventListener("contextmenu", contextMenuHandler);
 
   const terminal = new Terminal({
     cursorBlink: config.cursorBlink,
@@ -77,7 +93,7 @@ export function initTerminal(
 
   const keyboardHandler = createKeyboardHandler({
     sendInput: (data) => options.onData(data),
-    requestPaste: () => postMessage({ type: "triggerPaste" }),
+    requestPaste,
     hasSelection: () => terminal.hasSelection(),
     copySelection: () => {
       const selection = terminal.getSelection();
@@ -192,6 +208,7 @@ export function initTerminal(
   const dispose = () => {
     cleanupResize();
     cleanupVisibility();
+    container.removeEventListener("contextmenu", contextMenuHandler);
     container.removeEventListener("focusin", refreshTerminal);
     container.removeEventListener("click", refreshTerminal);
     container.removeEventListener("wheel", wheelHandler, true);
