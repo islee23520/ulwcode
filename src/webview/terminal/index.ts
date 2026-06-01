@@ -20,12 +20,34 @@ export interface TerminalInstance {
   dispose: () => void;
 }
 
-const MOUSE_ENABLE = "\x1b[?1000h\x1b[?1002h\x1b[?1006h";
-const MOUSE_DISABLE = "\x1b[?1000l\x1b[?1002l\x1b[?1006l";
-
 const isWindowsPlatform = (): boolean =>
   typeof navigator !== "undefined" &&
   /Windows|Win32|Win64/i.test(navigator.userAgent ?? "");
+
+export interface WheelHandlerOptions {
+  isWindows: () => boolean;
+  getMouseTrackingMode: () => string;
+  scrollLines: (count: number) => void;
+}
+
+export function createWheelHandler(options: WheelHandlerOptions) {
+  return (event: WheelEvent): void => {
+    if (!options.isWindows() || event.ctrlKey || event.deltaY === 0) {
+      return;
+    }
+
+    // When a TUI enables mouse tracking (e.g. \x1b[?1002h),
+    // let xterm.js handle the wheel event so it sends the
+    // escape sequence to the PTY for the application to process.
+    if (options.getMouseTrackingMode() !== "none") {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    options.scrollLines(event.deltaY > 0 ? 3 : -3);
+  };
+}
 
 export function initTerminal(
   container: HTMLElement,
@@ -83,7 +105,6 @@ export function initTerminal(
 
   terminal.open(container);
   terminal.focus();
-  terminal.write(MOUSE_ENABLE);
 
   try {
     const webglAddon = new WebglAddon();
@@ -101,22 +122,11 @@ export function initTerminal(
   const refreshTerminal = () => terminal.refresh(0, terminal.rows - 1);
   container.addEventListener("focusin", refreshTerminal);
   container.addEventListener("click", refreshTerminal);
-  const wheelHandler = (event: WheelEvent) => {
-    if (!isWindowsPlatform() || event.ctrlKey || event.deltaY === 0) {
-      return;
-    }
-
-    // When a TUI enables mouse tracking (e.g. \x1b[?1002h),
-    // let xterm.js handle the wheel event so it sends the
-    // escape sequence to the PTY for the application to process.
-    if (terminal.modes.mouseTrackingMode !== "none") {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    terminal.scrollLines(event.deltaY > 0 ? 3 : -3);
-  };
+  const wheelHandler = createWheelHandler({
+    isWindows: isWindowsPlatform,
+    getMouseTrackingMode: () => terminal.modes.mouseTrackingMode,
+    scrollLines: (count) => terminal.scrollLines(count),
+  });
   container.addEventListener("wheel", wheelHandler, {
     capture: true,
     passive: false,
@@ -188,7 +198,6 @@ export function initTerminal(
     window.removeEventListener("dragover", dragOverHandler);
     window.removeEventListener("dragleave", dragLeaveHandler);
     window.removeEventListener("drop", dropHandler);
-    terminal.write(MOUSE_DISABLE);
     terminal.dispose();
   };
 
@@ -199,10 +208,3 @@ export function initTerminal(
   };
 }
 
-export function setMouseTracking(
-  terminal: Terminal | null,
-  enabled: boolean,
-): void {
-  if (!terminal) return;
-  terminal.write(enabled ? MOUSE_ENABLE : MOUSE_DISABLE);
-}
