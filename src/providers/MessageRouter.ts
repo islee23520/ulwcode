@@ -22,7 +22,11 @@ import type {
   TmuxRawSubcommand,
   TmuxWebviewCommandId,
 } from "../types";
-import { isWindowsAbsolutePath } from "../utils/pathUtils";
+import {
+  createSelection,
+  fuzzyMatchFile,
+  openFileInEditor,
+} from "./openFile";
 
 export interface MessageRouterProviderBridge {
   startOpenCode(): Promise<void>;
@@ -363,63 +367,9 @@ export class MessageRouter {
     endLine?: number,
     column?: number,
   ): Promise<void> {
-    if (
-      filePath.includes("..") ||
-      filePath.includes("\0") ||
-      filePath.includes("~")
-    ) {
-      void vscode.window.showErrorMessage(
-        "Invalid file path: Path traversal detected",
-      );
-      return;
-    }
-
-    try {
-      const normalizedPath = filePath.replace(/\\/g, "/");
-
-      let uri: vscode.Uri;
-
-      if (vscode.Uri.parse(filePath).scheme === "file") {
-        uri = vscode.Uri.file(filePath);
-      } else if (
-        normalizedPath.startsWith("/") ||
-        isWindowsAbsolutePath(filePath)
-      ) {
-        uri = vscode.Uri.file(filePath);
-      } else {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders && workspaceFolders.length > 0) {
-          uri = vscode.Uri.joinPath(workspaceFolders[0].uri, normalizedPath);
-        } else {
-          uri = vscode.Uri.file(normalizedPath);
-        }
-      }
-
-      try {
-        const selection = this.createSelection(line, endLine, column);
-
-        await vscode.window.showTextDocument(uri, {
-          selection,
-          preview: true,
-        });
-      } catch {
-        const matchedUri = await this.fuzzyMatchFile(normalizedPath);
-        if (matchedUri) {
-          const selection = this.createSelection(line, endLine, column);
-
-          await vscode.window.showTextDocument(matchedUri, {
-            selection,
-            preview: true,
-          });
-        } else {
-          void vscode.window.showErrorMessage(
-            `Failed to open file: ${filePath}`,
-          );
-        }
-      }
-    } catch {
-      void vscode.window.showErrorMessage(`Failed to open file: ${filePath}`);
-    }
+    await openFileInEditor(filePath, line, endLine, column, (message) => {
+      this.logger.error(message);
+    });
   }
 
   public async handleFilesDropped(
@@ -751,68 +701,12 @@ export class MessageRouter {
     endLine?: number,
     column?: number,
   ): vscode.Range | undefined {
-    if (!line) {
-      return undefined;
-    }
-
-    const maxColumn = 9999;
-    return new vscode.Range(
-      Math.max(0, line - 1),
-      Math.max(0, (column || 1) - 1),
-      Math.max(0, (endLine || line) - 1),
-      endLine ? maxColumn : Math.max(0, (column || 1) - 1),
-    );
+    return createSelection(line, endLine, column);
   }
 
   public async fuzzyMatchFile(filePath: string): Promise<vscode.Uri | null> {
-    try {
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders || workspaceFolders.length === 0) {
-        return null;
-      }
-
-      const pathParts = filePath
-        .split(/[\\/]/)
-        .filter((part) => part.length > 0);
-      const filename = pathParts[pathParts.length - 1];
-
-      const pattern = `**/${filename}*`;
-      const files = await vscode.workspace.findFiles(pattern, null, 100);
-
-      const normalizedInput = filePath.replace(/\\/g, "/").toLowerCase();
-      files.sort((a, b) => {
-        const aPath = a.fsPath.replace(/\\/g, "/").toLowerCase();
-        const bPath = b.fsPath.replace(/\\/g, "/").toLowerCase();
-
-        if (aPath.endsWith(normalizedInput)) {
-          return -1;
-        }
-        if (bPath.endsWith(normalizedInput)) {
-          return 1;
-        }
-
-        const aDirParts = a.fsPath.split(/[\\/]/);
-        const bDirParts = b.fsPath.split(/[\\/]/);
-
-        for (let i = 0; i < pathParts.length - 1; i++) {
-          const expectedPart = pathParts[i].toLowerCase();
-          if (aDirParts[i] && aDirParts[i].toLowerCase() === expectedPart) {
-            return -1;
-          }
-          if (bDirParts[i] && bDirParts[i].toLowerCase() === expectedPart) {
-            return 1;
-          }
-        }
-
-        return 0;
-      });
-
-      return files[0] || null;
-    } catch (error) {
-      this.logger.error(
-        `Fuzzy match failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return null;
-    }
+    return fuzzyMatchFile(filePath, (message) => {
+      this.logger.error(message);
+    });
   }
 }
