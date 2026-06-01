@@ -1,3 +1,12 @@
 {
-   "signedContributors": []
+  "signedContributors": [
+    {
+      "name": "sage-z-cn",
+      "id": 43244285,
+      "comment_id": 4583072476,
+      "created_at": "2026-05-30T14:17:41Z",
+      "repoId": 1141875327,
+      "pullRequestNo": 44
+    }
+  ]
 }
