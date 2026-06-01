@@ -233,7 +233,7 @@ describe("createKeyboardHandler", () => {
   });
 
   describe("Shift+Enter handling", () => {
-    it("sends \\r\\n through sendInput on Shift+Enter", () => {
+    it("sends \\n through sendInput on Shift+Enter", () => {
       const sendInput = vi.fn();
       const keyboard = createKeyboardHandler({ isMac: true, sendInput });
 
@@ -245,7 +245,7 @@ describe("createKeyboardHandler", () => {
 
       expect(keyboard.handler(event)).toBe(false);
       expect(event.defaultPrevented).toBe(true);
-      expect(sendInput).toHaveBeenCalledWith("\r\n");
+      expect(sendInput).toHaveBeenCalledWith("\n");
     });
 
     it("does not intercept Shift+Enter when Ctrl is held", () => {
@@ -320,7 +320,7 @@ describe("createKeyboardHandler", () => {
       expect(keyboard.handler(event)).toBe(true);
     });
 
-    it("sends \\r\\n on Windows/Linux Shift+Enter", () => {
+    it("sends \\n on Windows/Linux Shift+Enter", () => {
       const sendInput = vi.fn();
       const keyboard = createKeyboardHandler({ isMac: false, sendInput });
 
@@ -332,7 +332,7 @@ describe("createKeyboardHandler", () => {
 
       expect(keyboard.handler(event)).toBe(false);
       expect(event.defaultPrevented).toBe(true);
-      expect(sendInput).toHaveBeenCalledWith("\r\n");
+      expect(sendInput).toHaveBeenCalledWith("\n");
     });
   });
 });

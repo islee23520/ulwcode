@@ -10,7 +10,7 @@ export interface KeyboardHandlerOptions {
   isMac?: boolean;
   /**
    * Callback to send input data through the PTY/host path.
-   * When provided, Shift+Enter sends `\r\n` (multiline newline) via this
+   * When provided, Shift+Enter sends `\n` (multiline newline) via this
    * callback instead of through xterm's default key processing.
    * When omitted, Shift+Enter is not intercepted.
    */
@@ -73,7 +73,7 @@ export function createKeyboardHandler(options: KeyboardHandlerOptions = {}) {
     if (isShiftEnter(event) && event.type === "keydown" && options.sendInput) {
       event.preventDefault();
       event.stopPropagation();
-      options.sendInput("\r\n");
+      options.sendInput("\n");
       return false;
     }
 
