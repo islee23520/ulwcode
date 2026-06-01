@@ -202,6 +202,22 @@ describe("Types", () => {
       expect(message.column).toBe(5);
     });
 
+    it("accepts openFile message with path line column and endLine", () => {
+      const message: WebviewMessage = {
+        type: "openFile",
+        path: "/test/file.ts",
+        line: 10,
+        column: 5,
+        endLine: 12,
+      };
+
+      expect(message.type).toBe("openFile");
+      expect(message.path).toBe("/test/file.ts");
+      expect(message.line).toBe(10);
+      expect(message.column).toBe(5);
+      expect(message.endLine).toBe(12);
+    });
+
     it("should accept openUrl message", () => {
       const message: WebviewMessage = {
         type: "openUrl",

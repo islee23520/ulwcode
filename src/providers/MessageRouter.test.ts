@@ -661,6 +661,45 @@ describe("MessageRouter", () => {
     );
   });
 
+  it("opens workspace file at requested line and column from openFile message", async () => {
+    await router.handleMessage({
+      type: "openFile",
+      path: "src/providers/MessageRouter.ts",
+      line: 120,
+      column: 5,
+    });
+
+    expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fsPath: "/workspace/src/providers/MessageRouter.ts",
+      }),
+      {
+        selection: {
+          start: { line: 119, character: 4 },
+          end: { line: 119, character: 4 },
+        },
+        preview: true,
+      },
+    );
+  });
+
+  it("rejects invalid openFile payloads without host side effects", async () => {
+    await router.handleMessage({ type: "openFile", path: 123 });
+    await router.handleMessage({
+      type: "openFile",
+      path: "src/providers/MessageRouter.ts",
+      line: 0,
+    });
+    await router.handleMessage({
+      type: "openFile",
+      path: "src/providers/MessageRouter.ts",
+      column: -1,
+    });
+
+    expect(vscode.window.showTextDocument).not.toHaveBeenCalled();
+    expect(vscode.workspace.findFiles).not.toHaveBeenCalled();
+  });
+
   it("reports open file failures when fuzzy matching cannot recover", async () => {
     vi.mocked(vscode.workspace.findFiles).mockResolvedValue([]);
     vi.mocked(vscode.window.showTextDocument).mockRejectedValue(
@@ -961,19 +1000,16 @@ describe("MessageRouter", () => {
   });
 
   it("opens file URI and absolute paths and reports outer path failures", async () => {
-    vi.mocked(vscode.Uri.parse).mockImplementationOnce(() => {
-      throw new Error("parse failed");
-    });
-    await router.handleOpenFile("safe-file.ts");
+    await router.handleOpenFile("https://example.com/safe-file.ts");
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
-      "Failed to open file: safe-file.ts",
+      "Invalid file path: Only file URIs can be opened",
     );
 
     await router.handleOpenFile("file:///workspace/absolute.ts", 1, undefined, 1);
     await router.handleOpenFile("C:\\workspace\\absolute.ts");
 
     expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
-      expect.objectContaining({ fsPath: "file:///workspace/absolute.ts" }),
+      expect.objectContaining({ fsPath: "/workspace/absolute.ts" }),
       expect.objectContaining({ preview: true }),
     );
     expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
@@ -1100,7 +1136,7 @@ describe("MessageRouter", () => {
     vscode.workspace.workspaceFolders = originalFolders;
 
     expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
-      expect.objectContaining({ fsPath: "file:///workspace/from-uri.ts" }),
+      expect.objectContaining({ fsPath: "/workspace/from-uri.ts" }),
       expect.objectContaining({ preview: true }),
     );
     expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
