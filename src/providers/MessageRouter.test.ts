@@ -346,7 +346,7 @@ describe("MessageRouter", () => {
     await router.handleMessage({ type: "requestAiToolSelector" });
     await router.handleMessage({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxCreateWindow",
+      commandId: "ulw.tmuxCreateWindow",
     });
     await router.handleMessage({ type: "toggleDashboard" });
     await router.handleMessage({ type: "toggleEditorAttachment" });
@@ -381,7 +381,7 @@ describe("MessageRouter", () => {
       true,
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.tmuxCreateWindow",
+      "ulw.tmuxCreateWindow",
     );
     expect(provider.toggleDashboard).toHaveBeenCalledTimes(1);
     expect(provider.toggleEditorAttachment).toHaveBeenCalledTimes(1);
@@ -800,7 +800,7 @@ describe("MessageRouter", () => {
     expect(terminal.sendText).toHaveBeenNthCalledWith(2, "npm lint");
     expect(terminal.sendText).toHaveBeenNthCalledWith(3, "npm build");
     expect(context.globalState.update).toHaveBeenCalledWith(
-      "opencodeTui.allowTerminalCommands",
+      "ulw.allowTerminalCommands",
       true,
     );
     expect(terminal.sendText).toHaveBeenCalledTimes(3);
@@ -927,20 +927,20 @@ describe("MessageRouter", () => {
 
     await router.handleMessage({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxNextWindow",
+      commandId: "ulw.tmuxNextWindow",
     });
     await router.handleMessage({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.invalidCommand" as never,
+      commandId: "ulw.invalidCommand" as never,
     });
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.tmuxNextWindow",
+      "ulw.tmuxNextWindow",
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
-        "executeTmuxCommand failed for opencodeTui.tmuxNextWindow: command boom",
+        "executeTmuxCommand failed for ulw.tmuxNextWindow: command boom",
       ),
     );
   });
@@ -1131,7 +1131,7 @@ describe("MessageRouter", () => {
 
     await router.handleMessage({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxCreateWindow",
+      commandId: "ulw.tmuxCreateWindow",
     });
     await router.handleMessage({
       type: "executeTmuxRawCommand",

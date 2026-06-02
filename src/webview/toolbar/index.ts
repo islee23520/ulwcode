@@ -31,19 +31,19 @@ export function setupBackendToggleButton(
 export function setupTmuxWindowButtons(): void {
   bindTmuxCommandButton(
     "btn-new-editor-terminal",
-    "opencodeTui.openNewSessionTerminalInEditor",
+    "ulw.openNewSessionTerminalInEditor",
   );
   bindTmuxCommandButton(
     "btn-tmux-split-horizontal",
-    "opencodeTui.tmuxSplitPaneH",
+    "ulw.tmuxSplitPaneH",
   );
   bindTmuxCommandButton(
     "btn-tmux-split-vertical",
-    "opencodeTui.tmuxSplitPaneV",
+    "ulw.tmuxSplitPaneV",
   );
-  bindTmuxCommandButton("btn-tmux-prev-window", "opencodeTui.tmuxPrevWindow");
-  bindTmuxCommandButton("btn-tmux-new-window", "opencodeTui.tmuxCreateWindow");
-  bindTmuxCommandButton("btn-tmux-next-window", "opencodeTui.tmuxNextWindow");
+  bindTmuxCommandButton("btn-tmux-prev-window", "ulw.tmuxPrevWindow");
+  bindTmuxCommandButton("btn-tmux-new-window", "ulw.tmuxCreateWindow");
+  bindTmuxCommandButton("btn-tmux-next-window", "ulw.tmuxNextWindow");
 }
 
 function bindTmuxCommandButton(

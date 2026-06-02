@@ -96,27 +96,27 @@ describe("toolbar backend toggle", () => {
 
     expect(postMessageMock).toHaveBeenNthCalledWith(1, {
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.openNewSessionTerminalInEditor",
+      commandId: "ulw.openNewSessionTerminalInEditor",
     });
     expect(postMessageMock).toHaveBeenNthCalledWith(2, {
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxSplitPaneH",
+      commandId: "ulw.tmuxSplitPaneH",
     });
     expect(postMessageMock).toHaveBeenNthCalledWith(3, {
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxSplitPaneV",
+      commandId: "ulw.tmuxSplitPaneV",
     });
     expect(postMessageMock).toHaveBeenNthCalledWith(4, {
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxPrevWindow",
+      commandId: "ulw.tmuxPrevWindow",
     });
     expect(postMessageMock).toHaveBeenNthCalledWith(5, {
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxCreateWindow",
+      commandId: "ulw.tmuxCreateWindow",
     });
     expect(postMessageMock).toHaveBeenNthCalledWith(6, {
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxNextWindow",
+      commandId: "ulw.tmuxNextWindow",
     });
   });
 

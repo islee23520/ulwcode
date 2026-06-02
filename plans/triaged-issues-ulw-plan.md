@@ -188,7 +188,7 @@ Scenario C:
 - PASS: VS Code quick open이 뜨지 않고 TUI가 키를 받는다.
 
 Scenario D:
-- `opencodeTui.sendKeybindingsToShell=false`로 설정한 뒤 sidebar terminal focus 상태에서 Ctrl+P를 누른다.
+- `ulw.sendKeybindingsToShell=false`로 설정한 뒤 sidebar terminal focus 상태에서 Ctrl+P를 누른다.
 - PASS: terminal input으로 전달되지 않고 VS Code quick open 또는 IDE 기본 동작이 실행된다.
 
 ### GitHub 처리

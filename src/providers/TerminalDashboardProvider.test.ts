@@ -563,7 +563,7 @@ describe("TerminalDashboardProvider", () => {
     await flushPromises();
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.openSessionInNewWindow",
+      "ulw.openSessionInNewWindow",
       {
         sessionId: "repo-a",
         backend: "tmux",
@@ -572,10 +572,10 @@ describe("TerminalDashboardProvider", () => {
       },
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.createTmuxSession",
+      "ulw.createTmuxSession",
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.switchNativeShell",
+      "ulw.switchNativeShell",
     );
     expect(discoverSessions).toHaveBeenCalledTimes(4);
     expect(view.webview.postMessage).toHaveBeenCalledWith(
@@ -759,7 +759,7 @@ describe("TerminalDashboardProvider", () => {
     await flushPromises();
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.createTmuxSession",
+      "ulw.createTmuxSession",
     );
     expect(vi.mocked(tmuxSessionManager.createWindow)).toHaveBeenCalledWith(
       "repo-a",
@@ -785,7 +785,7 @@ describe("TerminalDashboardProvider", () => {
 
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
-      "opencodeTui.terminalDashboard",
+      "ulw.terminalDashboard",
       "ULW Terminal Manager",
       {
         preserveFocus: true,
@@ -1052,7 +1052,7 @@ describe("TerminalDashboardProvider", () => {
       }),
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.openSessionInNewWindow",
+      "ulw.openSessionInNewWindow",
       {
         sessionId: "shell-1",
         backend: "native",
@@ -1061,7 +1061,7 @@ describe("TerminalDashboardProvider", () => {
       },
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.killNativeShell",
+      "ulw.killNativeShell",
       "shell-1",
     );
   });
@@ -1092,7 +1092,7 @@ describe("TerminalDashboardProvider", () => {
     });
 
     expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
-      "opencodeTui.switchNativeShell",
+      "ulw.switchNativeShell",
     );
   });
 
@@ -1120,7 +1120,7 @@ describe("TerminalDashboardProvider", () => {
       "No workspace folder available",
     );
     expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
-      "opencodeTui.openSessionInNewWindow",
+      "ulw.openSessionInNewWindow",
       expect.anything(),
     );
   });
@@ -1309,7 +1309,7 @@ describe("TerminalDashboardProvider", () => {
     });
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.openSessionInNewWindow",
+      "ulw.openSessionInNewWindow",
       {
         sessionId: "repo-a",
         backend: "zellij",
@@ -1634,12 +1634,12 @@ describe("TerminalDashboardProvider", () => {
     ).handleWebviewMessage({ action: "killSession", sessionId: "repo-a-1" });
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.killTmuxSession",
+      "ulw.killTmuxSession",
       "repo-a-1",
     );
     expect(vscode.commands.executeCommand).toHaveBeenNthCalledWith(
       2,
-      "opencodeTui.switchTmuxSession",
+      "ulw.switchTmuxSession",
       expect.any(String),
     );
   });
@@ -2160,7 +2160,7 @@ describe("TerminalDashboardProvider", () => {
     await messageHandler({ action: "activateNativeShell", instanceId: "missing" });
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.switchNativeShell",
+      "ulw.switchNativeShell",
     );
   });
 

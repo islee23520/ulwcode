@@ -37,7 +37,7 @@ const commands: TmuxCommand[] = [
     requiresSession: false,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.browseTmuxSessions",
+      commandId: "ulw.browseTmuxSessions",
     }),
   },
   {
@@ -47,7 +47,7 @@ const commands: TmuxCommand[] = [
     requiresSession: false,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.createTmuxSession",
+      commandId: "ulw.createTmuxSession",
     }),
   },
   {
@@ -57,7 +57,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxKillSession",
+      commandId: "ulw.tmuxKillSession",
     }),
   },
   {
@@ -67,7 +67,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxCreateWindow",
+      commandId: "ulw.tmuxCreateWindow",
     }),
   },
   {
@@ -77,7 +77,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxNextWindow",
+      commandId: "ulw.tmuxNextWindow",
     }),
   },
   {
@@ -87,7 +87,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxPrevWindow",
+      commandId: "ulw.tmuxPrevWindow",
     }),
   },
   {
@@ -97,7 +97,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxSelectWindow",
+      commandId: "ulw.tmuxSelectWindow",
     }),
   },
   {
@@ -107,7 +107,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxKillWindow",
+      commandId: "ulw.tmuxKillWindow",
     }),
   },
   {
@@ -127,7 +127,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxSwitchPane",
+      commandId: "ulw.tmuxSwitchPane",
     }),
   },
   {
@@ -137,7 +137,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxSplitPaneH",
+      commandId: "ulw.tmuxSplitPaneH",
     }),
   },
   {
@@ -147,7 +147,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxSplitPaneV",
+      commandId: "ulw.tmuxSplitPaneV",
     }),
   },
   {
@@ -157,7 +157,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxSplitPaneWithCommand",
+      commandId: "ulw.tmuxSplitPaneWithCommand",
     }),
   },
   {
@@ -167,7 +167,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxSendTextToPane",
+      commandId: "ulw.tmuxSendTextToPane",
     }),
   },
   {
@@ -177,7 +177,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxResizePane",
+      commandId: "ulw.tmuxResizePane",
     }),
   },
   {
@@ -188,7 +188,7 @@ const commands: TmuxCommand[] = [
     unsupportedBackends: ["zellij"],
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxSwapPane",
+      commandId: "ulw.tmuxSwapPane",
     }),
   },
   {
@@ -198,7 +198,7 @@ const commands: TmuxCommand[] = [
     requiresSession: true,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxKillPane",
+      commandId: "ulw.tmuxKillPane",
     }),
   },
   {
@@ -217,7 +217,7 @@ const commands: TmuxCommand[] = [
     requiresSession: false,
     buildMessage: () => ({
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxRefresh",
+      commandId: "ulw.tmuxRefresh",
     }),
   },
   {

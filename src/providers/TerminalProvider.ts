@@ -30,11 +30,13 @@ import { ZellijSessionManager } from "../services/ZellijSessionManager";
 import { NativeTerminalManager } from "../services/NativeTerminalManager";
 import { TerminalBackendRegistry } from "../services/terminalBackends";
 
+type TerminalDefaultLocation = "editor" | "sidebar";
+
 export class TerminalProvider
   implements vscode.WebviewViewProvider, vscode.WebviewPanelSerializer
 {
-  public static readonly viewType = "opencodeTui";
-  public static readonly panelViewType = "opencodeTui.terminalEditor";
+  public static readonly viewType = "ulw";
+  public static readonly panelViewType = "ulw.terminalEditor";
 
   private _view?: vscode.WebviewView;
   private _panel?: vscode.WebviewPanel;
@@ -224,7 +226,7 @@ export class TerminalProvider
     this.postCurrentSessionState(webviewView.webview);
     this.flushPendingWebviewMessages(webviewView.webview);
 
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     const autoStartOnOpen = config.get<boolean>("autoStartOnOpen", true);
     const visibilityListener = webviewView.onDidChangeVisibility(() => {
       if (!webviewView.visible) {
@@ -282,6 +284,28 @@ export class TerminalProvider
     });
   }
 
+  public async startAtConfiguredLocation(): Promise<void> {
+    if (this.getTerminalDefaultLocation() === "sidebar") {
+      await this.startOpenCode();
+      return;
+    }
+
+    await this.revealOrOpenEditorTab();
+    if (!this.isStarted()) {
+      await this.startOpenCode();
+    }
+  }
+
+  public async focusAtConfiguredLocation(): Promise<void> {
+    if (this.getTerminalDefaultLocation() === "sidebar") {
+      await this.revealSidebarView();
+      return;
+    }
+
+    await this.revealOrOpenEditorTab();
+    this.focus();
+  }
+
   public async toggleEditorAttachment(): Promise<void> {
     if (this.editorPanels.size > 0) {
       const panels = [...this.editorPanels];
@@ -299,7 +323,7 @@ export class TerminalProvider
   }
 
   public async openInEditorTab(): Promise<void> {
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
 
     if (config.get<boolean>("collapseSecondaryBarOnEditorOpen", true)) {
       await vscode.commands.executeCommand(
@@ -317,6 +341,21 @@ export class TerminalProvider
     this.initializeEditorPanel(panel);
 
     await vscode.commands.executeCommand("workbench.action.lockEditorGroup");
+  }
+
+  private async revealOrOpenEditorTab(): Promise<void> {
+    if (this._panel) {
+      this._panel.reveal(vscode.ViewColumn.Active);
+      return;
+    }
+
+    await this.openInEditorTab();
+  }
+
+  private getTerminalDefaultLocation(): TerminalDefaultLocation {
+    const config = vscode.workspace.getConfiguration("ulw");
+    const configured = config.get<string>("terminal.defaultLocation", "editor");
+    return configured === "sidebar" ? "sidebar" : "editor";
   }
 
   public async deserializeWebviewPanel(
@@ -488,7 +527,7 @@ export class TerminalProvider
     backendHint?: TerminalBackendType,
   ): Promise<void> {
     if (savePreference) {
-      const config = vscode.workspace.getConfiguration("opencodeTui");
+      const config = vscode.workspace.getConfiguration("ulw");
       await config.update(
         "defaultAiTool",
         toolName,
@@ -658,7 +697,7 @@ export class TerminalProvider
     forceShow = false,
     targetPaneId?: string,
   ): Promise<void> {
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     if (forceShow && !config.get<boolean>("promptAiToolOnSession", true)) {
       return;
     }
@@ -756,7 +795,7 @@ export class TerminalProvider
       return false;
     }
 
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     const selectedAiTool = record.config.selectedAiTool;
     const items = resolveAiToolConfigs(config.get("aiTools", [])).map((tool) => ({
       label:
@@ -1252,7 +1291,7 @@ export class TerminalProvider
   private async revealSidebarView(): Promise<void> {
     try {
       await vscode.commands.executeCommand(
-        "workbench.view.extension.opencodeTuiContainer",
+        "workbench.view.extension.ulwContainer",
       );
     } catch {
       // intentionally empty: sidebar reveal is best-effort
@@ -1277,7 +1316,7 @@ export class TerminalProvider
     Extract<HostMessage, { type: "terminalConfig" }>,
     "type"
   > {
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     return {
       fontSize: config.get<number>("fontSize", 14),
       fontFamily: config.get<string>(
@@ -1468,7 +1507,7 @@ export class TerminalProvider
   }
 
   public toggleDashboard(): void {
-    void vscode.commands.executeCommand("opencodeTui.openTerminalManager");
+    void vscode.commands.executeCommand("ulw.openTerminalManager");
   }
 
   public toggleTmuxCommandToolbar(): void {

@@ -18,7 +18,7 @@
   - zellij: identity is `backend:zellij:session:<sessionId>`
   - native: identity is `backend:native:instance:<instanceId>`
 - Persist only metadata: backend, session/instance id, title, title override, workspace label, workspace URI, created/updated/interacted/last-seen timestamps, archived flag, parent thread id placeholder, and last-known state.
-- Persist with VS Code `ExtensionContext.globalState` under `opencodeTui.threadHistory.v1`; cap at 300 records; never persist prompts, terminal output, pane contents, HTTP responses, or preview text.
+- Persist with VS Code `ExtensionContext.globalState` under `ulw.threadHistory.v1`; cap at 300 records; never persist prompts, terminal output, pane contents, HTTP responses, or preview text.
 - Add a dedicated service in `src/services/ThreadHistoryStore.ts` with tests in `src/services/ThreadHistoryStore.test.ts`.
 - Extend `src/types.ts` first, then mirror dashboard-browser types in `src/webview/dashboard/types.ts`.
 - Extend the TerminalDashboardProvider-driven dashboard only: sidebar dashboard view and the `TerminalDashboardProvider.show()` panel.
@@ -174,7 +174,7 @@ Critical path: Task 2 -> Task 3 -> Task 5 -> Task 6 -> Task 9
 
 - [ ] 3. Add thread-history persistence service
 
-  What to do: Write RED tests in `src/services/ThreadHistoryStore.test.ts`, then implement `src/services/ThreadHistoryStore.ts`. The service must accept `vscode.ExtensionContext`, load from `globalState.get("opencodeTui.threadHistory.v1")`, sanitize malformed records, persist with `globalState.update`, and expose deterministic methods: `list(scope)`, `upsertObserved(records, now)`, `archive(id)`, `restore(id)`, `delete(id)`, `rename(id, titleOverride)`, `touchInteracted(id, now)`, and `toDashboardEntries(scope, observedIds)`. Sorting must be `interactedAt desc`, then `updatedAt desc`, then `createdAt desc`, then `title asc`. Filter out records with `parentThreadId` from top-level dashboard entries unless `includeChildren` is true. Enforce a 300-record cap after each write and drop oldest closed archived records first.
+  What to do: Write RED tests in `src/services/ThreadHistoryStore.test.ts`, then implement `src/services/ThreadHistoryStore.ts`. The service must accept `vscode.ExtensionContext`, load from `globalState.get("ulw.threadHistory.v1")`, sanitize malformed records, persist with `globalState.update`, and expose deterministic methods: `list(scope)`, `upsertObserved(records, now)`, `archive(id)`, `restore(id)`, `delete(id)`, `rename(id, titleOverride)`, `touchInteracted(id, now)`, and `toDashboardEntries(scope, observedIds)`. Sorting must be `interactedAt desc`, then `updatedAt desc`, then `createdAt desc`, then `title asc`. Filter out records with `parentThreadId` from top-level dashboard entries unless `includeChildren` is true. Enforce a 300-record cap after each write and drop oldest closed archived records first.
   Must NOT do: Do not call tmux/zellij managers, do not inspect terminals, do not persist previews/output/prompts, and do not mutate `InstanceStore`.
 
   Parallelization: Can parallel: YES | Wave 2 | Blocks: [5, 6] | Blocked by: [2]
@@ -192,7 +192,7 @@ Critical path: Task 2 -> Task 3 -> Task 5 -> Task 6 -> Task 9
   - [ ] RED evidence exists: `npm run test -- src/services/ThreadHistoryStore.test.ts 2>&1 | tee .omo/evidence/zed-thread-manager/task-3-store-red.txt` fails before implementation
   - [ ] GREEN evidence exists: `npm run test -- src/services/ThreadHistoryStore.test.ts 2>&1 | tee .omo/evidence/zed-thread-manager/task-3-store-green.txt` passes after implementation
   - [ ] Malformed persisted entries are ignored without throwing
-  - [ ] `globalState.update("opencodeTui.threadHistory.v1", ...)` is called only with sanitized records
+  - [ ] `globalState.update("ulw.threadHistory.v1", ...)` is called only with sanitized records
   - [ ] Tests prove forbidden privacy fields are not preserved when present in stored unknown input
   - [ ] Tests prove observed live entries are marked available and unobserved entries remain as closed history
 
@@ -294,7 +294,7 @@ Critical path: Task 2 -> Task 3 -> Task 5 -> Task 6 -> Task 9
 
 - [ ] 6. Wire provider actions and command surface
 
-  What to do: Write RED tests in `src/providers/TerminalDashboardProvider.test.ts`, `src/__tests__/manifest-branding.test.ts`, and command tests if package contributions change. Add provider state fields `threadHistoryMode: "current" | "history"` and `threadHistoryFilter: string`. Add action handling for `toggleThreadHistory`, `filterThreadHistory`, `activateThreadHistoryEntry`, `archiveThreadHistoryEntry`, `restoreThreadHistoryEntry`, `deleteThreadHistoryEntry`, and `renameThreadHistoryEntry`. Activation must reuse existing `openSessionInNewWindow` behavior when the entry is live and has a workspace URI; closed entries without a live target must show a warning and remain in history. Rename must use `vscode.window.showInputBox` and store `titleOverride` only. Add command `opencodeTui.toggleThreadHistory` only if the package/manifest task can preserve dirty package changes; command callback calls `TerminalDashboardProvider.toggleThreadHistory()` and refreshes the dashboard.
+  What to do: Write RED tests in `src/providers/TerminalDashboardProvider.test.ts`, `src/__tests__/manifest-branding.test.ts`, and command tests if package contributions change. Add provider state fields `threadHistoryMode: "current" | "history"` and `threadHistoryFilter: string`. Add action handling for `toggleThreadHistory`, `filterThreadHistory`, `activateThreadHistoryEntry`, `archiveThreadHistoryEntry`, `restoreThreadHistoryEntry`, `deleteThreadHistoryEntry`, and `renameThreadHistoryEntry`. Activation must reuse existing `openSessionInNewWindow` behavior when the entry is live and has a workspace URI; closed entries without a live target must show a warning and remain in history. Rename must use `vscode.window.showInputBox` and store `titleOverride` only. Add command `ulw.toggleThreadHistory` only if the package/manifest task can preserve dirty package changes; command callback calls `TerminalDashboardProvider.toggleThreadHistory()` and refreshes the dashboard.
   Must NOT do: Do not spawn tmux/zellij/native sessions for closed history entries in this version. Do not delete live tmux/zellij sessions when deleting a history record; delete only metadata unless the existing kill-session action is used.
 
   Parallelization: Can parallel: YES | Wave 4 | Blocks: [9] | Blocked by: [2, 3, 5]
@@ -306,7 +306,7 @@ Critical path: Task 2 -> Task 3 -> Task 5 -> Task 6 -> Task 9
   - Pattern:  `src/providers/TerminalDashboardProvider.ts:730` - existing kill-session behavior to keep distinct from history delete
   - Pattern:  `src/test/mocks/vscode.ts:9` - mocked `showWarningMessage`
   - Pattern:  `src/test/mocks/vscode.ts:29` - mocked `showInputBox`
-  - Pattern:  `package.json:55` - command contribution list if adding `opencodeTui.toggleThreadHistory`
+  - Pattern:  `package.json:55` - command contribution list if adding `ulw.toggleThreadHistory`
   - Test:     `src/__tests__/manifest-branding.test.ts:1` - manifest assertion pattern
   - External: `https://github.com/zed-industries/zed/blob/818244003b6db179ae175ae3171c8d7f2846e732/crates/agent_ui/src/thread_metadata_store.rs#L701` - title override concept only
   - External: `https://github.com/zed-industries/zed/blob/818244003b6db179ae175ae3171c8d7f2846e732/crates/sidebar/src/sidebar.rs#L7092` - history toggle concept only
@@ -315,7 +315,7 @@ Critical path: Task 2 -> Task 3 -> Task 5 -> Task 6 -> Task 9
   - [ ] RED evidence exists: `npm run test -- src/providers/TerminalDashboardProvider.test.ts src/__tests__/manifest-branding.test.ts 2>&1 | tee .omo/evidence/zed-thread-manager/task-6-actions-red.txt` fails before implementation
   - [ ] GREEN evidence exists: `npm run test -- src/providers/TerminalDashboardProvider.test.ts src/__tests__/manifest-branding.test.ts 2>&1 | tee .omo/evidence/zed-thread-manager/task-6-actions-green.txt` passes after implementation
   - [ ] Tests prove archive hides entries from current view and restore returns them to current view if live
-  - [ ] Tests prove delete removes metadata but does not call `opencodeTui.killTmuxSession`
+  - [ ] Tests prove delete removes metadata but does not call `ulw.killTmuxSession`
   - [ ] Tests prove rename stores title override and empty/cancelled input does not mutate
   - [ ] Tests prove closed entry activation shows warning instead of spawning a new session
 
@@ -324,7 +324,7 @@ Critical path: Task 2 -> Task 3 -> Task 5 -> Task 6 -> Task 9
   Scenario: metadata actions do not kill live sessions
     Tool:     bash
     Steps:    npm run test -- src/providers/TerminalDashboardProvider.test.ts -t "history delete" 2>&1 | tee .omo/evidence/zed-thread-manager/task-6-delete-no-kill.txt
-    Expected: command exits 0 and asserts `opencodeTui.killTmuxSession` is not called for history deletion
+    Expected: command exits 0 and asserts `ulw.killTmuxSession` is not called for history deletion
     Evidence: .omo/evidence/zed-thread-manager/task-6-delete-no-kill.txt
 
   Scenario: command contribution remains valid

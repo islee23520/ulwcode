@@ -11,7 +11,7 @@ export interface SessionWindowHandoff {
 
 export class SessionWindowHandoffService {
   private static readonly STORAGE_KEY =
-    "opencodeTui.pendingSessionWindowHandoffs";
+    "ulw.pendingSessionWindowHandoffs";
   private static readonly HANDOFF_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
   constructor(private readonly context: vscode.ExtensionContext) {}

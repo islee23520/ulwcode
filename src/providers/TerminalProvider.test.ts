@@ -70,6 +70,7 @@ describe("TerminalProvider", () => {
     aiTools?: readonly unknown[];
     collapseSecondaryBarOnEditorOpen?: boolean;
     promptAiToolOnSession?: boolean;
+    terminalDefaultLocation?: string;
   }) {
     const {
       autoStartOnOpen = false,
@@ -78,6 +79,7 @@ describe("TerminalProvider", () => {
       aiTools = DEFAULT_AI_TOOLS,
       collapseSecondaryBarOnEditorOpen = false,
       promptAiToolOnSession = true,
+      terminalDefaultLocation = "editor",
     } = options ?? {};
 
     const configuration = {
@@ -105,6 +107,9 @@ describe("TerminalProvider", () => {
         }
         if (key === "promptAiToolOnSession") {
           return promptAiToolOnSession;
+        }
+        if (key === "terminal.defaultLocation") {
+          return terminalDefaultLocation;
         }
         return defaultValue;
       }),
@@ -622,7 +627,7 @@ describe("TerminalProvider", () => {
     await provider.openInEditorTab();
 
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
-      "opencodeTui.terminalEditor",
+      "ulw.terminalEditor",
       "ULW Terminal",
       vscode.ViewColumn.Beside,
       expect.objectContaining({
@@ -646,6 +651,66 @@ describe("TerminalProvider", () => {
       paneId: "default",
       type: "focusTerminal",
     });
+  });
+
+  it("starts at the configured editor location and starts the runtime", async () => {
+    mockConfiguration({ terminalDefaultLocation: "editor" });
+    provider = createProvider();
+    resolveProvider(provider);
+    const startSpy = vi
+      .spyOn(provider["sessionRuntime"], "startOpenCode")
+      .mockResolvedValue(undefined);
+
+    await provider.startAtConfiguredLocation();
+
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+    expect(startSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts at the configured sidebar location without opening an editor panel", async () => {
+    mockConfiguration({ terminalDefaultLocation: "sidebar" });
+    provider = createProvider();
+    resolveProvider(provider);
+    const startSpy = vi
+      .spyOn(provider["sessionRuntime"], "startOpenCode")
+      .mockResolvedValue(undefined);
+
+    await provider.startAtConfiguredLocation();
+
+    expect(startSpy).toHaveBeenCalledTimes(1);
+    expect(vscode.window.createWebviewPanel).not.toHaveBeenCalled();
+  });
+
+  it("reuses an existing editor panel when focusing the configured editor location", async () => {
+    mockConfiguration({ terminalDefaultLocation: "editor" });
+    provider = createProvider();
+    resolveProvider(provider);
+    await provider.openInEditorTab();
+    const panel = vi.mocked(vscode.window.createWebviewPanel).mock.results[0]
+      ?.value as any;
+
+    await provider.focusAtConfiguredLocation();
+
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+    expect(panel.reveal).toHaveBeenCalledWith(vscode.ViewColumn.Active);
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      paneId: "default",
+      type: "focusTerminal",
+    });
+  });
+
+  it("falls back to the editor location for invalid terminal.defaultLocation values", async () => {
+    mockConfiguration({ terminalDefaultLocation: "floating" });
+    provider = createProvider();
+    resolveProvider(provider);
+
+    await provider.focusAtConfiguredLocation();
+
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "workbench.view.focus",
+      "ulw",
+    );
   });
 
   it("reinitializes a restored editor panel during deserialization", async () => {
@@ -703,7 +768,7 @@ describe("TerminalProvider", () => {
 
     expect(panel.dispose).toHaveBeenCalledTimes(1);
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "workbench.view.extension.opencodeTuiContainer",
+      "workbench.view.extension.ulwContainer",
     );
     expect(view.show).toHaveBeenCalledWith(true);
   });
@@ -2350,7 +2415,7 @@ describe("TerminalProvider", () => {
     await provider.openInEditorTab();
 
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
-      "opencodeTui.terminalEditor",
+      "ulw.terminalEditor",
       "ULW Terminal",
       vscode.ViewColumn.Beside,
       expect.any(Object),
@@ -2464,7 +2529,7 @@ describe("TerminalProvider", () => {
     provider.toggleDashboard();
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.openTerminalManager",
+      "ulw.openTerminalManager",
     );
   });
 

@@ -1,5 +1,5 @@
 {
-  "name": "opencode-sidebar-tui",
+  "name": "ulwcode",
   "displayName": "ULW",
   "description": "Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support",
   "version": "1.10.0",
@@ -35,242 +35,243 @@
     "viewsContainers": {
       "secondarySidebar": [
         {
-          "id": "opencodeTuiContainer",
+          "id": "ulwContainer",
           "title": "ULW",
-          "icon": "resources/opencode-activity-bar.svg"
+          "icon": "resources/ulwcode-activity-bar.svg"
         }
       ]
     },
     "views": {
-      "opencodeTuiContainer": [
+      "ulwContainer": [
         {
-          "id": "opencodeTui",
+          "id": "ulw",
           "name": "Terminal",
           "type": "webview",
-          "icon": "resources/opencode-activity-bar.svg",
+          "icon": "resources/ulwcode-activity-bar.svg",
+          "when": "config.ulw.terminal.defaultLocation == 'sidebar'",
           "initialOrder": 1
         }
       ]
     },
     "commands": [
       {
-        "command": "opencodeTui.start",
+        "command": "ulw.start",
         "title": "Start ULW Terminal",
         "category": "ULW"
       },
       {
-        "command": "opencodeTui.focus",
+        "command": "ulw.focus",
         "title": "ULW: Focus Terminal"
       },
       {
-        "command": "opencodeTui.sendToTerminal",
+        "command": "ulw.sendToTerminal",
         "title": "Send to Active Terminal",
         "category": "ULW"
       },
       {
-        "command": "opencodeTui.sendAtMention",
+        "command": "ulw.sendAtMention",
         "title": "Send File Reference (@file)",
         "category": "ULW"
       },
       {
-        "command": "opencodeTui.sendAllOpenFiles",
+        "command": "ulw.sendAllOpenFiles",
         "title": "Send All Open File References",
         "category": "ULW"
       },
       {
-        "command": "opencodeTui.sendFileToTerminal",
+        "command": "ulw.sendFileToTerminal",
         "title": "Send to Agent Terminal",
         "category": "ULW"
       },
       {
-        "command": "opencodeTui.paste",
+        "command": "ulw.paste",
         "title": "Paste",
         "category": "ULW",
         "icon": "$(clippy)"
       },
       {
-        "command": "opencode.openInNewWindow",
+        "command": "ulw.openInNewWindow",
         "title": "Open Tmux Session in New Window",
         "category": "ULW",
         "icon": "$(empty-window)"
       },
       {
-        "command": "opencodeTui.openSessionInNewWindow",
+        "command": "ulw.openSessionInNewWindow",
         "title": "Open Session in New Window",
         "category": "ULW",
         "icon": "$(empty-window)"
       },
       {
-        "command": "opencode.spawnForWorkspace",
+        "command": "ulw.spawnForWorkspace",
         "title": "Spawn Tmux Session for Workspace",
         "category": "ULW",
         "icon": "$(add)"
       },
       {
-        "command": "opencodeTui.selectInstance",
+        "command": "ulw.selectInstance",
         "title": "Select Agent Tmux Session",
         "category": "ULW",
         "icon": "$(server-environment)"
       },
       {
-        "command": "opencodeTui.switchTmuxSession",
+        "command": "ulw.switchTmuxSession",
         "title": "Switch Tmux Session",
         "category": "ULW"
       },
       {
-        "command": "opencodeTui.createTmuxSession",
+        "command": "ulw.createTmuxSession",
         "title": "ULW: Create Tmux Session"
       },
       {
-        "command": "opencodeTui.browseTmuxSessions",
+        "command": "ulw.browseTmuxSessions",
         "title": "Browse Tmux Sessions",
         "category": "ULW",
         "icon": "$(server-environment)"
       },
       {
-        "command": "opencodeTui.switchNativeShell",
+        "command": "ulw.switchNativeShell",
         "title": "Switch to Native Shell",
         "category": "ULW"
       },
       {
-        "command": "opencodeTui.killNativeShell",
+        "command": "ulw.killNativeShell",
         "title": "ULW: Kill Native Shell"
       },
       {
-        "command": "opencodeTui.openTerminalManager",
+        "command": "ulw.openTerminalManager",
         "title": "Open Terminal Manager",
         "category": "ULW",
         "icon": "$(server)"
       },
       {
-        "command": "opencodeTui.toggleDashboard",
+        "command": "ulw.toggleDashboard",
         "title": "Open ULW Terminal Manager",
         "category": "ULW",
         "icon": "$(dashboard)"
       },
       {
-        "command": "opencodeTui.toggleTmuxCommandToolbar",
+        "command": "ulw.toggleTmuxCommandToolbar",
         "title": "Toggle Tmux Command Toolbar",
         "category": "ULW",
         "icon": "$(list-tree)"
       },
       {
-        "command": "opencodeTui.openDashboardInEditor",
+        "command": "ulw.openDashboardInEditor",
         "title": "Open ULW Terminal Manager in Editor",
         "category": "ULW",
         "icon": "$(editor-layout)"
       },
       {
-        "command": "opencodeTui.openTerminalInEditor",
+        "command": "ulw.openTerminalInEditor",
         "title": "Open Terminal in Editor",
         "category": "ULW",
         "icon": {
-          "light": "resources/opencode-activity-bar.svg",
-          "dark": "resources/opencode-activity-bar-dark.svg"
+          "light": "resources/ulwcode-activity-bar.svg",
+          "dark": "resources/ulwcode-activity-bar-dark.svg"
         }
       },
       {
-        "command": "opencodeTui.openNewSessionTerminalInEditor",
+        "command": "ulw.openNewSessionTerminalInEditor",
         "title": "Open New Session Terminal in Editor",
         "category": "ULW",
         "icon": "$(terminal-new)"
       },
       {
-        "command": "opencodeTui.restoreTerminalToSidebar",
+        "command": "ulw.restoreTerminalToSidebar",
         "title": "Restore Terminal to Sidebar",
         "category": "ULW",
         "icon": "$(layout-sidebar-left)"
       },
       {
-        "command": "opencodeTui.tmuxSwitchPane",
+        "command": "ulw.tmuxSwitchPane",
         "title": "Switch to Pane",
         "category": "ULW",
         "icon": "$(check)"
       },
       {
-        "command": "opencodeTui.tmuxSplitPaneH",
+        "command": "ulw.tmuxSplitPaneH",
         "title": "Split Pane Horizontal",
         "category": "ULW",
         "icon": "$(split-horizontal)"
       },
       {
-        "command": "opencodeTui.tmuxSplitPaneV",
+        "command": "ulw.tmuxSplitPaneV",
         "title": "Split Pane Vertical",
         "category": "ULW",
         "icon": "$(split-vertical)"
       },
       {
-        "command": "opencodeTui.tmuxSplitPaneWithCommand",
+        "command": "ulw.tmuxSplitPaneWithCommand",
         "title": "Split Pane with Command",
         "category": "ULW",
         "icon": "$(terminal)"
       },
       {
-        "command": "opencodeTui.tmuxSendTextToPane",
+        "command": "ulw.tmuxSendTextToPane",
         "title": "Send Text to Pane",
         "category": "ULW",
         "icon": "$(file-symlink-file)"
       },
       {
-        "command": "opencodeTui.tmuxResizePane",
+        "command": "ulw.tmuxResizePane",
         "title": "Resize Pane",
         "category": "ULW",
         "icon": "$(move)"
       },
       {
-        "command": "opencodeTui.tmuxSwapPane",
+        "command": "ulw.tmuxSwapPane",
         "title": "Swap Panes",
         "category": "ULW",
         "icon": "$(arrow-swap)"
       },
       {
-        "command": "opencodeTui.tmuxKillPane",
+        "command": "ulw.tmuxKillPane",
         "title": "Kill Pane",
         "category": "ULW",
         "icon": "$(trash)"
       },
       {
-        "command": "opencodeTui.tmuxNextWindow",
+        "command": "ulw.tmuxNextWindow",
         "title": "Next Window",
         "category": "ULW",
         "icon": "$(chevron-right)"
       },
       {
-        "command": "opencodeTui.tmuxPrevWindow",
+        "command": "ulw.tmuxPrevWindow",
         "title": "Previous Window",
         "category": "ULW",
         "icon": "$(chevron-left)"
       },
       {
-        "command": "opencodeTui.tmuxCreateWindow",
+        "command": "ulw.tmuxCreateWindow",
         "title": "Create Window",
         "category": "ULW",
         "icon": "$(add)"
       },
       {
-        "command": "opencodeTui.tmuxKillWindow",
+        "command": "ulw.tmuxKillWindow",
         "title": "Kill Window",
         "category": "ULW",
         "icon": "$(trash)"
       },
       {
-        "command": "opencodeTui.tmuxSelectWindow",
+        "command": "ulw.tmuxSelectWindow",
         "title": "Select Window",
         "category": "ULW",
         "icon": "$(list-selection)"
       },
       {
-        "command": "opencodeTui.tmuxKillSession",
+        "command": "ulw.tmuxKillSession",
         "title": "Kill Session",
         "category": "ULW",
         "icon": "$(trash)"
       },
       {
-        "command": "opencodeTui.killTmuxSession",
+        "command": "ulw.killTmuxSession",
         "title": "ULW: Kill Tmux Session"
       },
       {
-        "command": "opencodeTui.tmuxRefresh",
+        "command": "ulw.tmuxRefresh",
         "title": "Refresh Terminal Manager",
         "category": "ULW",
         "icon": "$(refresh)"
@@ -280,58 +281,58 @@
       "view/title": [],
       "editor/title": [
         {
-          "command": "opencodeTui.openTerminalManager",
+          "command": "ulw.openTerminalManager",
           "group": "navigation",
-          "when": "opencodeTui.active"
+          "when": "ulw.active"
         },
         {
-          "command": "opencodeTui.openTerminalInEditor",
+          "command": "ulw.openTerminalInEditor",
           "group": "navigation@1",
-          "when": "opencodeTui.active"
+          "when": "ulw.active"
         }
       ],
       "explorer/context": [
         {
-          "command": "opencodeTui.sendFileToTerminal",
+          "command": "ulw.sendFileToTerminal",
           "group": "2_workspace",
           "when": "!explorerResourceIsFolder"
         },
         {
-          "command": "opencodeTui.sendFileToTerminal",
+          "command": "ulw.sendFileToTerminal",
           "group": "2_workspace",
           "when": "explorerResourceIsFolder"
         }
       ],
       "editor/context": [
         {
-          "command": "opencodeTui.sendAtMention",
+          "command": "ulw.sendAtMention",
           "group": "navigation"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "opencodeTui.sendAtMention",
+        "command": "ulw.sendAtMention",
         "key": "ctrl+alt+l",
         "mac": "cmd+alt+l",
         "when": "editorTextFocus || terminalFocus"
       },
       {
-        "command": "opencodeTui.sendAllOpenFiles",
+        "command": "ulw.sendAllOpenFiles",
         "key": "ctrl+alt+a",
         "mac": "cmd+alt+a",
         "when": "editorTextFocus || terminalFocus"
       },
       {
-        "command": "opencodeTui.browseTmuxSessions",
+        "command": "ulw.browseTmuxSessions",
         "key": "ctrl+alt+t",
         "mac": "cmd+alt+t",
-        "when": "focusedView == 'opencodeTui'"
+        "when": "focusedView == 'ulw'"
       },
       {
         "command": "-workbench.action.quickOpen",
         "key": "ctrl+p",
-        "when": "focusedView == 'opencodeTui'"
+        "when": "focusedView == 'ulw'"
       },
       {
         "command": "-workbench.action.quickOpenNavigateNextInFilePicker",
@@ -339,39 +340,39 @@
         "when": "inFilesPicker && inQuickOpen"
       },
       {
-        "command": "opencodeTui.paste",
+        "command": "ulw.paste",
         "key": "ctrl+v",
         "mac": "cmd+v",
-        "when": "focusedView == 'opencodeTui'"
+        "when": "focusedView == 'ulw'"
       },
       {
-        "command": "opencodeTui.toggleTmuxCommandToolbar",
+        "command": "ulw.toggleTmuxCommandToolbar",
         "key": "ctrl+alt+m",
         "mac": "cmd+alt+m",
-        "when": "focusedView == 'opencodeTui'"
+        "when": "focusedView == 'ulw'"
       }
     ],
     "configuration": {
       "title": "ULW",
       "properties": {
-        "opencodeTui.fontSize": {
+        "ulw.fontSize": {
           "type": "number",
           "default": 14,
           "minimum": 6,
           "maximum": 25,
           "description": "Terminal font size in pixels"
         },
-        "opencodeTui.fontFamily": {
+        "ulw.fontFamily": {
           "type": "string",
           "default": "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', 'CascadiaCode NF', Menlo, monospace",
           "description": "Terminal font family (Nerd Font recommended for Powerline/glyph support)"
         },
-        "opencodeTui.cursorBlink": {
+        "ulw.cursorBlink": {
           "type": "boolean",
           "default": true,
           "description": "Enable cursor blinking"
         },
-        "opencodeTui.cursorStyle": {
+        "ulw.cursorStyle": {
           "type": "string",
           "default": "block",
           "enum": [
@@ -381,29 +382,29 @@
           ],
           "description": "Cursor style"
         },
-        "opencodeTui.scrollback": {
+        "ulw.scrollback": {
           "type": "number",
           "default": 10000,
           "minimum": 0,
           "maximum": 100000,
           "description": "Maximum number of lines in scrollback buffer"
         },
-        "opencodeTui.autoFocusOnSend": {
+        "ulw.autoFocusOnSend": {
           "type": "boolean",
           "default": true,
           "description": "Automatically focus ULW after sending file references or text"
         },
-        "opencodeTui.autoStartOnOpen": {
+        "ulw.autoStartOnOpen": {
           "type": "boolean",
           "default": true,
           "description": "Automatically start the AI tool when the sidebar is opened. When false, shows a tool selector each time."
         },
-        "opencodeTui.shellPath": {
+        "ulw.shellPath": {
           "type": "string",
           "default": "",
           "description": "Custom shell path to use for the terminal. Leave empty to use VS Code's default shell. Useful for specifying PowerShell, Git Bash, or other shells on Windows."
         },
-        "opencodeTui.shellArgs": {
+        "ulw.shellArgs": {
           "type": "array",
           "items": {
             "type": "string"
@@ -411,34 +412,34 @@
           "default": [],
           "description": "Custom arguments to pass to the shell. Leave empty for automatic detection. Example: [\"/c\"] for cmd.exe or [\"-Command\"] for PowerShell."
         },
-        "opencodeTui.sendKeybindingsToShell": {
+        "ulw.sendKeybindingsToShell": {
           "type": "boolean",
           "default": true,
           "description": "Send Ctrl/Cmd + letter shortcuts (including Ctrl+P) directly to the sidebar terminal instead of letting VS Code intercept them. This extension's main purpose is running opencode (a TUI with its own keybindings), so the default is ON. You can turn it off if you prefer normal IDE shortcuts even when the sidebar terminal is focused. Control keys like Ctrl+C are always sent to the terminal."
         },
-        "opencodeTui.showTmuxWindowControls": {
+        "ulw.showTmuxWindowControls": {
           "type": "boolean",
           "default": true,
           "description": "Show direct tmux session and window controls (+S, previous window, +W, next window) in the terminal toolbar. Turn this off to keep only the tmux command menu."
         },
-        "opencodeTui.autoShareContext": {
+        "ulw.autoShareContext": {
           "type": "boolean",
           "default": true,
           "description": "Automatically share editor context (open files, selections) with OpenCode"
         },
-        "opencodeTui.httpTimeout": {
+        "ulw.httpTimeout": {
           "type": "number",
           "default": 5000,
           "minimum": 1000,
           "maximum": 30000,
           "description": "HTTP API request timeout in milliseconds for communication with OpenCode"
         },
-        "opencodeTui.enableHttpApi": {
+        "ulw.enableHttpApi": {
           "type": "boolean",
           "default": true,
           "description": "Enable HTTP API for bidirectional communication between VS Code and OpenCode"
         },
-        "opencodeTui.logLevel": {
+        "ulw.logLevel": {
           "type": "string",
           "enum": [
             "debug",
@@ -449,26 +450,26 @@
           "default": "info",
           "description": "Log output level for ULW"
         },
-        "opencodeTui.contextDebounceMs": {
+        "ulw.contextDebounceMs": {
           "type": "number",
           "default": 500,
           "minimum": 100,
           "maximum": 5000,
           "description": "Debounce delay for context updates (ms)"
         },
-        "opencodeTui.maxDiagnosticLength": {
+        "ulw.maxDiagnosticLength": {
           "type": "number",
           "default": 500,
           "minimum": 100,
           "maximum": 2000,
           "description": "Maximum length of diagnostic messages"
         },
-        "opencodeTui.enableAutoSpawn": {
+        "ulw.enableAutoSpawn": {
           "type": "boolean",
           "default": true,
           "description": "Auto-spawn OpenCode if not running"
         },
-        "opencodeTui.terminalBackend": {
+        "ulw.terminalBackend": {
           "type": "string",
           "default": "tmux",
           "enum": [
@@ -484,12 +485,26 @@
           "description": "Select the terminal backend. Unavailable backends safely fall back to native.",
           "order": 1
         },
-        "opencodeTui.collapseSecondaryBarOnEditorOpen": {
+        "ulw.terminal.defaultLocation": {
+          "type": "string",
+          "default": "editor",
+          "enum": [
+            "editor",
+            "sidebar"
+          ],
+          "enumDescriptions": [
+            "Open ULW as a VS Code editor tab by default.",
+            "Show and use the ULW secondary sidebar terminal by default."
+          ],
+          "description": "Choose where ULW opens by default. Use editor for a separate terminal window inside VS Code, or sidebar to expose the secondary sidebar terminal.",
+          "order": 2
+        },
+        "ulw.collapseSecondaryBarOnEditorOpen": {
           "type": "boolean",
           "default": true,
           "description": "Close the secondary sidebar before moving the terminal into an editor group so the new editor tab gets the full workspace width."
         },
-        "opencodeTui.codeActionSeverities": {
+        "ulw.codeActionSeverities": {
           "type": "array",
           "items": {
             "type": "string",
@@ -506,7 +521,7 @@
           ],
           "description": "Diagnostic severities that trigger code actions"
         },
-        "opencodeTui.aiTools": {
+        "ulw.aiTools": {
           "type": "array",
           "items": {
             "type": "object",
@@ -584,22 +599,22 @@
           ],
           "description": "Configure AI coding tools. Use Add Item to add new tools, Edit to modify, Delete to remove."
         },
-        "opencodeTui.defaultAiTool": {
+        "ulw.defaultAiTool": {
           "type": "string",
           "default": "opencode",
           "description": "Name of the default AI tool to launch when creating a new terminal session"
         },
-        "opencodeTui.promptAiToolOnSession": {
+        "ulw.promptAiToolOnSession": {
           "type": "boolean",
           "default": true,
           "description": "Show the AI tool selector popup when attaching to or creating a tmux/zellij session"
         },
-        "opencodeTui.projectList.openedOnly": {
+        "ulw.projectList.openedOnly": {
           "type": "boolean",
           "default": true,
           "description": "Show only opened projects in the ULW Terminal Manager project list by default."
         },
-        "opencodeTui.pane.defaultSplitDirection": {
+        "ulw.pane.defaultSplitDirection": {
           "type": "string",
           "default": "horizontal",
           "enum": [
@@ -608,17 +623,17 @@
           ],
           "description": "Default direction when splitting a terminal pane"
         },
-        "opencodeTui.pane.focusOnClick": {
+        "ulw.pane.focusOnClick": {
           "type": "boolean",
           "default": true,
           "description": "Focus a pane when clicking on it"
         },
-        "opencodeTui.pane.showPaneActions": {
+        "ulw.pane.showPaneActions": {
           "type": "boolean",
           "default": true,
           "description": "Show pane action buttons (split, close) in the terminal"
         },
-        "opencodeTui.pane.renderer": {
+        "ulw.pane.renderer": {
           "type": "string",
           "default": "auto",
           "enum": [

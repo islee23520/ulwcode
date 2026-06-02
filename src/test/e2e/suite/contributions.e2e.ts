@@ -11,6 +11,7 @@ interface ViewContribution {
   id?: string;
   name?: string;
   type?: string;
+  when?: string;
 }
 
 interface MenuContribution {
@@ -43,7 +44,7 @@ interface ExtensionPackageJSON {
 
 async function activateExtension(): Promise<vscode.Extension<unknown>> {
   const extension = vscode.extensions.getExtension(
-    "islee23520.opencode-sidebar-tui",
+    "islee23520.ulwcode",
   );
 
   assert.ok(extension, "Extension should be available in the test host");
@@ -62,11 +63,11 @@ suite("Package contribution metadata", () => {
     const secondarySidebar =
       packageJSON.contributes?.viewsContainers?.secondarySidebar ?? [];
     const container = secondarySidebar.find(
-      ({ id }) => id === "opencodeTuiContainer",
+      ({ id }) => id === "ulwContainer",
     );
 
-    assert.ok(container, "opencodeTuiContainer should be contributed");
-    assert.strictEqual(packageJSON.name, "opencode-sidebar-tui");
+    assert.ok(container, "ulwContainer should be contributed");
+    assert.strictEqual(packageJSON.name, "ulwcode");
     assert.strictEqual(packageJSON.publisher, "islee23520");
     assert.strictEqual(packageJSON.displayName, "ULW");
     assert.strictEqual(
@@ -74,23 +75,23 @@ suite("Package contribution metadata", () => {
       "Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support",
     );
     assert.strictEqual(container.title, "ULW");
-    assert.strictEqual(container.icon, "resources/opencode-activity-bar.svg");
+    assert.strictEqual(container.icon, "resources/ulwcode-activity-bar.svg");
     assert.strictEqual(packageJSON.contributes?.configuration?.title, "ULW");
   });
 
   test("contributes ULW command palette labels while preserving command IDs", async () => {
     const packageJSON = await getPackageJSON();
     const commands = packageJSON.contributes?.commands ?? [];
-    const start = commands.find(({ command }) => command === "opencodeTui.start");
-    const focus = commands.find(({ command }) => command === "opencodeTui.focus");
+    const start = commands.find(({ command }) => command === "ulw.start");
+    const focus = commands.find(({ command }) => command === "ulw.focus");
 
     assert.deepStrictEqual(start, {
-      command: "opencodeTui.start",
+      command: "ulw.start",
       title: "Start ULW Terminal",
       category: "ULW",
     });
     assert.deepStrictEqual(focus, {
-      command: "opencodeTui.focus",
+      command: "ulw.focus",
       title: "ULW: Focus Terminal",
     });
     assert.ok(
@@ -101,11 +102,15 @@ suite("Package contribution metadata", () => {
 
   test("contributes terminal view metadata", async () => {
     const packageJSON = await getPackageJSON();
-    const views = packageJSON.contributes?.views?.opencodeTuiContainer ?? [];
-    const terminalView = views.find(({ id }) => id === "opencodeTui");
+    const views = packageJSON.contributes?.views?.ulwContainer ?? [];
+    const terminalView = views.find(({ id }) => id === "ulw");
 
-    assert.ok(terminalView, "opencodeTui webview should be contributed");
+    assert.ok(terminalView, "ulw webview should be contributed");
     assert.strictEqual(terminalView.type, "webview");
+    assert.strictEqual(
+      terminalView.when,
+      "config.ulw.terminal.defaultLocation == 'sidebar'",
+    );
   });
 
   test("contributes editor and explorer context menus", async () => {
@@ -117,14 +122,14 @@ suite("Package contribution metadata", () => {
     assert.ok(
       editorContext.some(
         ({ command, group }) =>
-          command === "opencodeTui.sendAtMention" && group === "navigation",
+          command === "ulw.sendAtMention" && group === "navigation",
       ),
       "editor/context should include sendAtMention",
     );
     assert.ok(
       explorerContext.some(
         ({ command, group, when }) =>
-          command === "opencodeTui.sendFileToTerminal" &&
+          command === "ulw.sendFileToTerminal" &&
           group === "2_workspace" &&
           when === "!explorerResourceIsFolder",
       ),
@@ -133,7 +138,7 @@ suite("Package contribution metadata", () => {
     assert.ok(
       explorerContext.some(
         ({ command, group, when }) =>
-          command === "opencodeTui.sendFileToTerminal" &&
+          command === "ulw.sendFileToTerminal" &&
           group === "2_workspace" &&
           when === "explorerResourceIsFolder",
       ),
@@ -146,17 +151,17 @@ suite("Package contribution metadata", () => {
     const keybindings = packageJSON.contributes?.keybindings ?? [];
     const expectedKeybindings = [
       {
-        command: "opencodeTui.sendAtMention",
+        command: "ulw.sendAtMention",
         key: "ctrl+alt+l",
         mac: "cmd+alt+l",
       },
       {
-        command: "opencodeTui.sendAllOpenFiles",
+        command: "ulw.sendAllOpenFiles",
         key: "ctrl+alt+a",
         mac: "cmd+alt+a",
       },
       {
-        command: "opencodeTui.browseTmuxSessions",
+        command: "ulw.browseTmuxSessions",
         key: "ctrl+alt+t",
         mac: "cmd+alt+t",
       },

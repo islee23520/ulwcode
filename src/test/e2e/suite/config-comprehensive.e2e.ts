@@ -23,7 +23,7 @@ interface ConfigurationSpec {
 
 async function activateExtension(): Promise<vscode.Extension<unknown>> {
   const extension = vscode.extensions.getExtension(
-    "islee23520.opencode-sidebar-tui",
+    "islee23520.ulwcode",
   );
 
   assert.ok(extension, "Extension should be available in the test host");
@@ -51,109 +51,114 @@ const nerdFontStack =
   "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', 'CascadiaCode NF', Menlo, monospace";
 
 const configurationSpecs: Record<string, ConfigurationSpec> = {
-  "opencodeTui.fontSize": {
+  "ulw.fontSize": {
     type: "number",
     defaultValue: 14,
     minimum: 6,
     maximum: 25,
   },
-  "opencodeTui.fontFamily": {
+  "ulw.fontFamily": {
     type: "string",
     defaultValue: nerdFontStack,
   },
-  "opencodeTui.cursorBlink": { type: "boolean", defaultValue: true },
-  "opencodeTui.cursorStyle": {
+  "ulw.cursorBlink": { type: "boolean", defaultValue: true },
+  "ulw.cursorStyle": {
     type: "string",
     defaultValue: "block",
     enumValues: ["block", "underline", "bar"],
   },
-  "opencodeTui.scrollback": {
+  "ulw.scrollback": {
     type: "number",
     defaultValue: 10000,
     minimum: 0,
     maximum: 100000,
   },
-  "opencodeTui.autoFocusOnSend": { type: "boolean", defaultValue: true },
-  "opencodeTui.autoStartOnOpen": { type: "boolean", defaultValue: true },
-  "opencodeTui.shellPath": { type: "string", defaultValue: "" },
-  "opencodeTui.shellArgs": {
+  "ulw.autoFocusOnSend": { type: "boolean", defaultValue: true },
+  "ulw.autoStartOnOpen": { type: "boolean", defaultValue: true },
+  "ulw.shellPath": { type: "string", defaultValue: "" },
+  "ulw.shellArgs": {
     type: "array",
     defaultValue: [],
     itemType: "string",
   },
-  "opencodeTui.sendKeybindingsToShell": {
+  "ulw.sendKeybindingsToShell": {
     type: "boolean",
     defaultValue: true,
   },
-  "opencodeTui.showTmuxWindowControls": {
+  "ulw.showTmuxWindowControls": {
     type: "boolean",
     defaultValue: true,
   },
-  "opencodeTui.autoShareContext": { type: "boolean", defaultValue: true },
-  "opencodeTui.httpTimeout": {
+  "ulw.autoShareContext": { type: "boolean", defaultValue: true },
+  "ulw.httpTimeout": {
     type: "number",
     defaultValue: 5000,
     minimum: 1000,
     maximum: 30000,
   },
-  "opencodeTui.enableHttpApi": { type: "boolean", defaultValue: true },
-  "opencodeTui.logLevel": {
+  "ulw.enableHttpApi": { type: "boolean", defaultValue: true },
+  "ulw.logLevel": {
     type: "string",
     defaultValue: "info",
     enumValues: ["debug", "info", "warn", "error"],
   },
-  "opencodeTui.contextDebounceMs": {
+  "ulw.contextDebounceMs": {
     type: "number",
     defaultValue: 500,
     minimum: 100,
     maximum: 5000,
   },
-  "opencodeTui.maxDiagnosticLength": {
+  "ulw.maxDiagnosticLength": {
     type: "number",
     defaultValue: 500,
     minimum: 100,
     maximum: 2000,
   },
-  "opencodeTui.enableAutoSpawn": { type: "boolean", defaultValue: true },
-  "opencodeTui.terminalBackend": {
+  "ulw.enableAutoSpawn": { type: "boolean", defaultValue: true },
+  "ulw.terminalBackend": {
     type: "string",
     defaultValue: "tmux",
     enumValues: ["native", "tmux", "zellij"],
   },
-  "opencodeTui.collapseSecondaryBarOnEditorOpen": {
+  "ulw.terminal.defaultLocation": {
+    type: "string",
+    defaultValue: "editor",
+    enumValues: ["editor", "sidebar"],
+  },
+  "ulw.collapseSecondaryBarOnEditorOpen": {
     type: "boolean",
     defaultValue: true,
   },
-  "opencodeTui.codeActionSeverities": {
+  "ulw.codeActionSeverities": {
     type: "array",
     defaultValue: ["error", "warning"],
     itemType: "string",
   },
-  "opencodeTui.aiTools": { type: "array", defaultValue: undefined },
-  "opencodeTui.defaultAiTool": { type: "string", defaultValue: "opencode" },
-  "opencodeTui.promptAiToolOnSession": {
+  "ulw.aiTools": { type: "array", defaultValue: undefined },
+  "ulw.defaultAiTool": { type: "string", defaultValue: "opencode" },
+  "ulw.promptAiToolOnSession": {
     type: "boolean",
     defaultValue: true,
   },
-  "opencodeTui.pane.defaultSplitDirection": {
+  "ulw.pane.defaultSplitDirection": {
     type: "string",
     defaultValue: "horizontal",
     enumValues: ["horizontal", "vertical"],
   },
-  "opencodeTui.pane.focusOnClick": {
+  "ulw.pane.focusOnClick": {
     type: "boolean",
     defaultValue: true,
   },
-  "opencodeTui.pane.showPaneActions": {
+  "ulw.pane.showPaneActions": {
     type: "boolean",
     defaultValue: true,
   },
-  "opencodeTui.pane.renderer": {
+  "ulw.pane.renderer": {
     type: "string",
     defaultValue: "auto",
     enumValues: ["webgl", "canvas", "auto"],
   },
-  "opencodeTui.projectList.openedOnly": {
+  "ulw.projectList.openedOnly": {
     type: "boolean",
     defaultValue: true,
   },
@@ -167,7 +172,7 @@ function assertConfigurationProperty(
   assert.ok(property, `${id} should be contributed`);
   assert.strictEqual(property.type, spec.type, `${id} should have expected type`);
 
-  if (id !== "opencodeTui.aiTools") {
+  if (id !== "ulw.aiTools") {
     assert.deepStrictEqual(
       property.default,
       spec.defaultValue,
@@ -193,12 +198,12 @@ function assertConfigurationProperty(
 }
 
 suite("Comprehensive configuration contributions", () => {
-  test("contributes exactly the expected 29 configuration properties", async () => {
+  test("contributes exactly the expected 30 configuration properties", async () => {
     const extension = await activateExtension();
     const properties = getConfigurationProperties(extension);
     const expectedPropertyIds = Object.keys(configurationSpecs).sort();
 
-    assert.strictEqual(expectedPropertyIds.length, 29);
+    assert.strictEqual(expectedPropertyIds.length, 30);
     assert.deepStrictEqual(Object.keys(properties).sort(), expectedPropertyIds);
   });
 
@@ -214,7 +219,7 @@ suite("Comprehensive configuration contributions", () => {
   test("defines aiTools object schema and default tools", async () => {
     const extension = await activateExtension();
     const properties = getConfigurationProperties(extension);
-    const aiTools = properties["opencodeTui.aiTools"];
+    const aiTools = properties["ulw.aiTools"];
 
     assert.strictEqual(aiTools?.type, "array");
     assert.strictEqual(aiTools?.items?.type, "object");
@@ -256,7 +261,7 @@ suite("Runtime configuration defaults", () => {
   test("reads key defaults from vscode.workspace.getConfiguration", async () => {
     await activateExtension();
 
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     const defaultValue = (key: string): unknown =>
       config.inspect(key)?.defaultValue;
 

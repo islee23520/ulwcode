@@ -1,0 +1,6 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="6" y="6" width="52" height="52" rx="10" fill="#111827"/>
+  <path d="M18 18v16c0 7 4.5 12 13 12s13-5 13-12V18h-7v16c0 4-2.2 6.5-6 6.5S25 38 25 34V18h-7z" fill="#F9FAFB"/>
+  <path d="M18 50h28" stroke="#38BDF8" stroke-width="4" stroke-linecap="round"/>
+  <text x="32" y="58" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="700" fill="#38BDF8">ULW</text>
+</svg>

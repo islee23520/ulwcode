@@ -28,7 +28,7 @@ export class OpenCodeCodeActionProvider implements vscode.CodeActionProvider {
 
   public registerCommand(): vscode.Disposable {
     return vscode.commands.registerCommand(
-      "opencodeTui.explainAndFix",
+      "ulw.explainAndFix",
       async (args?: ExplainAndFixCommandArgs) => {
         if (!args?.diagnostic || !args.documentUri) {
           vscode.window.showWarningMessage(
@@ -94,7 +94,7 @@ export class OpenCodeCodeActionProvider implements vscode.CodeActionProvider {
       isPreferred: true,
       command: {
         title: "Explain and Fix (Terminal)",
-        command: "opencodeTui.explainAndFix",
+        command: "ulw.explainAndFix",
         arguments: [
           {
             diagnostic,
@@ -108,7 +108,7 @@ export class OpenCodeCodeActionProvider implements vscode.CodeActionProvider {
   }
 
   private getConfiguredSeverities(): Set<vscode.DiagnosticSeverity> {
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     const severities = config.get<SeverityName[]>("codeActionSeverities", [
       "error",
       "warning",
@@ -128,7 +128,7 @@ export class OpenCodeCodeActionProvider implements vscode.CodeActionProvider {
     diagnostic: vscode.Diagnostic,
     document: vscode.TextDocument,
   ): string {
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     const maxDiagnosticLength = config.get<number>("maxDiagnosticLength", 500);
 
     const primaryDiagnostic = formatDiagnostic(

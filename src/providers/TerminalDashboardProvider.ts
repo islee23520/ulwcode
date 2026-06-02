@@ -39,7 +39,7 @@ interface ResolvedDashboardSession extends DashboardSessionSource {
 export class TerminalDashboardProvider
   implements vscode.WebviewViewProvider, vscode.Disposable
 {
-  public static readonly viewType = "opencodeTui.terminalDashboard";
+  public static readonly viewType = "ulw.terminalDashboard";
 
   private view?: vscode.WebviewView;
   private panel?: vscode.WebviewPanel;
@@ -188,7 +188,7 @@ export class TerminalDashboardProvider
 
       const panesMap: Record<string, TmuxDashboardPaneDto[]> = {};
       const windowsMap: Record<string, TmuxDashboardWindowDto[]> = {};
-      const config = vscode.workspace.getConfiguration("opencodeTui");
+      const config = vscode.workspace.getConfiguration("ulw");
       const tools: AiToolConfig[] = resolveAiToolConfigs(
         config.get("aiTools", []),
       );
@@ -447,7 +447,7 @@ export class TerminalDashboardProvider
           return;
         }
         await vscode.commands.executeCommand(
-          "opencodeTui.openSessionInNewWindow",
+          "ulw.openSessionInNewWindow",
           {
             sessionId: message.sessionId,
             backend,
@@ -459,11 +459,11 @@ export class TerminalDashboardProvider
         return;
       }
       case "create":
-        await vscode.commands.executeCommand("opencodeTui.createTmuxSession");
+        await vscode.commands.executeCommand("ulw.createTmuxSession");
         await this.postSessionsToWebview();
         return;
       case "switchNativeShell":
-        await vscode.commands.executeCommand("opencodeTui.switchNativeShell");
+        await vscode.commands.executeCommand("ulw.switchNativeShell");
         await this.postSessionsToWebview();
         return;
       case "createNativeShell":
@@ -491,7 +491,7 @@ export class TerminalDashboardProvider
             this.instanceStore.setActive(newId);
           }
 
-          await vscode.commands.executeCommand("opencodeTui.switchNativeShell");
+          await vscode.commands.executeCommand("ulw.switchNativeShell");
           await this.postSessionsToWebview();
         }
         return;
@@ -502,7 +502,7 @@ export class TerminalDashboardProvider
           return;
         }
         await vscode.commands.executeCommand(
-          "opencodeTui.openSessionInNewWindow",
+          "ulw.openSessionInNewWindow",
           {
             sessionId: message.instanceId,
             backend: "native",
@@ -516,7 +516,7 @@ export class TerminalDashboardProvider
         let targetPaneId: string | undefined;
         let resolvedTool: string | undefined;
         try {
-          const config = vscode.workspace.getConfiguration("opencodeTui");
+          const config = vscode.workspace.getConfiguration("ulw");
           const tools: AiToolConfig[] = resolveAiToolConfigs(
             config.get("aiTools", []),
           );
@@ -752,7 +752,7 @@ export class TerminalDashboardProvider
       case "killNativeShell": {
         await this.threadHistoryStore?.removeTerminal(message.instanceId);
         await vscode.commands.executeCommand(
-          "opencodeTui.killNativeShell",
+          "ulw.killNativeShell",
           message.instanceId,
         );
         await this.postSessionsToWebview();
@@ -771,7 +771,7 @@ export class TerminalDashboardProvider
           await this.terminalProvider.killTmuxSession(message.sessionId);
         } else {
           await vscode.commands.executeCommand(
-            "opencodeTui.killTmuxSession",
+            "ulw.killTmuxSession",
             message.sessionId,
           );
         }
@@ -787,7 +787,7 @@ export class TerminalDashboardProvider
               await this.terminalProvider?.switchToZellijSession(nextSession.id);
             } else {
               await vscode.commands.executeCommand(
-                "opencodeTui.switchTmuxSession",
+                "ulw.switchTmuxSession",
                 nextSession.id,
               );
             }
@@ -847,7 +847,7 @@ export class TerminalDashboardProvider
   ): Promise<void> {
     const webview = this.getActiveWebview();
     if (webview) {
-      const config = vscode.workspace.getConfiguration("opencodeTui");
+      const config = vscode.workspace.getConfiguration("ulw");
       const tools: AiToolConfig[] = resolveAiToolConfigs(
         config.get("aiTools", []),
       );

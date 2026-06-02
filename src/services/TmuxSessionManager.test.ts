@@ -1570,7 +1570,7 @@ describe("TmuxSessionManager", () => {
         {
           stdout: [
             "%0\t0\tOC | ULTRAWORK MODE ENABLED!\t1\tnode\t42783\t@0\t/workspaces/repo-a\t0\t0\t100\t20",
-            "%1\t1\t⠇ opencode-sidebar-tui\t0\tnode\t13140\t@0\t/workspaces/repo-a\t100\t0\t100\t20",
+            "%1\t1\t⠇ ulwcode\t0\tnode\t13140\t@0\t/workspaces/repo-a\t100\t0\t100\t20",
           ].join("\n"),
         },
         {
@@ -1609,7 +1609,7 @@ describe("TmuxSessionManager", () => {
         {
           paneId: "%1",
           index: 1,
-          title: "⠇ opencode-sidebar-tui",
+          title: "⠇ ulwcode",
           isActive: false,
           currentCommand: "node",
           panePid: 13140,

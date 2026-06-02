@@ -44,13 +44,13 @@ For VSCodium, Gitpod, Eclipse Theia, and other compatible IDEs:
 2. Search for **ULW**.
 3. Click **Install**.
 
-You can also use the [OpenVSX page](https://open-vsx.org/extension/islee23520/opencode-sidebar-tui).
+You can also use the [OpenVSX page](https://open-vsx.org/extension/islee23520/ulwcode).
 
 ### Install from Source
 
 ```bash
-git clone https://github.com/islee23520/opencode-sidebar-tui.git
-cd opencode-sidebar-tui
+git clone https://github.com/islee23520/ulwcode.git
+cd ulwcode
 npm install
 npm run compile
 npx @vscode/vsce package
@@ -137,30 +137,30 @@ The most important settings stay in English because they must match the real VS 
 
 | Setting                       | Description                                             |
 | ----------------------------- | ------------------------------------------------------- |
-| `opencodeTui.autoStart`       | Start the configured AI tool automatically when the view is activated |
-| `opencodeTui.autoStartOnOpen` | Start the configured AI tool when the sidebar opens                   |
-| `opencodeTui.fontSize`        | Terminal font size                                      |
-| `opencodeTui.fontFamily`      | Terminal font family                                    |
-| `opencodeTui.autoFocusOnSend` | Focus the sidebar after sending file references         |
+| `ulw.autoStart`       | Start the configured AI tool automatically when the view is activated |
+| `ulw.autoStartOnOpen` | Start the configured AI tool when the sidebar opens                   |
+| `ulw.fontSize`        | Terminal font size                                      |
+| `ulw.fontFamily`      | Terminal font family                                    |
+| `ulw.autoFocusOnSend` | Focus the sidebar after sending file references         |
 
 ### HTTP API and Context Sharing
 
 | Setting                         | Description                        |
 | ------------------------------- | ---------------------------------- |
-| `opencodeTui.enableHttpApi`     | Enable HTTP API communication      |
-| `opencodeTui.httpTimeout`       | Request timeout in milliseconds    |
-| `opencodeTui.autoShareContext`  | Share editor context automatically |
-| `opencodeTui.contextDebounceMs` | Debounce delay for context updates |
+| `ulw.enableHttpApi`     | Enable HTTP API communication      |
+| `ulw.httpTimeout`       | Request timeout in milliseconds    |
+| `ulw.autoShareContext`  | Share editor context automatically |
+| `ulw.contextDebounceMs` | Debounce delay for context updates |
 
 ### AI Tool and tmux Behavior
 
 | Setting                          | Description                                       |
 | -------------------------------- | ------------------------------------------------- |
-| `opencodeTui.aiTools`            | Configure available AI tools                      |
-| `opencodeTui.defaultAiTool`      | Default tool for new `tmux` sessions              |
-| `opencodeTui.enableAutoSpawn`    | Auto-spawn OpenCode if it is not already running  |
-| `opencodeTui.nativeShellDefault` | Default behavior when switching to a native shell |
-| `opencodeTui.tmuxSessionDefault` | Default behavior for new `tmux` sessions          |
+| `ulw.aiTools`            | Configure available AI tools                      |
+| `ulw.defaultAiTool`      | Default tool for new `tmux` sessions              |
+| `ulw.enableAutoSpawn`    | Auto-spawn OpenCode if it is not already running  |
+| `ulw.nativeShellDefault` | Default behavior when switching to a native shell |
+| `ulw.tmuxSessionDefault` | Default behavior for new `tmux` sessions          |
 
 ## Requirements
 

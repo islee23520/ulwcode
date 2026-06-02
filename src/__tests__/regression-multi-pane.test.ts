@@ -188,7 +188,7 @@ describe("multi-pane regression coverage", () => {
 
     const providerRegistration = vi
       .mocked(vscode.window.registerWebviewViewProvider)
-      .mock.calls.find((call) => call[0] === "opencodeTui");
+      .mock.calls.find((call) => call[0] === "ulw");
 
     expect(providerRegistration).toBeDefined();
 

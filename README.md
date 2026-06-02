@@ -1,7 +1,7 @@
 # ULW
 
-[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/islee23520.opencode-sidebar-tui?logo=visual-studio-code&label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=islee23520.opencode-sidebar-tui)
-[![Open VSX](https://img.shields.io/open-vsx/v/islee23520/opencode-sidebar-tui?logo=open-vsx&label=Open%20VSX)](https://open-vsx.org/extension/islee23520/opencode-sidebar-tui)
+[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/islee23520.ulwcode?logo=visual-studio-code&label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=islee23520.ulwcode)
+[![Open VSX](https://img.shields.io/open-vsx/v/islee23520/ulwcode?logo=open-vsx&label=Open%20VSX)](https://open-vsx.org/extension/islee23520/ulwcode)
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?logo=githubsponsors)](https://github.com/sponsors/islee23520)
 
 Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support.
@@ -66,15 +66,15 @@ For VSCodium, Gitpod, Eclipse Theia, and other VS Code-compatible IDEs:
 2. Search for "ULW"
 3. Click **Install**
 
-Or visit the [OpenVSX page](https://open-vsx.org/extension/islee23520/opencode-sidebar-tui).
+Or visit the [OpenVSX page](https://open-vsx.org/extension/islee23520/ulwcode).
 
 ### From Source
 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/islee23520/opencode-sidebar-tui.git
-cd opencode-sidebar-tui
+git clone https://github.com/islee23520/ulwcode.git
+cd ulwcode
 ```
 
 2. Install dependencies:
@@ -209,9 +209,9 @@ The extension communicates with OpenCode CLI via an HTTP API for reliable bidire
 
 ```json
 {
-  "opencodeTui.enableHttpApi": true,
-  "opencodeTui.httpTimeout": 5000,
-  "opencodeTui.autoShareContext": true
+  "ulw.enableHttpApi": true,
+  "ulw.httpTimeout": 5000,
+  "ulw.autoShareContext": true
 }
 ```
 
@@ -233,16 +233,17 @@ Available settings in VS Code settings (`Cmd+,` / `Ctrl+,`):
 
 | Setting                       | Type    | Default           | Description                                             |
 | ----------------------------- | ------- | ----------------- | ------------------------------------------------------- |
-| `opencodeTui.autoStart`       | boolean | `true`            | Automatically start OpenCode when the view is activated |
-| `opencodeTui.autoStartOnOpen` | boolean | `true`            | Automatically start OpenCode when sidebar is opened     |
-| `opencodeTui.fontSize`        | number  | `14`              | Terminal font size in pixels (6-25)                     |
-| `opencodeTui.fontFamily`      | string  | Nerd Font stack\* | Terminal font family                                    |
-| `opencodeTui.cursorBlink`     | boolean | `true`            | Enable cursor blinking                                  |
-| `opencodeTui.cursorStyle`     | string  | `"block"`         | Cursor style: `block`, `underline`, or `bar`            |
-| `opencodeTui.scrollback`      | number  | `10000`           | Maximum lines in scrollback buffer (0-100000)           |
-| `opencodeTui.autoFocusOnSend` | boolean | `true`            | Auto-focus sidebar after sending file references        |
-| `opencodeTui.shellPath`       | string  | `""`              | Custom shell path (empty = VS Code default)             |
-| `opencodeTui.shellArgs`       | array   | `[]`              | Custom shell arguments                                  |
+| `ulw.autoStart`       | boolean | `true`            | Automatically start OpenCode when the view is activated |
+| `ulw.autoStartOnOpen` | boolean | `true`            | Automatically start OpenCode when sidebar is opened     |
+| `ulw.fontSize`        | number  | `14`              | Terminal font size in pixels (6-25)                     |
+| `ulw.fontFamily`      | string  | Nerd Font stack\* | Terminal font family                                    |
+| `ulw.cursorBlink`     | boolean | `true`            | Enable cursor blinking                                  |
+| `ulw.cursorStyle`     | string  | `"block"`         | Cursor style: `block`, `underline`, or `bar`            |
+| `ulw.scrollback`      | number  | `10000`           | Maximum lines in scrollback buffer (0-100000)           |
+| `ulw.terminal.defaultLocation` | string | `"editor"` | Default terminal location: `editor` or `sidebar`        |
+| `ulw.autoFocusOnSend` | boolean | `true`            | Auto-focus ULW after sending file references            |
+| `ulw.shellPath`       | string  | `""`              | Custom shell path (empty = VS Code default)             |
+| `ulw.shellArgs`       | array   | `[]`              | Custom shell arguments                                  |
 
 \* Default: `'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', 'CascadiaCode NF', Menlo, monospace`
 
@@ -250,49 +251,49 @@ Available settings in VS Code settings (`Cmd+,` / `Ctrl+,`):
 
 | Setting                         | Type    | Default | Description                                      |
 | ------------------------------- | ------- | ------- | ------------------------------------------------ |
-| `opencodeTui.enableHttpApi`     | boolean | `true`  | Enable HTTP API for OpenCode communication       |
-| `opencodeTui.httpTimeout`       | number  | `5000`  | HTTP API request timeout in ms (1000-30000)      |
-| `opencodeTui.autoShareContext`  | boolean | `true`  | Auto-share editor context with OpenCode          |
-| `opencodeTui.contextDebounceMs` | number  | `500`   | Debounce delay for context updates (100-5000 ms) |
+| `ulw.enableHttpApi`     | boolean | `true`  | Enable HTTP API for OpenCode communication       |
+| `ulw.httpTimeout`       | number  | `5000`  | HTTP API request timeout in ms (1000-30000)      |
+| `ulw.autoShareContext`  | boolean | `true`  | Auto-share editor context with OpenCode          |
+| `ulw.contextDebounceMs` | number  | `500`   | Debounce delay for context updates (100-5000 ms) |
 
 ### AI Tool Settings
 
 | Setting                       | Type    | Default                       | Description                                               |
 | ----------------------------- | ------- | ----------------------------- | --------------------------------------------------------- |
-| `opencodeTui.aiTools`         | array   | `[{opencode, claude, codex}]` | Configure AI coding tools with custom paths and arguments |
-| `opencodeTui.defaultAiTool`   | string  | `"opencode"`                  | Default AI tool for new tmux sessions                     |
-| `opencodeTui.enableAutoSpawn` | boolean | `true`                        | Auto-spawn OpenCode if not running                        |
+| `ulw.aiTools`         | array   | `[{opencode, claude, codex}]` | Configure AI coding tools with custom paths and arguments |
+| `ulw.defaultAiTool`   | string  | `"opencode"`                  | Default AI tool for new tmux sessions                     |
+| `ulw.enableAutoSpawn` | boolean | `true`                        | Auto-spawn OpenCode if not running                        |
 
 ### Tmux Settings
 
 | Setting                          | Type   | Default | Description                                                              |
 | -------------------------------- | ------ | ------- | ------------------------------------------------------------------------ |
-| `opencodeTui.nativeShellDefault` | string | `""`    | Default behavior for native shell switch (`""`, `"opencode"`, `"shell"`) |
-| `opencodeTui.tmuxSessionDefault` | string | `""`    | Default behavior for new tmux sessions (`""`, `"opencode"`, `"shell"`)   |
-| `opencodeTui.showTmuxWindowControls` | boolean | `true` | Show direct tmux session/window controls in the terminal toolbar          |
+| `ulw.nativeShellDefault` | string | `""`    | Default behavior for native shell switch (`""`, `"opencode"`, `"shell"`) |
+| `ulw.tmuxSessionDefault` | string | `""`    | Default behavior for new tmux sessions (`""`, `"opencode"`, `"shell"`)   |
+| `ulw.showTmuxWindowControls` | boolean | `true` | Show direct tmux session/window controls in the terminal toolbar          |
 
 ### Advanced Settings
 
 | Setting                            | Type   | Default                | Description                                      |
 | ---------------------------------- | ------ | ---------------------- | ------------------------------------------------ |
-| `opencodeTui.logLevel`             | string | `"info"`               | Log level: `debug`, `info`, `warn`, `error`      |
-| `opencodeTui.maxDiagnosticLength`  | number | `500`                  | Maximum length of diagnostic messages (100-2000) |
-| `opencodeTui.codeActionSeverities` | array  | `["error", "warning"]` | Diagnostic severities that trigger code actions  |
+| `ulw.logLevel`             | string | `"info"`               | Log level: `debug`, `info`, `warn`, `error`      |
+| `ulw.maxDiagnosticLength`  | number | `500`                  | Maximum length of diagnostic messages (100-2000) |
+| `ulw.codeActionSeverities` | array  | `["error", "warning"]` | Diagnostic severities that trigger code actions  |
 
 ### Example Configuration
 
 ```json
 {
-  "opencodeTui.autoStart": true,
-  "opencodeTui.fontSize": 14,
-  "opencodeTui.fontFamily": "'JetBrainsMono Nerd Font', monospace",
-  "opencodeTui.cursorBlink": true,
-  "opencodeTui.cursorStyle": "block",
-  "opencodeTui.scrollback": 10000,
-  "opencodeTui.enableHttpApi": true,
-  "opencodeTui.httpTimeout": 5000,
-  "opencodeTui.autoShareContext": true,
-  "opencodeTui.defaultAiTool": "opencode"
+  "ulw.autoStart": true,
+  "ulw.fontSize": 14,
+  "ulw.fontFamily": "'JetBrainsMono Nerd Font', monospace",
+  "ulw.cursorBlink": true,
+  "ulw.cursorStyle": "block",
+  "ulw.scrollback": 10000,
+  "ulw.enableHttpApi": true,
+  "ulw.httpTimeout": 5000,
+  "ulw.autoShareContext": true,
+  "ulw.defaultAiTool": "opencode"
 }
 ```
 
@@ -388,11 +389,11 @@ Based on the [vscode-sidebar-terminal](https://github.com/s-hiraoku/vscode-sideb
 
 ## Star History
 
-<a href="https://star-history.com/#islee23520/opencode-sidebar-tui&Date">
+<a href="https://star-history.com/#islee23520/ulwcode&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=islee23520/opencode-sidebar-tui&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=islee23520/opencode-sidebar-tui&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=islee23520/opencode-sidebar-tui&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=islee23520/ulwcode&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=islee23520/ulwcode&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=islee23520/ulwcode&type=Date" />
  </picture>
 </a>
 

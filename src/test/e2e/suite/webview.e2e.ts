@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 async function activateExtension(): Promise<vscode.Extension<unknown>> {
   const extension = vscode.extensions.getExtension(
-    "islee23520.opencode-sidebar-tui",
+    "islee23520.ulwcode",
   );
 
   assert.ok(extension, "Extension should be available in the test host");
@@ -21,10 +21,10 @@ suite("Webview registration", () => {
     };
 
     const sidebarViews =
-      packageJSON.contributes?.views?.opencodeTuiContainer ?? [];
-    const terminalView = sidebarViews.find((view) => view.id === "opencodeTui");
+      packageJSON.contributes?.views?.ulwContainer ?? [];
+    const terminalView = sidebarViews.find((view) => view.id === "ulw");
 
-    assert.ok(terminalView, "opencodeTui sidebar view should be contributed");
+    assert.ok(terminalView, "ulw sidebar view should be contributed");
     assert.strictEqual(terminalView.type, "webview");
   });
 
@@ -33,7 +33,7 @@ suite("Webview registration", () => {
 
     const commands = await vscode.commands.getCommands(true);
     assert.ok(
-      commands.includes("opencodeTui.toggleDashboard"),
+      commands.includes("ulw.toggleDashboard"),
       "Dashboard command should be registered",
     );
   });
@@ -42,7 +42,7 @@ suite("Webview registration", () => {
     await activateExtension();
 
     const commands = await vscode.commands.getCommands(true);
-    const viewContainerCommand = "workbench.view.extension.opencodeTuiContainer";
+    const viewContainerCommand = "workbench.view.extension.ulwContainer";
 
     assert.ok(
       commands.includes(viewContainerCommand),

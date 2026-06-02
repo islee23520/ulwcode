@@ -26,6 +26,8 @@ type ProviderMock = Pick<
   | "pasteText"
   | "openInEditorTab"
   | "toggleEditorAttachment"
+  | "startAtConfiguredLocation"
+  | "focusAtConfiguredLocation"
 >;
 
 type OutputChannelMock = Pick<OutputChannelService, "info" | "warn" | "error">;
@@ -40,6 +42,8 @@ function createProviderMock(): ProviderMock {
     pasteText: vi.fn(),
     openInEditorTab: vi.fn(),
     toggleEditorAttachment: vi.fn(),
+    startAtConfiguredLocation: vi.fn(),
+    focusAtConfiguredLocation: vi.fn(),
   };
 }
 
@@ -51,11 +55,21 @@ function createOutputChannelMock(): OutputChannelMock {
   };
 }
 
-function mockAutoFocusOnSend(enabled: boolean): void {
+function mockConfiguration(options?: {
+  autoFocusOnSend?: boolean;
+  terminalDefaultLocation?: "editor" | "sidebar";
+}): void {
+  const {
+    autoFocusOnSend = true,
+    terminalDefaultLocation = "editor",
+  } = options ?? {};
   const configuration = {
     get: vi.fn((key: string, defaultValue?: unknown) => {
       if (key === "autoFocusOnSend") {
-        return enabled;
+        return autoFocusOnSend;
+      }
+      if (key === "terminal.defaultLocation") {
+        return terminalDefaultLocation;
       }
       return defaultValue;
     }),
@@ -64,6 +78,10 @@ function mockAutoFocusOnSend(enabled: boolean): void {
   };
 
   vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(configuration);
+}
+
+function mockAutoFocusOnSend(enabled: boolean): void {
+  mockConfiguration({ autoFocusOnSend: enabled });
 }
 
 function createDependencies(
@@ -114,7 +132,7 @@ describe("registerTerminalCommands", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    mockAutoFocusOnSend(true);
+    mockConfiguration();
     vscode.window.activeTextEditor = undefined;
     vscode.window.tabGroups.all = [];
   });
@@ -129,27 +147,52 @@ describe("registerTerminalCommands", () => {
 
     expect(Array.from(commands.keys())).toEqual(
       expect.arrayContaining([
-        "opencodeTui.start",
-        "opencodeTui.sendToTerminal",
-        "opencodeTui.sendAtMention",
-        "opencodeTui.sendAllOpenFiles",
-        "opencodeTui.sendFileToTerminal",
-        "opencodeTui.paste",
-        "opencodeTui.focus",
-        "opencodeTui.openTerminalInEditor",
-        "opencodeTui.restoreTerminalToSidebar",
+        "ulw.start",
+        "ulw.sendToTerminal",
+        "ulw.sendAtMention",
+        "ulw.sendAllOpenFiles",
+        "ulw.sendFileToTerminal",
+        "ulw.paste",
+        "ulw.focus",
+        "ulw.openTerminalInEditor",
+        "ulw.restoreTerminalToSidebar",
       ]),
     );
     expect(commands.size).toBe(9);
   });
 
   it("starts OpenCode from the start command", () => {
+    mockConfiguration({ terminalDefaultLocation: "sidebar" });
     const deps = createDependencies();
     const commands = registerAndGetCommands(deps);
 
-    getCommand(commands, "opencodeTui.start")();
+    getCommand(commands, "ulw.start")();
 
-    expect(deps.provider?.startOpenCode).toHaveBeenCalledTimes(1);
+    expect(deps.provider?.startAtConfiguredLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts in an editor tab when terminal.defaultLocation is editor", () => {
+    mockConfiguration({ terminalDefaultLocation: "editor" });
+    const deps = createDependencies();
+    const commands = registerAndGetCommands(deps);
+
+    getCommand(commands, "ulw.start")();
+
+    expect(deps.provider?.startAtConfiguredLocation).toHaveBeenCalledTimes(1);
+    expect(deps.provider?.openInEditorTab).not.toHaveBeenCalled();
+    expect(deps.provider?.startOpenCode).not.toHaveBeenCalled();
+  });
+
+  it("starts in the sidebar when terminal.defaultLocation is sidebar", () => {
+    mockConfiguration({ terminalDefaultLocation: "sidebar" });
+    const deps = createDependencies();
+    const commands = registerAndGetCommands(deps);
+
+    getCommand(commands, "ulw.start")();
+
+    expect(deps.provider?.startAtConfiguredLocation).toHaveBeenCalledTimes(1);
+    expect(deps.provider?.startOpenCode).not.toHaveBeenCalled();
+    expect(deps.provider?.openInEditorTab).not.toHaveBeenCalled();
   });
 
   it("sends selected editor text to the terminal and focuses when enabled", () => {
@@ -163,7 +206,7 @@ describe("registerTerminalCommands", () => {
     vscode.window.activeTextEditor = editor;
 
     const commands = registerAndGetCommands(deps);
-    getCommand(commands, "opencodeTui.sendToTerminal")();
+    getCommand(commands, "ulw.sendToTerminal")();
 
     expect(document.getText).toHaveBeenCalledWith(selection);
     expect(deps.getActiveTerminalId).toHaveBeenCalledTimes(1);
@@ -172,7 +215,7 @@ describe("registerTerminalCommands", () => {
     );
     expect(deps.sendPrompt).toHaveBeenCalledWith("selected text\n");
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.focus",
+      "ulw.focus",
     );
 
     vi.advanceTimersByTime(100);
@@ -184,7 +227,7 @@ describe("registerTerminalCommands", () => {
     const noEditorDeps = createDependencies();
     const noEditorCommands = registerAndGetCommands(noEditorDeps);
 
-    getCommand(noEditorCommands, "opencodeTui.sendToTerminal")();
+    getCommand(noEditorCommands, "ulw.sendToTerminal")();
 
     expect(noEditorDeps.sendPrompt).not.toHaveBeenCalled();
     expect(noEditorDeps.outputChannel?.info).not.toHaveBeenCalled();
@@ -204,7 +247,7 @@ describe("registerTerminalCommands", () => {
     );
 
     const emptySelectionCommands = registerAndGetCommands(emptySelectionDeps);
-    getCommand(emptySelectionCommands, "opencodeTui.sendToTerminal")();
+    getCommand(emptySelectionCommands, "ulw.sendToTerminal")();
 
     expect(emptySelectionDeps.sendPrompt).not.toHaveBeenCalled();
     expect(emptySelectionDeps.outputChannel?.info).not.toHaveBeenCalled();
@@ -222,11 +265,11 @@ describe("registerTerminalCommands", () => {
     vscode.window.activeTextEditor = new vscode.TextEditor(document, selection);
 
     const commands = registerAndGetCommands(deps);
-    getCommand(commands, "opencodeTui.sendToTerminal")();
+    getCommand(commands, "ulw.sendToTerminal")();
 
     expect(deps.sendPrompt).toHaveBeenCalledWith("text\n");
     expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
-      "opencodeTui.focus",
+      "ulw.focus",
     );
 
     vi.runAllTimers();
@@ -249,7 +292,7 @@ describe("registerTerminalCommands", () => {
     vscode.window.activeTextEditor = editor;
 
     const successCommands = registerAndGetCommands(successDeps);
-    getCommand(successCommands, "opencodeTui.sendAtMention")();
+    getCommand(successCommands, "ulw.sendAtMention")();
 
     expect(successDeps.outputChannel?.info).toHaveBeenCalledWith(
       '[DIAG:sendAtMention] terminalId="terminal-1" fileRef="@src/file.ts#L1"',
@@ -267,7 +310,7 @@ describe("registerTerminalCommands", () => {
     vscode.window.activeTextEditor = editor;
     const noProviderCommands = registerAndGetCommands(noProviderDeps);
 
-    getCommand(noProviderCommands, "opencodeTui.sendAtMention")();
+    getCommand(noProviderCommands, "ulw.sendAtMention")();
 
     expect(noProviderDeps.outputChannel?.warn).toHaveBeenCalledWith(
       "[DIAG:sendAtMention] skipped — provider=false",
@@ -282,7 +325,7 @@ describe("registerTerminalCommands", () => {
     vscode.window.activeTextEditor = undefined;
     const noEditorCommands = registerAndGetCommands(noEditorDeps);
 
-    getCommand(noEditorCommands, "opencodeTui.sendAtMention")();
+    getCommand(noEditorCommands, "ulw.sendAtMention")();
 
     expect(noEditorDeps.outputChannel?.warn).toHaveBeenCalledWith(
       "[DIAG:sendAtMention] skipped — editor missing",
@@ -315,7 +358,7 @@ describe("registerTerminalCommands", () => {
     ];
 
     const commands = registerAndGetCommands(deps);
-    getCommand(commands, "opencodeTui.sendAllOpenFiles")();
+    getCommand(commands, "ulw.sendAllOpenFiles")();
 
     expect(deps.provider?.formatUriReference).toHaveBeenCalledTimes(2);
     expect(deps.outputChannel?.info).toHaveBeenCalledWith(
@@ -342,7 +385,7 @@ describe("registerTerminalCommands", () => {
     ];
 
     const commands = registerAndGetCommands(deps);
-    getCommand(commands, "opencodeTui.sendAllOpenFiles")();
+    getCommand(commands, "ulw.sendAllOpenFiles")();
 
     expect(deps.sendPrompt).not.toHaveBeenCalled();
     expect(deps.getActiveTerminalId).not.toHaveBeenCalled();
@@ -361,7 +404,7 @@ describe("registerTerminalCommands", () => {
     const commands = registerAndGetCommands(deps);
     const sendFileToTerminal = getCommand(
       commands,
-      "opencodeTui.sendFileToTerminal",
+      "ulw.sendFileToTerminal",
     );
 
     sendFileToTerminal("ignored", [firstUri]);
@@ -388,7 +431,7 @@ describe("registerTerminalCommands", () => {
   it("ignores file sends without context sharing or usable uri arguments", () => {
     const noContextDeps = createDependencies({ contextSharingService: undefined });
     const noContextCommands = registerAndGetCommands(noContextDeps);
-    getCommand(noContextCommands, "opencodeTui.sendFileToTerminal")(
+    getCommand(noContextCommands, "ulw.sendFileToTerminal")(
       vscode.Uri.file("/workspace/a.ts"),
     );
     vi.advanceTimersByTime(100);
@@ -400,8 +443,8 @@ describe("registerTerminalCommands", () => {
 
     const invalidArgsDeps = createDependencies();
     const invalidArgsCommands = registerAndGetCommands(invalidArgsDeps);
-    getCommand(invalidArgsCommands, "opencodeTui.sendFileToTerminal")("ignored");
-    getCommand(invalidArgsCommands, "opencodeTui.sendFileToTerminal")();
+    getCommand(invalidArgsCommands, "ulw.sendFileToTerminal")("ignored");
+    getCommand(invalidArgsCommands, "ulw.sendFileToTerminal")();
     vi.advanceTimersByTime(100);
 
     expect(invalidArgsDeps.sendPrompt).not.toHaveBeenCalled();
@@ -414,7 +457,7 @@ describe("registerTerminalCommands", () => {
     );
     const commands = registerAndGetCommands(deps);
 
-    getCommand(commands, "opencodeTui.sendFileToTerminal")(
+    getCommand(commands, "ulw.sendFileToTerminal")(
       vscode.Uri.file("/workspace/direct.ts"),
     );
     vi.advanceTimersByTime(100);
@@ -427,7 +470,7 @@ describe("registerTerminalCommands", () => {
     const deps = createDependencies();
     const commands = registerAndGetCommands(deps);
 
-    getCommand(commands, "opencodeTui.sendFileToTerminal")([]);
+    getCommand(commands, "ulw.sendFileToTerminal")([]);
     vi.advanceTimersByTime(100);
 
     expect(deps.provider?.formatUriReference).not.toHaveBeenCalled();
@@ -439,7 +482,7 @@ describe("registerTerminalCommands", () => {
     const commands = registerAndGetCommands(deps);
     const sendFileToTerminal = getCommand(
       commands,
-      "opencodeTui.sendFileToTerminal",
+      "ulw.sendFileToTerminal",
     );
 
     sendFileToTerminal("ignored", [vscode.Uri.file("/workspace/a.ts")]);
@@ -458,7 +501,7 @@ describe("registerTerminalCommands", () => {
     const successDeps = createDependencies();
 
     const successCommands = registerAndGetCommands(successDeps);
-    await getCommand(successCommands, "opencodeTui.paste")();
+    await getCommand(successCommands, "ulw.paste")();
 
     expect(successDeps.provider?.requestPaste).toHaveBeenCalledTimes(1);
     expect(successDeps.outputChannel?.error).not.toHaveBeenCalled();
@@ -472,7 +515,7 @@ describe("registerTerminalCommands", () => {
     });
 
     const errorCommands = registerAndGetCommands(errorDeps);
-    await getCommand(errorCommands, "opencodeTui.paste")();
+    await getCommand(errorCommands, "ulw.paste")();
 
     expect(errorDeps.outputChannel?.error).toHaveBeenCalledWith(
       "[TerminalProvider] Failed to paste: webview unavailable",
@@ -486,7 +529,7 @@ describe("registerTerminalCommands", () => {
 
     const noProviderDeps = createDependencies({ provider: undefined });
     const noProviderCommands = registerAndGetCommands(noProviderDeps);
-    await getCommand(noProviderCommands, "opencodeTui.paste")();
+    await getCommand(noProviderCommands, "ulw.paste")();
 
     expect(noProviderDeps.outputChannel?.error).not.toHaveBeenCalled();
 
@@ -501,40 +544,72 @@ describe("registerTerminalCommands", () => {
     );
 
     const stringErrorCommands = registerAndGetCommands(stringErrorDeps);
-    await getCommand(stringErrorCommands, "opencodeTui.paste")();
+    await getCommand(stringErrorCommands, "ulw.paste")();
 
     expect(stringErrorDeps.outputChannel?.error).toHaveBeenCalledWith(
       "[TerminalProvider] Failed to paste: paste failed",
     );
   });
 
-  it("focuses the sidebar, opens the terminal in an editor tab, and restores it to the sidebar", () => {
+  it("focuses the configured editor terminal, opens the terminal in an editor tab, and restores it to the sidebar", () => {
+    mockConfiguration({ terminalDefaultLocation: "editor" });
     const deps = createDependencies();
     const commands = registerAndGetCommands(deps);
 
-    getCommand(commands, "opencodeTui.focus")();
-    getCommand(commands, "opencodeTui.openTerminalInEditor")();
-    getCommand(commands, "opencodeTui.restoreTerminalToSidebar")();
+    getCommand(commands, "ulw.focus")();
+    getCommand(commands, "ulw.openTerminalInEditor")();
+    getCommand(commands, "ulw.restoreTerminalToSidebar")();
 
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+    expect(deps.provider?.focusAtConfiguredLocation).toHaveBeenCalledTimes(1);
+    expect(deps.provider?.openInEditorTab).toHaveBeenCalledTimes(1);
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
       "workbench.view.focus",
-      "opencodeTui",
+      "ulw",
     );
+    expect(deps.provider?.toggleEditorAttachment).toHaveBeenCalledTimes(1);
+  });
+
+  it("focuses the secondary sidebar when terminal.defaultLocation is sidebar", () => {
+    mockConfiguration({ terminalDefaultLocation: "sidebar" });
+    const deps = createDependencies();
+    const commands = registerAndGetCommands(deps);
+
+    getCommand(commands, "ulw.focus")();
+
+    expect(deps.provider?.focusAtConfiguredLocation).toHaveBeenCalledTimes(1);
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "workbench.view.focus",
+      "ulw",
+    );
+  });
+
+  it("keeps explicit editor and restore commands independent of the default location", () => {
+    mockConfiguration({ terminalDefaultLocation: "sidebar" });
+    const deps = createDependencies();
+    const commands = registerAndGetCommands(deps);
+
+    getCommand(commands, "ulw.openTerminalInEditor")();
+    getCommand(commands, "ulw.restoreTerminalToSidebar")();
+
     expect(deps.provider?.openInEditorTab).toHaveBeenCalledTimes(1);
     expect(deps.provider?.toggleEditorAttachment).toHaveBeenCalledTimes(1);
   });
 
-  it("returns the executeCommand promise from opencodeTui.focus", () => {
+  it("returns the provider focus promise from ulw.focus", () => {
+    mockConfiguration({ terminalDefaultLocation: "sidebar" });
     const deps = createDependencies();
     const commands = registerAndGetCommands(deps);
-    const focusCommand = getCommand(commands, "opencodeTui.focus");
+    const focusCommand = getCommand(commands, "ulw.focus");
+    const focusPromise = Promise.resolve();
 
-    vi.mocked(vscode.commands.executeCommand).mockResolvedValueOnce(true);
+    vi.mocked(deps.provider!.focusAtConfiguredLocation).mockReturnValueOnce(
+      focusPromise,
+    );
 
     const result = focusCommand();
 
     expect(result).toBeDefined();
-    expect(result).toBe(vi.mocked(vscode.commands.executeCommand).mock.results[0]?.value);
+    expect(result).toBe(focusPromise);
     expect(result).toHaveProperty("then");
   });
 });

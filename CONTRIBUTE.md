@@ -13,8 +13,8 @@ Thanks for helping improve ULW. This project is a VS Code extension that embeds 
 ## Local Setup
 
 ```bash
-git clone https://github.com/islee23520/opencode-sidebar-tui.git
-cd opencode-sidebar-tui
+git clone https://github.com/islee23520/ulwcode.git
+cd ulwcode
 npm install
 npm run compile
 ```

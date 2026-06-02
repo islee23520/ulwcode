@@ -215,10 +215,10 @@ describe("dashboardCommands", () => {
     expect(disposables).toHaveLength(3);
     expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(3);
 
-    getRegisteredCommand("opencodeTui.toggleDashboard")();
+    getRegisteredCommand("ulw.toggleDashboard")();
     expect(deps.provider?.toggleDashboard).toHaveBeenCalledTimes(1);
 
-    getRegisteredCommand("opencodeTui.toggleTmuxCommandToolbar")();
+    getRegisteredCommand("ulw.toggleTmuxCommandToolbar")();
     expect(deps.provider?.toggleTmuxCommandToolbar).toHaveBeenCalledTimes(1);
 
     vi.clearAllMocks();
@@ -234,10 +234,10 @@ describe("dashboardCommands", () => {
     registerDashboardCommands(noProviderDeps);
 
     expect(() =>
-      getRegisteredCommand("opencodeTui.toggleDashboard")(),
+      getRegisteredCommand("ulw.toggleDashboard")(),
     ).not.toThrow();
 
-    getRegisteredCommand("opencodeTui.openDashboardInEditor")();
+    getRegisteredCommand("ulw.openDashboardInEditor")();
     await flushAsyncWork();
 
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
@@ -246,7 +246,7 @@ describe("dashboardCommands", () => {
   it("shows an error when opening the dashboard editor without a tmux manager", async () => {
     registerDashboardCommands(createDependencies({ tmuxManager: undefined }));
 
-    getRegisteredCommand("opencodeTui.openDashboardInEditor")();
+    getRegisteredCommand("ulw.openDashboardInEditor")();
     await flushAsyncWork();
 
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
@@ -284,8 +284,8 @@ describe("dashboardCommands", () => {
     ]);
     vscode.workspace.workspaceFolders = [
       {
-        uri: { fsPath: "/Users/ilseoblee/workspace/tool/opencode-sidebar-tui" },
-        name: "opencode-sidebar-tui",
+        uri: { fsPath: "/Users/ilseoblee/workspace/tool/ulwcode" },
+        name: "ulwcode",
         index: 0,
       },
     ] as typeof vscode.workspace.workspaceFolders;
@@ -299,7 +299,7 @@ describe("dashboardCommands", () => {
     expect(deps.tmuxManager?.discoverSessions).toHaveBeenCalledTimes(1);
     expect(webview.postMessage).toHaveBeenCalledWith({
       type: "updateDashboard",
-      workspace: "opencode-sidebar-tui",
+      workspace: "ulwcode",
       sessions: [
         {
           id: "tmux-1",
@@ -372,7 +372,7 @@ describe("dashboardCommands", () => {
     );
 
     registerDashboardCommands(actualDeps);
-    getRegisteredCommand("opencodeTui.openDashboardInEditor")();
+    getRegisteredCommand("ulw.openDashboardInEditor")();
     await flushAsyncWork();
 
     expect(actualDeps.outputChannel?.error).toHaveBeenCalledWith(
@@ -391,7 +391,7 @@ describe("dashboardCommands", () => {
     );
 
     registerDashboardCommands(stringErrorDeps);
-    getRegisteredCommand("opencodeTui.openDashboardInEditor")();
+    getRegisteredCommand("ulw.openDashboardInEditor")();
     await flushAsyncWork();
 
     expect(stringErrorDeps.outputChannel?.error).toHaveBeenCalledWith(
@@ -419,11 +419,11 @@ describe("dashboardCommands", () => {
     ] as typeof vscode.workspace.workspaceFolders;
 
     registerDashboardCommands(deps);
-    getRegisteredCommand("opencodeTui.openDashboardInEditor")();
+    getRegisteredCommand("ulw.openDashboardInEditor")();
     await flushAsyncWork();
 
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
-      "opencodeTui.dashboardEditor",
+      "ulw.dashboardEditor",
       "ULW Terminal Manager",
       vscode.ViewColumn.One,
       {
@@ -461,15 +461,15 @@ describe("dashboardCommands", () => {
     deps.tmuxManager = originalTmuxManager;
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.switchTmuxSession",
+      "ulw.switchTmuxSession",
       "s-1",
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.killTmuxSession",
+      "ulw.killTmuxSession",
       "s-1",
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "opencodeTui.createTmuxSession",
+      "ulw.createTmuxSession",
     );
 
     const postMessageCountAfterActions = vi.mocked(harness.webview.postMessage)

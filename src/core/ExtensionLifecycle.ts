@@ -253,7 +253,7 @@ export class ExtensionLifecycle {
 
         context.subscriptions.push(
           vscode.commands.registerCommand(
-            "opencodeTui.openTerminalManager",
+            "ulw.openTerminalManager",
             () => {
               this.terminalDashboardProvider?.show();
             },
@@ -286,7 +286,7 @@ export class ExtensionLifecycle {
       // Expose that the extension is fully active so editor/title buttons
       // (openTerminalInEditor, openTerminalManager, etc.) only appear after
       // commands are registered. This prevents "command not found" errors.
-      await vscode.commands.executeCommand("setContext", "opencodeTui.active", true);
+      await vscode.commands.executeCommand("setContext", "ulw.active", true);
 
       logger.info("ULW activated successfully");
     } catch (error) {
@@ -389,7 +389,7 @@ export class ExtensionLifecycle {
     this.instanceStore.setActive(instanceId);
 
     // Trigger sidebar view — auto-start flow will pick up the active instance
-    void Promise.resolve(vscode.commands.executeCommand("opencodeTui.focus")).catch(
+    void Promise.resolve(vscode.commands.executeCommand("ulw.focus")).catch(
       (error: unknown) => {
         logger.warn(
           `[ExtensionLifecycle] Focus after handoff failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -410,7 +410,7 @@ export class ExtensionLifecycle {
         return;
       }
 
-      await this.tuiProvider.startOpenCode();
+      await this.tuiProvider.startAtConfiguredLocation();
     }
 
     const apiClient = this.tuiProvider.getApiClient();
@@ -433,9 +433,9 @@ export class ExtensionLifecycle {
       );
     }
 
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     if (config.get<boolean>("autoFocusOnSend", true)) {
-      vscode.commands.executeCommand("opencodeTui.focus");
+      vscode.commands.executeCommand("ulw.focus");
       setTimeout(() => {
         if (typeof this.tuiProvider?.focus === "function") {
           this.tuiProvider.focus();
@@ -499,9 +499,9 @@ export class ExtensionLifecycle {
       reference + " ",
     );
 
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     if (config.get<boolean>("autoFocusOnSend", true)) {
-      vscode.commands.executeCommand("opencodeTui.focus");
+      vscode.commands.executeCommand("ulw.focus");
       setTimeout(() => {
         if (typeof this.tuiProvider?.focus === "function") {
           this.tuiProvider.focus();
@@ -624,7 +624,7 @@ export class ExtensionLifecycle {
 
     // Clear the context key so editor/title buttons disappear cleanly
     try {
-      await vscode.commands.executeCommand("setContext", "opencodeTui.active", false);
+      await vscode.commands.executeCommand("setContext", "ulw.active", false);
     } catch {
       // intentionally empty: setContext during deactivation is best-effort
     }
@@ -644,7 +644,7 @@ export class ExtensionLifecycle {
   private async ensureSendKeybindingsToShellDefault(): Promise<void> {
     if (!this.context) return;
 
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     const inspect = config.inspect<boolean>("sendKeybindingsToShell");
 
     const userHasExplicitValue =
@@ -657,7 +657,7 @@ export class ExtensionLifecycle {
     }
 
     const alreadyAutoEnabled = this.context.globalState.get<boolean>(
-      "opencodeTui.hasAutoEnabledKeybindings",
+      "ulw.hasAutoEnabledKeybindings",
       false,
     );
 
@@ -672,7 +672,7 @@ export class ExtensionLifecycle {
         vscode.ConfigurationTarget.Global,
       );
       await this.context.globalState.update(
-        "opencodeTui.hasAutoEnabledKeybindings",
+        "ulw.hasAutoEnabledKeybindings",
         true,
       );
 

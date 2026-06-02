@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    name: "opencode-sidebar-tui",
+    name: "ulwcode",
     globals: true,
     environment: "node",
     include: ["src/**/*.test.ts"],

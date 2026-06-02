@@ -1,4 +1,4 @@
-export const THREAD_HISTORY_STORAGE_KEY = "opencodeTui.threadHistory.entries";
+export const THREAD_HISTORY_STORAGE_KEY = "ulw.threadHistory.entries";
 
 export type ThreadHistoryKind = "agent" | "terminal";
 export type ThreadHistoryStatus =

@@ -67,7 +67,7 @@ describe("ExtensionLifecycle", () => {
       await lifecycle.activate(mockContext);
 
       expect(vscode.window.registerWebviewViewProvider).toHaveBeenCalledWith(
-        "opencodeTui",
+        "ulw",
         expect.any(Object),
         expect.objectContaining({
           webviewOptions: { retainContextWhenHidden: true },
@@ -75,11 +75,11 @@ describe("ExtensionLifecycle", () => {
       );
 
       expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
-        "opencodeTui.openTerminalManager",
+        "ulw.openTerminalManager",
         expect.any(Function),
       );
       expect(vscode.window.registerWebviewPanelSerializer).toHaveBeenCalledWith(
-        "opencodeTui.terminalEditor",
+        "ulw.terminalEditor",
         expect.any(Object),
       );
     });
@@ -92,7 +92,7 @@ describe("ExtensionLifecycle", () => {
       await lifecycle.activate(mockContext);
 
       expect(vscode.window.registerWebviewViewProvider).toHaveBeenCalledWith(
-        "opencodeTui",
+        "ulw",
         expect.any(Object),
         expect.objectContaining({
           webviewOptions: { retainContextWhenHidden: true },
@@ -100,7 +100,7 @@ describe("ExtensionLifecycle", () => {
       );
       expect(
         vscode.window.registerWebviewViewProvider,
-      ).not.toHaveBeenCalledWith("opencodeTui.tmuxSessions", expect.anything());
+      ).not.toHaveBeenCalledWith("ulw.tmuxSessions", expect.anything());
     });
 
     it("should log unavailable terminal backends and continue activation", async () => {
@@ -126,7 +126,7 @@ describe("ExtensionLifecycle", () => {
     it("should swallow duplicate webview provider registration races", async () => {
       vi.mocked(vscode.window.registerWebviewViewProvider).mockImplementation(
         () => {
-          throw new Error("provider already registered for opencodeTui");
+          throw new Error("provider already registered for ulw");
         },
       );
 
@@ -144,7 +144,7 @@ describe("ExtensionLifecycle", () => {
       await lifecycle.activate(mockContext);
 
       expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
-        "opencodeTui.start",
+        "ulw.start",
         expect.any(Function),
       );
     });
@@ -152,7 +152,7 @@ describe("ExtensionLifecycle", () => {
     it("should consume selected project handoff into the active instance", async () => {
       const selectedWorkspaceUri = "file:///workspace/selected";
       const otherWorkspaceUri = "file:///workspace/other";
-      const pendingHandoffsKey = "opencodeTui.pendingSessionWindowHandoffs";
+      const pendingHandoffsKey = "ulw.pendingSessionWindowHandoffs";
       let storedHandoffs: readonly unknown[] = [
         {
           id: "other-handoff",
@@ -179,7 +179,7 @@ describe("ExtensionLifecycle", () => {
           if (key === pendingHandoffsKey) {
             return storedHandoffs;
           }
-          if (key === "opencodeTui.hasAutoEnabledKeybindings") {
+          if (key === "ulw.hasAutoEnabledKeybindings") {
             return true;
           }
           return defaultValue;
@@ -208,7 +208,7 @@ describe("ExtensionLifecycle", () => {
       expect(activeRecord.runtime.zellijSessionId).toBe("selected-session");
       expect(activeRecord.runtime.tmuxSessionId).toBeUndefined();
       expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-        "opencodeTui.focus",
+        "ulw.focus",
       );
       expect(mockContext.globalState.update).toHaveBeenCalledWith(
         pendingHandoffsKey,
@@ -300,7 +300,7 @@ describe("ExtensionLifecycle", () => {
 
       const explainAndFix = getRegisteredCommandHandler<
         (args: { diagnostic: unknown; documentUri: string }) => Promise<void>
-      >("opencodeTui.explainAndFix");
+      >("ulw.explainAndFix");
 
       await explainAndFix({
         diagnostic: {
@@ -355,7 +355,7 @@ describe("ExtensionLifecycle", () => {
       await lifecycle.activate(mockContext);
 
       const openTerminalManager = getRegisteredCommandHandler<() => void>(
-        "opencodeTui.openTerminalManager",
+        "ulw.openTerminalManager",
       );
 
       openTerminalManager();
@@ -736,8 +736,10 @@ describe("ExtensionLifecycle", () => {
       const appendPrompt = vi.fn().mockResolvedValue(undefined);
       const focus = vi.fn();
       const startOpenCode = vi.fn().mockResolvedValue(undefined);
+      const startAtConfiguredLocation = vi.fn().mockResolvedValue(undefined);
       const provider = {
         startOpenCode,
+        startAtConfiguredLocation,
         getApiClient: vi.fn(() => ({ appendPrompt })),
         isHttpAvailable: vi.fn(() => true),
         focus,
@@ -756,10 +758,11 @@ describe("ExtensionLifecycle", () => {
       await sendPromise;
       await vi.runAllTimersAsync();
 
-      expect(startOpenCode).toHaveBeenCalledTimes(1);
+      expect(startAtConfiguredLocation).toHaveBeenCalledTimes(1);
+      expect(startOpenCode).not.toHaveBeenCalled();
       expect(appendPrompt).toHaveBeenCalledWith("ship it");
       expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-        "opencodeTui.focus",
+        "ulw.focus",
       );
       expect(focus).toHaveBeenCalledTimes(1);
       expect(terminalManager.writeToTerminal).not.toHaveBeenCalled();
@@ -771,6 +774,7 @@ describe("ExtensionLifecycle", () => {
         .mockResolvedValue(undefined);
       const provider = {
         startOpenCode: vi.fn().mockResolvedValue(undefined),
+        startAtConfiguredLocation: vi.fn().mockResolvedValue(undefined),
         getApiClient: vi.fn(),
         isHttpAvailable: vi.fn(() => false),
       };
@@ -789,6 +793,7 @@ describe("ExtensionLifecycle", () => {
 
       expect(appendPromptSpy).toHaveBeenCalledWith("hello");
       expect(provider.startOpenCode).not.toHaveBeenCalled();
+      expect(provider.startAtConfiguredLocation).not.toHaveBeenCalled();
       expect(provider.getApiClient).not.toHaveBeenCalled();
     });
 
@@ -879,7 +884,7 @@ describe("ExtensionLifecycle", () => {
         "fallback\n",
       );
       expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
-        "opencodeTui.focus",
+        "ulw.focus",
       );
     });
   });
@@ -932,7 +937,7 @@ describe("ExtensionLifecycle", () => {
         "@packages/core ",
       );
       expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-        "opencodeTui.focus",
+        "ulw.focus",
       );
       expect(focus).toHaveBeenCalledTimes(1);
     });
@@ -1080,7 +1085,7 @@ describe("ExtensionLifecycle", () => {
 
     it("should register start command", () => {
       const calls = vi.mocked(vscode.commands.registerCommand).mock.calls;
-      const startCall = calls.find((call) => call[0] === "opencodeTui.start");
+      const startCall = calls.find((call) => call[0] === "ulw.start");
 
       expect(startCall).toBeDefined();
     });
@@ -1088,7 +1093,7 @@ describe("ExtensionLifecycle", () => {
     it("should register sendToTerminal command", () => {
       const calls = vi.mocked(vscode.commands.registerCommand).mock.calls;
       const sendCall = calls.find(
-        (call) => call[0] === "opencodeTui.sendToTerminal",
+        (call) => call[0] === "ulw.sendToTerminal",
       );
 
       expect(sendCall).toBeDefined();
@@ -1097,7 +1102,7 @@ describe("ExtensionLifecycle", () => {
     it("should register sendAtMention command", () => {
       const calls = vi.mocked(vscode.commands.registerCommand).mock.calls;
       const mentionCall = calls.find(
-        (call) => call[0] === "opencodeTui.sendAtMention",
+        (call) => call[0] === "ulw.sendAtMention",
       );
 
       expect(mentionCall).toBeDefined();
@@ -1106,7 +1111,7 @@ describe("ExtensionLifecycle", () => {
     it("should register sendAllOpenFiles command", () => {
       const calls = vi.mocked(vscode.commands.registerCommand).mock.calls;
       const allFilesCall = calls.find(
-        (call) => call[0] === "opencodeTui.sendAllOpenFiles",
+        (call) => call[0] === "ulw.sendAllOpenFiles",
       );
 
       expect(allFilesCall).toBeDefined();
@@ -1115,7 +1120,7 @@ describe("ExtensionLifecycle", () => {
     it("should register sendFileToTerminal command", () => {
       const calls = vi.mocked(vscode.commands.registerCommand).mock.calls;
       const fileCall = calls.find(
-        (call) => call[0] === "opencodeTui.sendFileToTerminal",
+        (call) => call[0] === "ulw.sendFileToTerminal",
       );
 
       expect(fileCall).toBeDefined();
@@ -1132,10 +1137,10 @@ describe("ExtensionLifecycle", () => {
 
       const calls = vi.mocked(vscode.commands.registerCommand).mock.calls;
       const createCall = calls.find(
-        (call) => call[0] === "opencodeTui.createTmuxSession",
+        (call) => call[0] === "ulw.createTmuxSession",
       );
       const nativeCall = calls.find(
-        (call) => call[0] === "opencodeTui.switchNativeShell",
+        (call) => call[0] === "ulw.switchNativeShell",
       );
 
       expect(createCall).toBeDefined();
@@ -1151,12 +1156,12 @@ describe("ExtensionLifecycle", () => {
       expect(switchToNativeShell).toHaveBeenCalledTimes(1);
     });
 
-    describe("opencode.spawnForWorkspace", () => {
+    describe("ulw.spawnForWorkspace", () => {
       const getSpawnForWorkspaceHandler = () => {
         (lifecycle as any).registerCommands(mockContext);
         const commandCall = vi
           .mocked(vscode.commands.registerCommand)
-          .mock.calls.find((call) => call[0] === "opencode.spawnForWorkspace");
+          .mock.calls.find((call) => call[0] === "ulw.spawnForWorkspace");
 
         expect(commandCall).toBeDefined();
         return commandCall?.[1] as (uri?: {
@@ -1190,7 +1195,7 @@ describe("ExtensionLifecycle", () => {
           "existing-workspace-instance",
         );
         expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-          "opencodeTui.focus",
+          "ulw.focus",
         );
       });
 
@@ -1250,7 +1255,7 @@ describe("ExtensionLifecycle", () => {
       const inspectMock = vi.fn(() => ({ globalValue: false }));
       const updateMock = vi.fn();
       vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
-        if (section === "opencodeTui") {
+        if (section === "ulw") {
           return {
             inspect: inspectMock,
             update: updateMock,
@@ -1274,7 +1279,7 @@ describe("ExtensionLifecycle", () => {
       const inspectMock = vi.fn(() => ({ workspaceValue: true }));
       const updateMock = vi.fn();
       vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
-        if (section === "opencodeTui") {
+        if (section === "ulw") {
           return {
             inspect: inspectMock,
             update: updateMock,
@@ -1298,7 +1303,7 @@ describe("ExtensionLifecycle", () => {
       const inspectMock = vi.fn(() => ({ workspaceFolderValue: false }));
       const updateMock = vi.fn();
       vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
-        if (section === "opencodeTui") {
+        if (section === "ulw") {
           return {
             inspect: inspectMock,
             update: updateMock,
@@ -1320,20 +1325,20 @@ describe("ExtensionLifecycle", () => {
 
     it("should skip auto-enable when alreadyAutoEnabled flag is true in globalState", async () => {
       vi.mocked(mockContext.globalState.get).mockImplementation((key: string, def: any) => {
-        if (key === "opencodeTui.hasAutoEnabledKeybindings") return true;
+        if (key === "ulw.hasAutoEnabledKeybindings") return true;
         return def;
       });
 
       await lifecycle.activate(mockContext);
 
       expect(mockContext.globalState.get).toHaveBeenCalledWith(
-        "opencodeTui.hasAutoEnabledKeybindings",
+        "ulw.hasAutoEnabledKeybindings",
         false,
       );
       // ensure no auto-enable update happened for this path (default getConfiguration mock has update)
       // we can check globalState update not called for the flag
       expect(mockContext.globalState.update).not.toHaveBeenCalledWith(
-        "opencodeTui.hasAutoEnabledKeybindings",
+        "ulw.hasAutoEnabledKeybindings",
         true,
       );
     });
@@ -1345,7 +1350,7 @@ describe("ExtensionLifecycle", () => {
       Reflect.set(lifecycle, "outputChannelService", { warn: warnSpy });
 
       vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
-        if (section === "opencodeTui") {
+        if (section === "ulw") {
           return {
             inspect: vi.fn(() => undefined),
             update: failingUpdate,
@@ -1381,7 +1386,7 @@ describe("ExtensionLifecycle", () => {
       Reflect.set(lifecycle, "outputChannelService", { warn: warnSpy });
 
       vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
-        if (section === "opencodeTui") {
+        if (section === "ulw") {
           return {
             inspect: vi.fn(() => undefined),
             update: failingUpdate,
@@ -1404,12 +1409,12 @@ describe("ExtensionLifecycle", () => {
 
       Reflect.set(lifecycle, "outputChannelService", { info: infoSpy });
       vi.mocked(mockContext.globalState.get).mockImplementation((key: string, def: any) => {
-        if (key === "opencodeTui.hasAutoEnabledKeybindings") return false;
+        if (key === "ulw.hasAutoEnabledKeybindings") return false;
         return def;
       });
       vi.mocked(mockContext.globalState.update).mockImplementation(globalStateUpdateMock);
       vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
-        if (section === "opencodeTui") {
+        if (section === "ulw") {
           return {
             inspect: vi.fn(() => ({})),
             update: updateMock,
@@ -1427,7 +1432,7 @@ describe("ExtensionLifecycle", () => {
         vscode.ConfigurationTarget.Global,
       );
       expect(globalStateUpdateMock).toHaveBeenCalledWith(
-        "opencodeTui.hasAutoEnabledKeybindings",
+        "ulw.hasAutoEnabledKeybindings",
         true,
       );
       expect(infoSpy).toHaveBeenCalledWith(

@@ -111,7 +111,7 @@ npx @vscode/vsce publish major
 ### Step 5: Verify Publication
 
 1. Wait 5-10 minutes for marketplace indexing
-2. Visit: https://marketplace.visualstudio.com/items?itemName=ilseoblee.opencode-sidebar-tui
+2. Visit: https://marketplace.visualstudio.com/items?itemName=ilseoblee.ulwcode
 3. Search in VS Code: "ULW"
 
 ---
@@ -140,7 +140,7 @@ ovsx publish -p YOUR_OVSX_TOKEN
 
 ### Step 4: Verify
 
-Visit: [https://open-vsx.org/extension/ilseoblee/opencode-sidebar-tui](https://open-vsx.org/extension/ilseoblee/opencode-sidebar-tui)
+Visit: [https://open-vsx.org/extension/ilseoblee/ulwcode](https://open-vsx.org/extension/ilseoblee/ulwcode)
 
 ---
 
@@ -154,7 +154,7 @@ Visit: [https://open-vsx.org/extension/ilseoblee/opencode-sidebar-tui](https://o
 - ✅ Extension built and packaged
 - ✅ Version: 0.1.4
 - ✅ Publisher: ilseoblee
-- ✅ Repository: https://github.com/ilseoblee/opencode-sidebar-tui
+- ✅ Repository: https://github.com/ilseoblee/ulwcode
 - ✅ License: MIT
 - ✅ README: Comprehensive documentation
 
@@ -205,7 +205,7 @@ npx @vscode/vsce package
 npx @vscode/vsce show ilseoblee
 
 # Unpublish (use carefully!)
-npx @vscode/vsce unpublish ilseoblee.opencode-sidebar-tui
+npx @vscode/vsce unpublish ilseoblee.ulwcode
 ```
 
 ## Support

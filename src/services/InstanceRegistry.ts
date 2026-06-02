@@ -2,11 +2,11 @@ import * as vscode from "vscode";
 import { TerminalBackendType } from "../types";
 import { InstanceConfig, InstanceRecord, InstanceStore } from "./InstanceStore";
 
-const GLOBAL_INSTANCES_KEY = "opencodeTui.instances.global";
-const WORKSPACE_INSTANCES_KEY = "opencodeTui.instances.workspace";
+const GLOBAL_INSTANCES_KEY = "ulw.instances.global";
+const WORKSPACE_INSTANCES_KEY = "ulw.instances.workspace";
 const LEGACY_INSTANCE_KEYS = [
-  "opencodeTui.instance",
-  "opencodeTui.instanceConfig",
+  "ulw.instance",
+  "ulw.instanceConfig",
 ];
 const DEFAULT_INSTANCE_ID = "default";
 const DEFAULT_DEBOUNCE_MS = 500;

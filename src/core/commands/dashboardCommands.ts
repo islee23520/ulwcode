@@ -18,14 +18,14 @@ export function registerDashboardCommands(
   const disposables: vscode.Disposable[] = [];
 
   disposables.push(
-    vscode.commands.registerCommand("opencodeTui.toggleDashboard", () => {
+    vscode.commands.registerCommand("ulw.toggleDashboard", () => {
       deps.provider?.toggleDashboard();
     }),
   );
 
   disposables.push(
     vscode.commands.registerCommand(
-      "opencodeTui.toggleTmuxCommandToolbar",
+      "ulw.toggleTmuxCommandToolbar",
       () => {
         deps.provider?.toggleTmuxCommandToolbar();
       },
@@ -33,7 +33,7 @@ export function registerDashboardCommands(
   );
 
   disposables.push(
-    vscode.commands.registerCommand("opencodeTui.openDashboardInEditor", () => {
+    vscode.commands.registerCommand("ulw.openDashboardInEditor", () => {
       void openDashboardInEditor(deps);
     }),
   );
@@ -50,7 +50,7 @@ async function openDashboardInEditor(
   }
 
   const panel = vscode.window.createWebviewPanel(
-    "opencodeTui.dashboardEditor",
+    "ulw.dashboardEditor",
     "ULW Terminal Manager",
     vscode.ViewColumn.One,
     {
@@ -70,7 +70,7 @@ async function openDashboardInEditor(
       case "activate":
         if (message.sessionId) {
           await vscode.commands.executeCommand(
-            "opencodeTui.switchTmuxSession",
+            "ulw.switchTmuxSession",
             message.sessionId,
           );
         }
@@ -78,14 +78,14 @@ async function openDashboardInEditor(
       case "killSession":
         if (message.sessionId) {
           await vscode.commands.executeCommand(
-            "opencodeTui.killTmuxSession",
+            "ulw.killTmuxSession",
             message.sessionId,
           );
           await updateDashboardWebview(panel.webview, deps);
         }
         break;
       case "create":
-        await vscode.commands.executeCommand("opencodeTui.createTmuxSession");
+        await vscode.commands.executeCommand("ulw.createTmuxSession");
         await updateDashboardWebview(panel.webview, deps);
         break;
     }

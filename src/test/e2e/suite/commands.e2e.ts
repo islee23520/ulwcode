@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 async function activateExtension(): Promise<vscode.Extension<unknown>> {
   const extension = vscode.extensions.getExtension(
-    "islee23520.opencode-sidebar-tui",
+    "islee23520.ulwcode",
   );
 
   assert.ok(extension, "Extension should be available in the test host");
@@ -17,11 +17,11 @@ suite("Command registration", () => {
 
     const commands = await vscode.commands.getCommands(true);
 
-    assert.ok(commands.includes("opencodeTui.start"));
-    assert.ok(commands.includes("opencodeTui.focus"));
-    assert.ok(commands.includes("opencodeTui.openTerminalInEditor"));
-    assert.ok(commands.includes("opencodeTui.openNewSessionTerminalInEditor"));
-    assert.ok(commands.includes("opencodeTui.toggleDashboard"));
+    assert.ok(commands.includes("ulw.start"));
+    assert.ok(commands.includes("ulw.focus"));
+    assert.ok(commands.includes("ulw.openTerminalInEditor"));
+    assert.ok(commands.includes("ulw.openNewSessionTerminalInEditor"));
+    assert.ok(commands.includes("ulw.toggleDashboard"));
   });
 
   test("registers focus command without relying on internal workbench commands", async () => {
@@ -29,8 +29,8 @@ suite("Command registration", () => {
 
     const commands = await vscode.commands.getCommands(true);
     assert.ok(
-      commands.includes("opencodeTui.focus"),
-      "opencodeTui.focus should be registered",
+      commands.includes("ulw.focus"),
+      "ulw.focus should be registered",
     );
   });
 
@@ -40,9 +40,9 @@ suite("Command registration", () => {
     const properties = extension.packageJSON.contributes.configuration
       .properties as Record<string, { default: unknown }>;
 
-    assert.strictEqual(properties["opencodeTui.autoStartOnOpen"].default, true);
+    assert.strictEqual(properties["ulw.autoStartOnOpen"].default, true);
     assert.strictEqual(
-      properties["opencodeTui.defaultAiTool"].default,
+      properties["ulw.defaultAiTool"].default,
       "opencode",
     );
   });

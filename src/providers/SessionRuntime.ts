@@ -255,7 +255,7 @@ export class SessionRuntime {
     const requestedBackend = config.backend ?? "native";
     const backend = this.backendRegistry.resolveAvailable(requestedBackend);
 
-    const workspaceConfig = vscode.workspace.getConfiguration("opencodeTui");
+    const workspaceConfig = vscode.workspace.getConfiguration("ulw");
     const enableHttpApi = workspaceConfig.get<boolean>("enableHttpApi", true);
     const workspacePath =
       config.cwd ?? this.resolveStartupWorkspacePath().workspacePath;
@@ -472,7 +472,7 @@ export class SessionRuntime {
       this.reconnectListeners();
       this.syncActiveInstance(instanceId);
 
-      const config = vscode.workspace.getConfiguration("opencodeTui");
+      const config = vscode.workspace.getConfiguration("ulw");
       const enableHttpApi = config.get<boolean>("enableHttpApi", true);
       const operator = this.activeTool
         ? this.aiToolRegistry.getForConfig(this.activeTool)
@@ -538,7 +538,7 @@ export class SessionRuntime {
     try {
       this.disposeListeners();
 
-      const config = vscode.workspace.getConfiguration("opencodeTui");
+      const config = vscode.workspace.getConfiguration("ulw");
       const enableHttpApi = config.get<boolean>("enableHttpApi", true);
       const httpTimeout = config.get<number>("httpTimeout", 5000);
 
@@ -856,7 +856,7 @@ export class SessionRuntime {
     if (wasManualSessionSelection) {
       return;
     }
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     if (!config.get<boolean>("promptAiToolOnSession", true)) {
       return;
     }
@@ -1404,7 +1404,7 @@ export class SessionRuntime {
     const shouldShowSelector =
       options.forceToolPrompt && !preferredToolName;
     if (shouldShowSelector) {
-      const config = vscode.workspace.getConfiguration("opencodeTui");
+      const config = vscode.workspace.getConfiguration("ulw");
       if (
         !options.respectPromptAiToolOnSession ||
         config.get<boolean>("promptAiToolOnSession", true)
@@ -1447,7 +1447,7 @@ export class SessionRuntime {
       }
     }
 
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     if (config.get<boolean>("promptAiToolOnSession", true)) {
       this.callbacks.showAiToolSelector(sessionId, sessionId, true);
     }
@@ -1872,7 +1872,7 @@ export class SessionRuntime {
   ): void {
     void vscode.commands.executeCommand(
       "setContext",
-      "opencodeTui.tmuxAttached",
+      "ulw.tmuxAttached",
       backend === "tmux" && Boolean(sessionId),
     );
 
@@ -2241,7 +2241,7 @@ export class SessionRuntime {
       return;
     }
 
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     const enableHttpApi = config.get<boolean>("enableHttpApi", true);
     const autoShareContext = config.get<boolean>("autoShareContext", true);
     const operator = this.activeTool
@@ -2305,7 +2305,7 @@ export class SessionRuntime {
   }
 
   private getConfiguredTools(
-    config = vscode.workspace.getConfiguration("opencodeTui"),
+    config = vscode.workspace.getConfiguration("ulw"),
   ): AiToolConfig[] {
     return resolveAiToolConfigs(config.get("aiTools", []));
   }
@@ -2313,7 +2313,7 @@ export class SessionRuntime {
   private resolveStoredTool(
     instanceId = this.activeInstanceId,
   ): AiToolConfig | undefined {
-    const config = vscode.workspace.getConfiguration("opencodeTui");
+    const config = vscode.workspace.getConfiguration("ulw");
     const storedToolName =
       this.instanceStore?.get(instanceId)?.config.selectedAiTool;
     return this.resolveToolConfig(
@@ -2324,7 +2324,7 @@ export class SessionRuntime {
 
   private resolveToolConfig(
     toolName: string | undefined,
-    config = vscode.workspace.getConfiguration("opencodeTui"),
+    config = vscode.workspace.getConfiguration("ulw"),
   ): AiToolConfig | undefined {
     if (!toolName) {
       return undefined;
