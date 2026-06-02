@@ -2,58 +2,63 @@
 
 ## OVERVIEW
 
-The extension's stateful backend. Instance lifecycle, discovery, HTTP, context, tmux, and logging.
+Stateful backend layer for instances, terminal backends, HTTP clients, context/file references, tmux/zellij integration, and logging.
 
 ## WHERE TO LOOK
 
-| Task                    | Location                      | Lines | Notes                                          |
-| ----------------------- | ----------------------------- | ----- | ---------------------------------------------- |
-| Instance state hub      | `InstanceStore.ts`            | 242   | EventEmitter, active instance, change events   |
-| Lifecycle orchestration | `InstanceController.ts`       | 357   | spawn/connect/disconnect/kill/resolve          |
-| Process discovery       | `InstanceDiscoveryService.ts` | 562   | Process scan, auto-spawn, store sync           |
-| Persistence             | `InstanceRegistry.ts`         | 322   | globalState/workspaceState, migration          |
-| 4-tier resolution       | `ConnectionResolver.ts`       | 258   | stored → discovered → spawned + client pool    |
-| HTTP client             | `OpenCodeApiClient.ts`        | 165   | Retry/backoff, `/health`, `/tui/append-prompt` |
-| Port allocation         | `PortManager.ts`              | 271   | Singleton export, range 16384-65535            |
-| Tmux CLI                | `TmuxSessionManager.ts`       | 462   | Standalone, no service deps                    |
-| Context observation     | `ContextManager.ts`           | 142   | Active editor, selection, diagnostics          |
-| Context formatting      | `ContextSharingService.ts`    | 141   | `@file#L` formatter                            |
-| File references         | `FileReferenceManager.ts`     | 282   | Serialize, git diff, dir expansion             |
-| Quick pick UI           | `InstanceQuickPick.ts`        | 272   | Store + discovery + controller wiring          |
-| Logging                 | `OutputChannelService.ts`     | 124   | Singleton (`getInstance()`)                    |
-| Output capture          | `OutputCaptureManager.ts`     | 119   | `script` command to temp file                  |
+| Task                  | Location                                                                   | Notes                                                                         |
+| --------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Instance state hub    | `InstanceStore.ts`                                                         | active instance, immutable clones, `change`/`setActive`/`add`/`remove` events |
+| Instance persistence  | `InstanceRegistry.ts`                                                      | `globalState`/`workspaceState`, migrations                                    |
+| Spawn/connect/kill    | `InstanceController.ts`                                                    | user actions, terminal manager, port manager                                  |
+| Discovery             | `InstanceDiscoveryService.ts`                                              | process scan, auto-spawn, store sync                                          |
+| Connection resolution | `ConnectionResolver.ts`                                                    | stored -> discovered -> spawned, client pooling                               |
+| HTTP API              | `OpenCodeApiClient.ts`                                                     | `/health`, `/tui/append-prompt`, retry/backoff                                |
+| Port allocation       | `PortManager.ts`                                                           | exported `portManager`, range 16384-65535                                     |
+| Native terminal       | `NativeTerminalManager.ts`                                                 | VS Code terminal backend                                                      |
+| PTY terminal          | `../terminals/TerminalManager.ts`                                          | node-pty backend                                                              |
+| Tmux                  | `TmuxSessionManager.ts`, `TmuxPaneSyncService.ts`                          | CLI session/pane operations and sync messages                                 |
+| Zellij                | `ZellijSessionManager.ts`, `ZellijPaneSyncService.ts`                      | zellij session/pane operations and sync messages                              |
+| Pane state            | `PaneStore.ts`                                                             | webview pane layout/state snapshots                                           |
+| AI tools              | `aiTools/`                                                                 | operator-specific launch/file-reference behavior                              |
+| Context               | `ContextManager.ts`, `ContextSharingService.ts`, `FileReferenceManager.ts` | active editor, diagnostics, `@file#L` formatting                              |
+| Logging/capture       | `OutputChannelService.ts`, `OutputCaptureManager.ts`                       | singleton logger and shell output capture                                     |
 
-## INSTANCE LAYER — CORRECT SEPARATION
+## INSTANCE LAYER
 
 ```
-InstanceStore (in-memory state + events)
-  ↑ hydrates/persists        ↑ writes (discovery)    ↑ writes (user actions)
-InstanceRegistry ─────── InstanceDiscoveryService ─ InstanceController
-                                   ↓ reads               ↓ reads
-                              OpenCodeApiClient      PortManager, TerminalManager
-                                   ↓
-                            ConnectionResolver (chains discovery → spawn + client pool)
+InstanceStore
+  ↑ hydrate/persist       ↑ discover/sync           ↑ user action
+InstanceRegistry ── InstanceDiscoveryService ── InstanceController
+                             ↓                         ↓
+                       OpenCodeApiClient         PortManager + terminal managers
+                             ↓
+                    ConnectionResolver
 ```
 
-## SINGLETONS
+## SINGLETONS / EVENTS
 
-- `OutputChannelService.getInstance()` — global logging
-- `portManager` (module-level export) — port allocation
+- `OutputChannelService.getInstance()` only; tests call `resetInstance()`.
+- `portManager` is exported from `PortManager.ts`; avoid ad hoc port scans.
+- `InstanceStore` uses Node `EventEmitter`.
+- `FileReferenceManager`, terminal managers, and pane sync services expose VS Code-style disposables/listeners.
 
 ## CONVENTIONS
 
-- Async flows → `try/catch` + actionable logs
-- Port allocation → via `PortManager` (no ad hoc allocation)
-- Tests → colocated as `*.test.ts` next to the service
+- Async service flows catch errors and log enough context to diagnose user-visible failures.
+- Persisted instance config lives in registry; live runtime updates flow through `InstanceStore`.
+- Backend-specific behavior belongs in backend managers/operators, not in provider glue.
+- Tests are colocated except shared service tests in `src/services/__tests__/`.
 
 ## ANTI-PATTERNS
 
-- No duplicating instance state outside `InstanceStore`
-- No ad hoc port allocation — use `PortManager`
-- No tmux logic in providers — use `TmuxSessionManager`
-- Never `new OutputChannelService()` — use `getInstance()`
-- Never bypass mocks — follow existing patterns in `src/test/mocks/`
+- No duplicated active-instance state outside `InstanceStore`.
+- No direct construction of `OutputChannelService`.
+- No raw tmux/zellij commands outside their session managers.
+- No manual port selection outside `PortManager`.
+- No bypassing `src/test/mocks` for VS Code or node-pty behavior.
 
-## KNOWN DEBT
+## TESTING
 
-- `PortManager` — created separately in provider and lifecycle (needs singleton consolidation)
+- Run targeted tests for touched services before the full suite.
+- Singleton/event tests must reset mocks and singleton state between cases.

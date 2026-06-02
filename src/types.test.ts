@@ -5,8 +5,11 @@ import type {
   PaneConfig,
   PaneLayout,
   TerminalBackendType,
+  ThreadHistoryDashboardDto,
   TmuxDashboardActionMessage,
   TmuxDashboardHostMessage,
+  TmuxDashboardSessionDto,
+  NativeShellDto,
   TmuxPaneSyncMessage,
   WebviewMessage,
 } from "./types";
@@ -101,7 +104,9 @@ describe("Types", () => {
       ];
 
       expect(messages).toHaveLength(25);
-      expect(messages[0]?.paneId).toBe("pane-1");
+      expect(messages[0]).toEqual(
+        expect.objectContaining({ paneId: "pane-1" }),
+      );
       expect(messages[23]?.type).toBe("executeTmuxRawCommand");
     });
 
@@ -356,14 +361,86 @@ describe("Types", () => {
         tool: "custom-tool",
         savePreference: true,
       };
+      const toggleHistoryMessage: TmuxDashboardActionMessage = {
+        action: "toggleThreadHistory",
+      };
+      const archiveMessage: TmuxDashboardActionMessage = {
+        action: "archiveThread",
+        threadId: "thread-a",
+      };
+      const restoreMessage: TmuxDashboardActionMessage = {
+        action: "restoreThread",
+        threadId: "thread-a",
+      };
+      const deleteMessage: TmuxDashboardActionMessage = {
+        action: "deleteThread",
+        threadId: "thread-a",
+      };
       expect(launchMessage.action).toBe("launchAiTool");
       expect(launchMessage.tool).toBe("custom-tool");
+      expect(toggleHistoryMessage.action).toBe("toggleThreadHistory");
+      expect(archiveMessage.threadId).toBe("thread-a");
+      expect(restoreMessage.threadId).toBe("thread-a");
+      expect(deleteMessage.threadId).toBe("thread-a");
+    });
+
+    it("carries workspace URI on dashboard project contracts", () => {
+      const workspaceUri = "file:///workspaces/repo-a";
+      const session: TmuxDashboardSessionDto = {
+        id: "repo-a",
+        name: "Repo A",
+        workspace: "repo-a",
+        workspaceUri,
+        isActive: true,
+      };
+      const nativeShell: NativeShellDto = {
+        id: "shell-a",
+        label: "Shell A",
+        state: "connected",
+        isActive: false,
+        workspaceUri,
+      };
+      const activateMessage: TmuxDashboardActionMessage = {
+        action: "activate",
+        sessionId: session.id,
+        workspaceUri,
+      };
+
+      expect(session.workspaceUri).toBe(workspaceUri);
+      expect(nativeShell.workspaceUri).toBe(workspaceUri);
+      expect(activateMessage.workspaceUri).toBe(workspaceUri);
     });
 
     it("should accept tmux dashboard host messages", () => {
+      const threadHistory: ThreadHistoryDashboardDto = {
+        active: [
+          {
+            id: "thread-a",
+            kind: "agent",
+            title: "Implement project history",
+            sessionId: "repo-a",
+            workspaceName: "repo-a",
+            workspaceUri: "file:///workspaces/repo-a",
+            createdAt: "2026-06-02T08:00:00.000Z",
+            updatedAt: "2026-06-02T09:00:00.000Z",
+            status: "running",
+          },
+        ],
+        projects: [
+          {
+            workspaceName: "repo-a",
+            workspaceUri: "file:///workspaces/repo-a",
+            entries: [],
+          },
+        ],
+        buckets: [{ bucket: "today", entries: [] }],
+      };
       const message: TmuxDashboardHostMessage = {
         type: "updateTmuxSessions",
         workspace: "repo-a",
+        workspaceUri: "file:///workspaces/repo-a",
+        threadHistory,
+        showingThreadHistory: true,
         sessions: [
           {
             id: "repo-a-2",
@@ -376,7 +453,12 @@ describe("Types", () => {
 
       expect(message.type).toBe("updateTmuxSessions");
       expect(message.workspace).toBe("repo-a");
+      expect(message.workspaceUri).toBe("file:///workspaces/repo-a");
       expect(message.sessions[0]?.isActive).toBe(true);
+      expect(message.threadHistory?.active[0]?.title).toBe(
+        "Implement project history",
+      );
+      expect(message.showingThreadHistory).toBe(true);
     });
 
     it("uses default AI tools baseline", () => {
@@ -402,7 +484,9 @@ describe("Types", () => {
         { type: "paneBackendChanged", paneId: "pane-1", backend: "zellij" },
       ];
 
-      expect(messages[0]?.paneId).toBe("pane-1");
+      expect(messages[0]).toEqual(
+        expect.objectContaining({ paneId: "pane-1" }),
+      );
       expect(messages[5]?.type).toBe("paneBackendChanged");
     });
 

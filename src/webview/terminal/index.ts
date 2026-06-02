@@ -4,7 +4,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { readTerminalConfig } from "./config";
 import { createKeyboardHandler } from "./keyboard";
-import { copySelectionToClipboard } from "../clipboard";
+import { copyOsc52ToClipboard, copySelectionToClipboard } from "../clipboard";
 import {
   setupResizeHandling,
   setupVisibilityHandling,
@@ -12,6 +12,7 @@ import {
 } from "./resize";
 import { createLinkProvider } from "../links";
 import { handleDrop } from "../dragdrop";
+import { hasFileDragPayload } from "../dragdrop/file-drag";
 import { postMessage } from "../shared/vscode-api";
 
 export interface TerminalInstance {
@@ -83,7 +84,10 @@ export function initTerminal(
 
   terminal.open(container);
   terminal.focus();
-  terminal.write(MOUSE_ENABLE);
+  const osc52ClipboardHandler = terminal.parser.registerOscHandler(
+    52,
+    copyOsc52ToClipboard,
+  );
 
   try {
     const webglAddon = new WebglAddon();
@@ -135,11 +139,9 @@ export function initTerminal(
 
   const dragOverHandler = (e: DragEvent) => {
     if (!e.dataTransfer) return;
-    const hasFiles = e.dataTransfer.types.some(
-      (t) =>
-        t === "Files" ||
-        t === "text/uri-list" ||
-        t.startsWith("application/vnd.code."),
+    const hasFiles = hasFileDragPayload(
+      Array.from(e.dataTransfer.types ?? []),
+      e.dataTransfer.items,
     );
     if (!hasFiles) return;
     e.preventDefault();
@@ -168,9 +170,9 @@ export function initTerminal(
 
   // Attach at window level so Finder/OS drags are caught even when
   // xterm's WebGL canvas layers are under the cursor.
-  window.addEventListener("dragover", dragOverHandler);
-  window.addEventListener("dragleave", dragLeaveHandler);
-  window.addEventListener("drop", dropHandler);
+  window.addEventListener("dragover", dragOverHandler, true);
+  window.addEventListener("dragleave", dragLeaveHandler, true);
+  window.addEventListener("drop", dropHandler, true);
 
   const dispose = () => {
     cleanupResize();
@@ -178,10 +180,10 @@ export function initTerminal(
     container.removeEventListener("focusin", refreshTerminal);
     container.removeEventListener("click", refreshTerminal);
     container.removeEventListener("wheel", wheelHandler, true);
-    window.removeEventListener("dragover", dragOverHandler);
-    window.removeEventListener("dragleave", dragLeaveHandler);
-    window.removeEventListener("drop", dropHandler);
-    terminal.write(MOUSE_DISABLE);
+    window.removeEventListener("dragover", dragOverHandler, true);
+    window.removeEventListener("dragleave", dragLeaveHandler, true);
+    window.removeEventListener("drop", dropHandler, true);
+    osc52ClipboardHandler.dispose();
     terminal.dispose();
   };
 

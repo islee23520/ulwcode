@@ -2,46 +2,63 @@
 
 ## OVERVIEW
 
-Vitest + manual mocks. `@vscode/test-electron` is not used — standalone runner.
+Vitest unit tests use manual VS Code/node-pty mocks. E2E tests use `@vscode/test-electron` through the `vscode-test` script and compile separately.
+
+## STRUCTURE
+
+```
+test/
+├── mocks/
+│   ├── vscode.ts          # manual VS Code API mock
+│   ├── node-pty.ts        # createMockPtyProcess + simulation helpers
+│   └── index.ts           # setupMocks/resetMocks
+└── e2e/
+    └── suite/             # Mocha-style VS Code extension tests
+```
 
 ## WHERE TO LOOK
 
-| Task             | Location                     | Notes                                         |
-| ---------------- | ---------------------------- | --------------------------------------------- |
-| VS Code API mock | `src/test/mocks/vscode.ts`   | 363 lines, full API surface                   |
-| node-pty mock    | `src/test/mocks/node-pty.ts` | `createMockPtyProcess()` + simulation helpers |
-| Mock setup/reset | `src/test/mocks/index.ts`    | `setupMocks()`, `resetMocks()`                |
-| Test setup       | `src/__tests__/setup.ts`     | Global vitest setup                           |
-| Test colocated   | `src/**/*.test.ts`           | `Foo.test.ts` placed next to the service      |
+| Task                | Location                  | Notes                                                              |
+| ------------------- | ------------------------- | ------------------------------------------------------------------ |
+| VS Code API mock    | `mocks/vscode.ts`         | commands, window, workspace, EventEmitter, WebviewPanel/View fakes |
+| PTY mock            | `mocks/node-pty.ts`       | `_simulateData`, `_simulateExit`, mock process helpers             |
+| Mock setup/reset    | `mocks/index.ts`          | `vi.mock("vscode")`, `vi.mock("node-pty")`, reset helpers          |
+| Vitest global setup | `../__tests__/setup.ts`   | global cleanup for unit tests                                      |
+| E2E suite           | `e2e/suite/*.e2e.ts`      | activation, commands, config, session flows                        |
+| Unit config         | `../../vitest.config.ts`  | include/exclude, coverage, `vscode` alias                          |
+| E2E config          | `../../tsconfig.e2e.json` | compiles `src/test/e2e` to `out/test/e2e`                          |
 
 ## MOCK PATTERNS
 
 ```typescript
-// vscode.ts — EventEmitter, workspace, window, commands, full API mock
-// node-pty.ts — createMockPtyProcess() with _simulateData(), _simulateExit()
-
-// Usage in tests:
 import { vi } from "vitest";
-vi.mock("vscode"); // vitest alias → src/test/mocks/vscode.ts
-vi.mock("node-pty"); // vitest alias → src/test/mocks/node-pty.ts
+
+vi.mock("vscode");
+vi.mock("node-pty", async () => {
+  const actual = await vi.importActual("../test/mocks/node-pty");
+  return actual;
+});
 ```
-
-## VITEST CONFIG
-
-- `environment: "node"` — jsdom not used
-- `vscode` aliased to `./src/test/mocks/vscode.ts`
-- `mockReset: true` + `restoreMocks: true` — auto cleanup between tests
-- Coverage: 80% lines/functions/statements, 70% branches
-- **Webview excluded:** `src/webview/**` is excluded from coverage
 
 ## CONVENTIONS
 
-- New service test → create `*.test.ts` next to the service
-- Never bypass existing mock patterns — use `src/test/mocks/`
-- Singleton tests → must call `resetInstance()` / `resetMocks()`
+- Unit tests are `src/**/*.test.ts` and usually colocated with the implementation.
+- Use `src/test/mocks` instead of real VS Code windows, terminals, or PTYs.
+- Reset singleton and event state between tests (`resetMocks()`, `resetInstance()`).
+- Webview unit tests may use local DOM fakes because Vitest environment is `node`, not jsdom.
+- Coverage thresholds: lines/functions/statements 80%, branches 70%; webview excluded.
 
 ## ANTI-PATTERNS
 
-- Never use `@vscode/test-electron` — replaced by manual mocks
-- Never modify mock files directly — use `vi.mock()` + helper functions
-- Never leave singleton state uncleared — reset in each test
+- Do not use `@vscode/test-electron` for unit tests.
+- Do not mutate mock internals from tests when a helper already exists.
+- Do not leave listeners, timers, singleton instances, or mock terminals alive across tests.
+
+## COMMANDS
+
+```bash
+npm run test
+npm run test:coverage
+npm run compile:e2e
+npm run test:e2e
+```

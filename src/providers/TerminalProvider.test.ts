@@ -623,7 +623,7 @@ describe("TerminalProvider", () => {
 
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
       "opencodeTui.terminalEditor",
-      "Open Sidebar Terminal",
+      "ULW Terminal",
       vscode.ViewColumn.Beside,
       expect.objectContaining({
         enableScripts: true,
@@ -1030,6 +1030,7 @@ describe("TerminalProvider", () => {
       state: "connected",
     });
     const setMouseOn = vi.fn().mockResolvedValue(undefined);
+    const configureMouseAndClipboard = vi.fn().mockResolvedValue(undefined);
     const killSession = vi.fn().mockResolvedValue(undefined);
     const findSessionForWorkspace = vi.fn().mockResolvedValue({
       id: "repo-fallback-2",
@@ -1039,6 +1040,7 @@ describe("TerminalProvider", () => {
     });
     const tmuxSessionManager = {
       setMouseOn,
+      configureMouseAndClipboard,
       killSession,
       findSessionForWorkspace,
     } as unknown as TmuxSessionManager;
@@ -2349,7 +2351,7 @@ describe("TerminalProvider", () => {
 
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
       "opencodeTui.terminalEditor",
-      "Open Sidebar Terminal",
+      "ULW Terminal",
       vscode.ViewColumn.Beside,
       expect.any(Object),
     );
@@ -2408,23 +2410,25 @@ describe("TerminalProvider", () => {
     );
   });
 
-  it("reuses an existing editor panel instead of creating another one", async () => {
+  it("opens another editor terminal panel instead of reusing the existing one", async () => {
     mockConfiguration();
     provider = createProvider();
     resolveProvider(provider);
 
     await provider.openInEditorTab();
-    const panel = vi.mocked(vscode.window.createWebviewPanel).mock.results[0]
-      ?.value as any;
     const focusSpy = vi.spyOn(provider, "focus");
 
     await provider.openInEditorTab();
 
-    expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
-    expect(panel.reveal).toHaveBeenCalledWith(vscode.ViewColumn.Active);
-    expect(focusSpy).toHaveBeenCalledTimes(1);
-    expect(vscode.commands.executeCommand).toHaveBeenCalledTimes(1);
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(2);
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledTimes(2);
+    expect(vscode.commands.executeCommand).toHaveBeenNthCalledWith(
+      1,
+      "workbench.action.lockEditorGroup",
+    );
+    expect(vscode.commands.executeCommand).toHaveBeenNthCalledWith(
+      2,
       "workbench.action.lockEditorGroup",
     );
   });
@@ -2925,7 +2929,6 @@ describe("TerminalProvider", () => {
     vi.spyOn(runtime, "switchToZellijSession").mockResolvedValue(undefined);
     vi.spyOn(runtime, "switchToNativeShell").mockResolvedValue(undefined);
     vi.spyOn(runtime, "routeDroppedTextToTmuxPane").mockResolvedValue(true);
-    vi.spyOn(runtime, "formatDroppedFiles").mockReturnValue("@src/a.ts");
     vi.spyOn(runtime, "formatPastedImage").mockReturnValue("@image.png");
     vi.spyOn(provider, "toggleEditorAttachment").mockResolvedValue(undefined);
     const dashboardSpy = vi.spyOn(provider, "toggleDashboard");
@@ -2945,7 +2948,7 @@ describe("TerminalProvider", () => {
     expect(provider.toggleEditorAttachment).toHaveBeenCalledTimes(1);
     expect(restartSpy).toHaveBeenCalledTimes(1);
     expect(runtime.switchToNativeShell).toHaveBeenCalledTimes(1);
-    expect(runtime.routeDroppedTextToTmuxPane).toHaveBeenCalledWith("@src/a.ts ", { col: 1, row: 2 });
+    expect(runtime.routeDroppedTextToTmuxPane).toHaveBeenCalledWith("'/tmp/a.ts' ", { col: 1, row: 2 });
     expect(runtime.formatPastedImage).not.toHaveBeenCalledWith("not-created");
   });
 
@@ -2980,7 +2983,7 @@ describe("TerminalProvider", () => {
     resolveProvider(provider);
     const selectorSpy = vi
       .spyOn(provider, "showAiToolSelector")
-      .mockImplementation(() => undefined);
+      .mockResolvedValue(undefined);
     const runtime = provider["sessionRuntime"] as unknown as {
       callbacks: {
         showAiToolSelector: (

@@ -2,6 +2,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal, type ITerminalAddon, type ITerminalOptions } from "@xterm/xterm";
 import type { DroppedBlobFile, TerminalBackendType } from "../types";
+import { hasFileDragPayload } from "./dragdrop/file-drag";
 import { postMessage } from "./shared/vscode-api";
 
 export interface TerminalInstance {
@@ -47,8 +48,8 @@ export class PaneManager {
     }
 
     this.container = container;
-    container.addEventListener("dragover", this.handleDragOver);
-    container.addEventListener("drop", this.handleDrop);
+    container.addEventListener("dragover", this.handleDragOver, true);
+    container.addEventListener("drop", this.handleDrop, true);
   }
 
   createPane(
@@ -274,8 +275,8 @@ export class PaneManager {
 
   dispose(): void {
     if (this.container) {
-      this.container.removeEventListener("dragover", this.handleDragOver);
-      this.container.removeEventListener("drop", this.handleDrop);
+      this.container.removeEventListener("dragover", this.handleDragOver, true);
+      this.container.removeEventListener("drop", this.handleDrop, true);
     }
 
     for (const paneId of this.getAllPaneIds()) {
@@ -293,11 +294,9 @@ export class PaneManager {
       return;
     }
 
-    const hasFiles = Array.from(dataTransfer.types ?? []).some(
-      (type) =>
-        type === "Files" ||
-        type === "text/uri-list" ||
-        type.startsWith("application/vnd.code."),
+    const hasFiles = hasFileDragPayload(
+      Array.from(dataTransfer.types ?? []),
+      dataTransfer.items,
     );
 
     if (!hasFiles) {
@@ -388,6 +387,11 @@ export class PaneManager {
 
     for (const payload of stringPayloads) {
       consumePayload(payload);
+    }
+
+    for (const file of Array.from(dataTransfer.files ?? [])) {
+      const candidate = file as File & { path?: unknown };
+      addFile(typeof candidate.path === "string" ? candidate.path : null);
     }
 
     return files;

@@ -13,7 +13,10 @@ build/**
 .claude/**
 .kiro/**
 .omc/**
+.omo/**
 .opencode/**
+.openchrome/**
+.playwright-mcp/**
 .sisyphus/**
 .trae/**
 .windsurf/**

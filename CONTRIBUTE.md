@@ -1,6 +1,6 @@
-# Contributing to Open Sidebar TUI
+# Contributing to ULW
 
-Thanks for helping improve Open Sidebar TUI. This project is a VS Code extension that embeds an OpenCode-capable terminal in the sidebar, with `node-pty` for PTY support, `xterm.js` for rendering, `tmux` session management, and HTTP API communication with OpenCode.
+Thanks for helping improve ULW. This project is a VS Code extension that embeds an Open TUI terminal MUX in the sidebar, with `node-pty` for PTY support, `xterm.js` for rendering, `tmux`/`zellij` session management, and HTTP API communication with OpenCode.
 
 ## Requirements
 

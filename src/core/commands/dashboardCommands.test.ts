@@ -424,14 +424,14 @@ describe("dashboardCommands", () => {
 
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
       "opencodeTui.dashboardEditor",
-      "Terminal Managers",
+      "ULW Terminal Manager",
       vscode.ViewColumn.One,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
       },
     );
-    expect(harness.webview.html).toContain("Terminal Dashboard");
+    expect(harness.webview.html).toContain("ULW Terminal Manager");
     expect(harness.webview.html).toContain("Workspace: -");
     expect(harness.webview.postMessage).toHaveBeenCalledWith({
       type: "updateDashboard",

@@ -306,6 +306,54 @@ describe("PaneManager", () => {
     });
   });
 
+  it("allows macOS Finder file URL drags so the drop event can fire", () => {
+    const manager = new PaneManager();
+    const root = document.createElement("div");
+    manager.init(root);
+    const event = new Event("dragover", {
+      bubbles: true,
+      cancelable: true,
+    }) as DragEvent;
+    Object.defineProperty(event, "dataTransfer", {
+      configurable: true,
+      value: {
+        types: ["public.file-url"],
+        items: [],
+      },
+    });
+    const preventDefault = vi.spyOn(event, "preventDefault");
+    const stopPropagation = vi.spyOn(event, "stopPropagation");
+
+    root.dispatchEvent(event);
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows VS Code Explorer plain text drags so the drop event can fire", () => {
+    const manager = new PaneManager();
+    const root = document.createElement("div");
+    manager.init(root);
+    const event = new Event("dragover", {
+      bubbles: true,
+      cancelable: true,
+    }) as DragEvent;
+    Object.defineProperty(event, "dataTransfer", {
+      configurable: true,
+      value: {
+        types: ["text/plain"],
+        items: [],
+      },
+    });
+    const preventDefault = vi.spyOn(event, "preventDefault");
+    const stopPropagation = vi.spyOn(event, "stopPropagation");
+
+    root.dispatchEvent(event);
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+  });
+
   describe("backend tracking", () => {
     it("returns 'native' by default", () => {
       const manager = new PaneManager();

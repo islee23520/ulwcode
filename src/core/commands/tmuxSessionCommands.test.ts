@@ -27,10 +27,17 @@ type SessionSummary = {
 
 type CommandHandlers = {
   openInNewWindow: () => Promise<void>;
+  openSessionInNewWindow: (payload?: {
+    sessionId: string;
+    backend?: "tmux" | "zellij" | "native";
+    workspaceUri: string;
+    label?: string;
+  }) => Promise<void>;
   spawnForWorkspace: (uri?: { toString(): string }) => Promise<void>;
   selectInstance: () => void;
   switchTmuxSession: (sessionId?: string) => Promise<void>;
   createTmuxSession: () => Promise<void>;
+  openNewSessionTerminalInEditor: () => Promise<void>;
   killTmuxSession: (sessionId?: string) => Promise<void>;
   switchNativeShell: () => Promise<void>;
   browseTmuxSessions: () => Promise<void>;
@@ -42,6 +49,7 @@ function createProvider(): TerminalProvider {
     switchToTmuxSession: vi.fn().mockResolvedValue(undefined),
     switchToZellijSession: vi.fn().mockResolvedValue(undefined),
     createTmuxSession: vi.fn().mockResolvedValue(undefined),
+    openInEditorTab: vi.fn().mockResolvedValue(undefined),
     killTmuxSession: vi.fn().mockResolvedValue(undefined),
     switchToNativeShell: vi.fn().mockResolvedValue(undefined),
   });
@@ -105,6 +113,9 @@ function getCommandHandlers(): CommandHandlers {
     openInNewWindow: getHandler(
       "opencode.openInNewWindow",
     ) as () => Promise<void>,
+    openSessionInNewWindow: getHandler(
+      "opencodeTui.openSessionInNewWindow",
+    ) as CommandHandlers["openSessionInNewWindow"],
     spawnForWorkspace: getHandler("opencode.spawnForWorkspace") as (uri?: {
       toString(): string;
     }) => Promise<void>,
@@ -114,6 +125,9 @@ function getCommandHandlers(): CommandHandlers {
     ) => Promise<void>,
     createTmuxSession: getHandler(
       "opencodeTui.createTmuxSession",
+    ) as () => Promise<void>,
+    openNewSessionTerminalInEditor: getHandler(
+      "opencodeTui.openNewSessionTerminalInEditor",
     ) as () => Promise<void>,
     killTmuxSession: getHandler("opencodeTui.killTmuxSession") as (
       sessionId?: string,
@@ -138,7 +152,7 @@ describe("registerTmuxSessionCommands", () => {
     Reflect.set(vscode.workspace, "name", undefined);
   });
 
-  it("registers all 9 tmux session commands", () => {
+  it("registers all tmux session commands", () => {
     const disposables = registerTmuxSessionCommands({ context: undefined, provider: undefined,
     instanceStore: undefined,
     instanceController: undefined,
@@ -146,8 +160,8 @@ describe("registerTmuxSessionCommands", () => {
     outputChannel: undefined,
     tmuxManager: undefined, });
 
-    expect(disposables).toHaveLength(10);
-    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(10);
+    expect(disposables).toHaveLength(11);
+    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(11);
   });
 
   it("shows an error when openInNewWindow runs without an instance store", async () => {
@@ -296,6 +310,137 @@ describe("registerTmuxSessionCommands", () => {
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
       "Failed to open in new window: boom-string",
     );
+  });
+
+  it("opens the selected session workspace URI in a new VS Code window", async () => {
+    const context = new vscode.ExtensionContext();
+    vi.mocked(context.globalState.get).mockReturnValue([]);
+    vi.mocked(context.globalState.update).mockResolvedValue(undefined);
+
+    registerTmuxSessionCommands({ context, provider: undefined,
+    instanceStore: createInstanceStore(),
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
+
+    await getCommandHandlers().openSessionInNewWindow({
+      sessionId: "repo-b",
+      backend: "tmux",
+      workspaceUri: "file:///workspace/repo-b",
+      label: "Repo B",
+    });
+
+    expect(context.globalState.update).toHaveBeenCalledWith(
+      "opencodeTui.pendingSessionWindowHandoffs",
+      expect.arrayContaining([
+        expect.objectContaining({
+          workspaceUri: "file:///workspace/repo-b",
+          sessionId: "repo-b",
+          backend: "tmux",
+          label: "Repo B",
+        }),
+      ]),
+    );
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "vscode.openFolder",
+      expect.objectContaining({ path: "/workspace/repo-b" }),
+      true,
+    );
+  });
+
+  it("warns when opening a session without a workspace URI", async () => {
+    const context = new vscode.ExtensionContext();
+    registerTmuxSessionCommands({ context, provider: undefined,
+    instanceStore: createInstanceStore(),
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
+
+    await getCommandHandlers().openSessionInNewWindow({
+      sessionId: "repo-b",
+      backend: "tmux",
+      workspaceUri: "",
+    });
+
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+      "No workspace folder available",
+    );
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "vscode.openFolder",
+      expect.anything(),
+      true,
+    );
+  });
+
+  it("does not open another window for a known open project", async () => {
+    const context = new vscode.ExtensionContext();
+    const instanceStore = createInstanceStore([
+      {
+        config: {
+          id: "existing",
+          workspaceUri: "file:///workspace/repo-b",
+          label: "Repo B",
+        },
+        runtime: {},
+        state: "connected",
+      },
+    ]);
+
+    registerTmuxSessionCommands({ context, provider: undefined,
+    instanceStore,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
+
+    await getCommandHandlers().openSessionInNewWindow({
+      sessionId: "repo-b",
+      backend: "tmux",
+      workspaceUri: "file:///workspace/repo-b",
+      label: "Repo B",
+    });
+
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "vscode.openFolder",
+      expect.anything(),
+      true,
+    );
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+      "Project already open: Repo B",
+    );
+  });
+
+  it("coalesces rapid duplicate project window opens", async () => {
+    const context = new vscode.ExtensionContext();
+    vi.mocked(context.globalState.get).mockReturnValue([]);
+    vi.mocked(context.globalState.update).mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 10)),
+    );
+
+    registerTmuxSessionCommands({ context, provider: undefined,
+    instanceStore: createInstanceStore(),
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
+
+    const payload = {
+      sessionId: "repo-b",
+      backend: "tmux" as const,
+      workspaceUri: "file:///workspace/repo-b",
+      label: "Repo B",
+    };
+    await Promise.all([
+      getCommandHandlers().openSessionInNewWindow(payload),
+      getCommandHandlers().openSessionInNewWindow(payload),
+    ]);
+
+    const openFolderCalls = vi
+      .mocked(vscode.commands.executeCommand)
+      .mock.calls.filter((call) => call[0] === "vscode.openFolder");
+    expect(openFolderCalls).toHaveLength(1);
   });
 
   it("shows an error when spawnForWorkspace runs without an instance store", async () => {
@@ -662,6 +807,27 @@ describe("registerTmuxSessionCommands", () => {
       vi.mocked(provider.createTmuxSession).mock.invocationCallOrder[0],
     );
     expect(provider.killTmuxSession).toHaveBeenCalledWith("tmux-2");
+  });
+
+  it("creates a new tmux session before opening a terminal editor", async () => {
+    const provider = createProvider();
+
+    registerTmuxSessionCommands({ context: undefined, provider,
+    instanceStore: undefined,
+    instanceController: undefined,
+    instanceQuickPick: undefined,
+    outputChannel: undefined,
+    tmuxManager: undefined, });
+
+    await getCommandHandlers().openNewSessionTerminalInEditor();
+
+    expect(provider.createTmuxSession).toHaveBeenCalledTimes(1);
+    expect(provider.openInEditorTab).toHaveBeenCalledTimes(1);
+    expect(
+      vi.mocked(provider.createTmuxSession).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(provider.openInEditorTab).mock.invocationCallOrder[0],
+    );
   });
 
   it("switches to the native shell when a provider is available", async () => {

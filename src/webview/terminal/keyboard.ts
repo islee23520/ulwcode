@@ -100,6 +100,13 @@ export function createKeyboardHandler(options: KeyboardHandlerOptions = {}) {
     }
 
     if (isWorkbenchPrimaryModifier(event)) {
+      // On macOS, Cmd shortcuts belong to VS Code (Quick Open, Command Palette, etc.).
+      // TUI shortcuts use Ctrl on macOS (Ctrl+P for fuzzy finder, Ctrl+K, etc.),
+      // so there is no conflict — always let Cmd through.
+      if (isMac) {
+        return false;
+      }
+      // On Windows/Linux, Ctrl shortcuts go to the shell when configured.
       if (
         options.sendKeybindingsToShell ||
         ALWAYS_TERMINAL_CONTROL.has(event.code)

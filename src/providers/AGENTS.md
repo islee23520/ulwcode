@@ -2,46 +2,54 @@
 
 ## OVERVIEW
 
-Extension-host code. Bridges VS Code webview views/actions with backend services.
+VS Code extension-host bridge between webviews, commands, and backend services. Providers own view lifecycle and routing, not business state.
 
 ## STRUCTURE
 
 ```
 providers/
-├── TerminalProvider.ts            # Webview lifecycle shell + orchestration
-├── MessageRouter.ts              # Message dispatch + all handlers
-├── SessionRuntime.ts             # Start/restart/tmux/instance management
-├── TerminalDashboardProvider.ts  # tmux dashboard
-├── CodeActionProvider.ts         # Code actions
-└── AGENTS.md
+├── TerminalProvider.ts            # sidebar/editor terminal webview lifecycle
+├── MessageRouter.ts               # WebviewMessage dispatch and host-side handlers
+├── SessionRuntime.ts              # native/tmux/zellij process/session runtime
+├── TerminalDashboardProvider.ts   # terminal manager provider shell
+├── CodeActionProvider.ts          # explain/fix code actions
+└── *.test.ts
 ```
 
 ## WHERE TO LOOK
 
-| Task             | Location                     | Notes                                             |
-| ---------------- | ---------------------------- | ------------------------------------------------- |
-| Webview shell    | `TerminalProvider.ts`        | resolveWebviewView, getHtmlForWebview, dispose    |
-| Message handling | `MessageRouter.ts`           | handleMessage dispatch + 20+ handlers             |
-| Session runtime  | `SessionRuntime.ts`          | start/restart, tmux attach/switch, HTTP readiness |
-| Tmux dashboard   | `TerminalDashboardProvider.ts` | Inline HTML/CSS/JS                              |
-| Code actions     | `CodeActionProvider.ts`      | Focused, no issues                                |
+| Task                     | Location                       | Notes                                                                 |
+| ------------------------ | ------------------------------ | --------------------------------------------------------------------- |
+| Terminal webview shell   | `TerminalProvider.ts`          | `resolveWebviewView`, editor panels, HTML/CSP, pending message queue  |
+| Browser message handling | `MessageRouter.ts`             | terminal I/O, clipboard, image paste, file open/drop, backend actions |
+| Session runtime          | `SessionRuntime.ts`            | startup/restart, pane sessions, backend selection, HTTP polling       |
+| Dashboard provider       | `TerminalDashboardProvider.ts` | dashboard view/editor wiring and dashboard actions                    |
+| Code actions             | `CodeActionProvider.ts`        | sends selected diagnostics/context to terminal                        |
 
-## PROVIDER SPLIT — RESPONSIBILITY MAP
+## RESPONSIBILITY MAP
 
-| Module             | Owns                                                                               |
-| ------------------ | ---------------------------------------------------------------------------------- |
-| `TerminalProvider` | webview lifecycle, HTML generation, nonce, public API surface                      |
-| `MessageRouter`    | terminal I/O, clipboard, image paste, file open/drop, VS Code terminal bridge      |
-| `SessionRuntime`   | process start/restart, tmux session management, instance switching, HTTP readiness |
+| Module                      | Owns                                                                                   |
+| --------------------------- | -------------------------------------------------------------------------------------- |
+| `TerminalProvider`          | VS Code webview lifecycle, CSP/nonce, editor-panel bridge, outbound host messages      |
+| `MessageRouter`             | typed `WebviewMessage` dispatch and VS Code API side effects                           |
+| `SessionRuntime`            | terminal process/session state transitions and backend-specific launch/switch behavior |
+| `TerminalDashboardProvider` | dashboard HTML/webview shell and tmux/zellij/native action fan-out                     |
 
 ## CONVENTIONS
 
-- Providers = extension host process (not browser)
-- Message contracts use `src/types.ts` — no arbitrary shapes
-- Provider role: routing, orchestration, state bridging only
+- Providers run in extension host, so VS Code and Node APIs are allowed here.
+- Accept only message shapes from `src/types.ts`.
+- Use `SessionRuntime` for start/switch/restart; use services for tmux/zellij/API details.
+- Preserve pane IDs when relaying pane-scoped host messages.
 
 ## ANTI-PATTERNS
 
-- No browser-only logic (DOM, rendering) here — belongs in `src/webview`
-- No arbitrary message shapes — must update `src/types.ts`
-- Never bypass `ExtensionLifecycle` for provider registration or command wiring
+- No DOM rendering logic here; browser behavior belongs in `src/webview`.
+- No independent instance state; read/write through `InstanceStore` and runtime helpers.
+- No raw tmux/zellij CLI calls from providers.
+- No arbitrary dashboard action payloads; extend typed DTOs first.
+
+## TESTING
+
+- Provider tests are large and fixture-heavy; keep new behavior covered in the matching `*.test.ts`.
+- For webview-facing changes, add router/provider assertions plus a webview unit test when browser code changes too.

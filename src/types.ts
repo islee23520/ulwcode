@@ -1,5 +1,6 @@
 export const TMUX_WEBVIEW_COMMAND_IDS = [
   "opencodeTui.browseTmuxSessions",
+  "opencodeTui.openNewSessionTerminalInEditor",
   "opencodeTui.createTmuxSession",
   "opencodeTui.tmuxSwitchPane",
   "opencodeTui.tmuxCreateWindow",
@@ -262,19 +263,57 @@ export function detectAiToolName(
 export type NativeShellDto = {
   id: string;
   label?: string;
+  workspaceUri?: string;
   state: string;
   isActive: boolean;
+};
+
+export type ThreadHistoryEntryDto = {
+  id: string;
+  kind: "agent" | "terminal";
+  title: string;
+  titleOverride?: string;
+  sessionId?: string;
+  terminalId?: string;
+  workspaceUri?: string;
+  workspaceName?: string;
+  updatedAt: string;
+  createdAt: string;
+  status: "running" | "completed" | "waiting" | "error";
+  archived?: boolean;
+};
+
+export type ThreadHistoryProjectDto = {
+  workspaceName: string;
+  workspaceUri?: string;
+  entries: ThreadHistoryEntryDto[];
+};
+
+export type ThreadHistoryBucketDto = {
+  bucket: "today" | "yesterday" | "thisWeek" | "pastWeek" | "older";
+  entries: ThreadHistoryEntryDto[];
+};
+
+export type ThreadHistoryDashboardDto = {
+  active: ThreadHistoryEntryDto[];
+  projects: ThreadHistoryProjectDto[];
+  buckets: ThreadHistoryBucketDto[];
+  archivedOnly?: boolean;
 };
 
 export type TmuxDashboardActionMessage =
   | { action: "refresh" }
   | { action: "toggleScope" }
+  | { action: "toggleThreadHistory" }
+  | { action: "archiveThread"; threadId: string }
+  | { action: "restoreThread"; threadId: string }
+  | { action: "deleteThread"; threadId: string }
   | { action: "create" }
   | { action: "createNativeShell" }
   | { action: "switchNativeShell" }
-  | { action: "activateNativeShell"; instanceId: string }
+  | { action: "activateNativeShell"; instanceId: string; workspaceUri?: string }
   | { action: "killNativeShell"; instanceId: string }
-  | { action: "activate"; sessionId: string }
+  | { action: "activate"; sessionId: string; workspaceUri?: string }
   | {
       action: "showAiToolSelector";
       sessionId: string;
@@ -333,6 +372,7 @@ export type TmuxDashboardSessionDto = {
   id: string;
   name: string;
   workspace: string;
+  workspaceUri?: string;
   isActive: boolean;
   paneCount?: number;
   preview?: string;
@@ -367,7 +407,10 @@ export type TmuxDashboardHostMessage =
       type: "updateTmuxSessions";
       sessions: TmuxDashboardSessionDto[];
       nativeShells?: NativeShellDto[];
+      threadHistory?: ThreadHistoryDashboardDto;
+      showingThreadHistory?: boolean;
       workspace: string;
+      workspaceUri?: string;
       windows?: Record<string, TmuxDashboardWindowDto[]>;
       panes?: Record<string, TmuxDashboardPaneDto[]>;
       showingAll?: boolean;

@@ -11,7 +11,7 @@ export interface SessionCardProps {
   session: TmuxDashboardSessionDto;
   windows?: TmuxDashboardWindowDto[];
   tools?: AiToolConfig[];
-  onActivate: (sessionId: string) => void;
+  onActivate: (sessionId: string, workspaceUri: string | undefined) => void;
   onShowAiToolSelector: (sessionId: string, sessionName: string) => void;
   onKill: (sessionId: string) => void;
 }
@@ -43,8 +43,9 @@ export const SessionCard: FunctionComponent<SessionCardProps> = ({
     {
       class: `session-card${activeClass}`,
       "data-session-id": session.id,
+      "data-workspace-uri": session.workspaceUri,
       onClick: (): void => {
-        onActivate(session.id);
+        onActivate(session.id, session.workspaceUri);
       },
     },
     h(

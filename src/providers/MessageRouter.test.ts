@@ -437,26 +437,22 @@ describe("MessageRouter", () => {
     router.handleFilesDropped(["/workspace/README.md"], true);
     router.handleFilesDropped(["/workspace/docs/guide.md"], false);
 
-    expect(provider.formatDroppedFiles).toHaveBeenNthCalledWith(
-      1,
-      ["/workspace/src/index.ts", "/workspace/notes.md"],
-      true,
-    );
+    expect(provider.formatDroppedFiles).not.toHaveBeenCalled();
     expect(provider.routeDroppedTextToTmuxPane).toHaveBeenCalledWith(
-      "@/workspace/src/index.ts /workspace/notes.md ",
+      "'/workspace/src/index.ts' '/workspace/notes.md' ",
       { col: 4, row: 2 },
     );
     expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
       "terminal-1",
-      "@/workspace/src/index.ts /workspace/notes.md ",
+      "'/workspace/src/index.ts' '/workspace/notes.md' ",
     );
     expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
       "terminal-1",
-      "@/workspace/README.md ",
+      "'/workspace/README.md' ",
     );
     expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
       "terminal-1",
-      "/workspace/docs/guide.md ",
+      "'/workspace/docs/guide.md' ",
     );
   });
 
@@ -479,7 +475,20 @@ describe("MessageRouter", () => {
 
     expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
       "pane-7",
-      "@/workspace/pane.txt ",
+      "'/workspace/pane.txt' ",
+    );
+  });
+
+  it("shell-quotes dropped paths containing spaces and single quotes", async () => {
+    vi.mocked(vscode.workspace.asRelativePath).mockImplementation(
+      (value: string) => value,
+    );
+
+    await router.handleFilesDropped(["/workspace/has space/owner's note.md"], false);
+
+    expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
+      "terminal-1",
+      "'/workspace/has space/owner'\\''s note.md' ",
     );
   });
 
@@ -506,13 +515,10 @@ describe("MessageRouter", () => {
       false,
     );
 
-    expect(provider.formatDroppedFiles).toHaveBeenCalledWith(
-      ["/outside/workspace/file.ts"],
-      false,
-    );
+    expect(provider.formatDroppedFiles).not.toHaveBeenCalled();
     expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
       "terminal-1",
-      "/outside/workspace/file.ts ",
+      "'/outside/workspace/file.ts' ",
     );
   });
 
@@ -534,19 +540,43 @@ describe("MessageRouter", () => {
       expect.any(Buffer),
       { flag: "wx", mode: 0o600 },
     );
-    expect(provider.formatDroppedFiles).toHaveBeenCalledWith(
-      ["/tmp/opencode-tests/opencode-drop-uuid-1234-notes.txt"],
-      false,
-    );
+    expect(provider.formatDroppedFiles).not.toHaveBeenCalled();
     expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
       "terminal-1",
-      "/tmp/opencode-tests/opencode-drop-uuid-1234-notes.txt ",
+      "'/tmp/opencode-tests/opencode-drop-uuid-1234-notes.txt' ",
     );
 
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
     expect(mockUnlink).toHaveBeenCalledWith(
       "/tmp/opencode-tests/opencode-drop-uuid-1234-notes.txt",
+    );
+  });
+
+  it("resolves Finder blob-only drops to workspace file paths when names are unique", async () => {
+    vi.mocked(vscode.workspace.asRelativePath).mockImplementation(
+      (value: string) => value,
+    );
+    vi.mocked(vscode.workspace.findFiles)
+      .mockResolvedValueOnce([vscode.Uri.file("/workspace/src/a.ts")])
+      .mockResolvedValueOnce([vscode.Uri.file("/workspace/src/b.ts")]);
+
+    await router.handleFilesDropped([], false, undefined, [
+      {
+        name: "a.ts",
+        data: "data:text/plain;base64,QQ==",
+      },
+      {
+        name: "b.ts",
+        data: "data:text/plain;base64,Qg==",
+      },
+    ]);
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(provider.formatDroppedFiles).not.toHaveBeenCalled();
+    expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
+      "terminal-1",
+      "'/workspace/src/a.ts' '/workspace/src/b.ts' ",
     );
   });
 
@@ -565,12 +595,9 @@ describe("MessageRouter", () => {
       },
     ]);
 
-    expect(provider.formatDroppedFiles).toHaveBeenCalledWith(
-      ["/tmp/opencode-tests/opencode-drop-uuid-1234-image.png"],
-      true,
-    );
+    expect(provider.formatDroppedFiles).not.toHaveBeenCalled();
     expect(provider.routeDroppedTextToTmuxPane).toHaveBeenCalledWith(
-      "@/tmp/opencode-tests/opencode-drop-uuid-1234-image.png ",
+      "'/tmp/opencode-tests/opencode-drop-uuid-1234-image.png' ",
       { col: 2, row: 3 },
     );
   });
@@ -678,7 +705,7 @@ describe("MessageRouter", () => {
     const integratedTerminal = createMockTerminal("External A", "/workspace/a");
     const hiddenCwdTerminal = createMockTerminal("External B");
     const sidebarTerminal = createMockTerminal(
-      "Open Sidebar Terminal",
+      "ULW Terminal",
       "/workspace/sidebar",
     );
     Object.defineProperty(hiddenCwdTerminal, "shellIntegration", {
@@ -987,7 +1014,11 @@ describe("MessageRouter", () => {
       throw new Error("bad uri");
     });
     await router.handleFilesDropped(["file://bad-uri"], false);
-    expect(provider.formatDroppedFiles).toHaveBeenCalledWith(["file://bad-uri"], false);
+    expect(provider.formatDroppedFiles).not.toHaveBeenCalled();
+    expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
+      "terminal-1",
+      "'file://bad-uri' ",
+    );
 
     vi.clearAllMocks();
     await router.handleFilesDropped([], false);

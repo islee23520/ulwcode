@@ -36,15 +36,15 @@ Option B: Via VS Code UI
 ### 4. Test the Extension
 
 1. **Open the sidebar**
-   - Click the OpenCode icon in the activity bar
-   - Or use Command Palette: "View: Show OpenCode"
+   - Click the ULW icon in the activity bar
+   - Or use Command Palette: "View: Show ULW"
 
 2. **Verify auto-start**
    - OpenCode should start automatically
-   - You should see the Open Sidebar Terminal interface
+   - You should see the ULW Terminal interface
 
 3. **Test commands**
-   - Try: `Open Sidebar Terminal: Clear Terminal`
+   - Try a command from the `ULW` command category
 
 4. **Test terminal interaction**
    - Type commands in the terminal
@@ -70,7 +70,7 @@ For rapid testing during development:
 
 ### Expected Behavior
 
-✅ Open Sidebar appears in activity bar
+✅ ULW appears in activity bar
 ✅ Terminal automatically starts with OpenCode
 ✅ Full TUI interaction works (keyboard, mouse)
 ✅ Terminal renders correctly (colors, formatting)

@@ -18,6 +18,7 @@ import {
   HostMessage,
   TMUX_RAW_ALLOWED_SUBCOMMANDS,
   TerminalBackendType,
+  detectAiToolName,
   resolveAiToolConfigs,
 } from "../types";
 import type { TmuxRawSubcommand } from "../types";
@@ -37,6 +38,7 @@ export class TerminalProvider
 
   private _view?: vscode.WebviewView;
   private _panel?: vscode.WebviewPanel;
+  private readonly editorPanels = new Set<vscode.WebviewPanel>();
   private readonly contextSharingService: ContextSharingService;
   private readonly logger = OutputChannelService.getInstance();
   private readonly aiToolRegistry: AiToolOperatorRegistry;
@@ -134,13 +136,11 @@ export class TerminalProvider
       launchAiTool: (sessionId, toolName, savePreference, targetPaneId) =>
         this.launchAiTool(sessionId, toolName, savePreference, targetPaneId),
       showAiToolSelector: (sessionId, sessionName, forceShow, targetPaneId) =>
-        Promise.resolve(
-          this.showAiToolSelector(
-            sessionId,
-            sessionName,
-            forceShow,
-            targetPaneId,
-          ),
+        this.showAiToolSelector(
+          sessionId,
+          sessionName,
+          forceShow,
+          targetPaneId,
         ),
       executeRawTmuxCommand: (subcommand, args) =>
         this.executeRawTmuxCommand(subcommand, args),
@@ -283,10 +283,13 @@ export class TerminalProvider
   }
 
   public async toggleEditorAttachment(): Promise<void> {
-    const currentPanel = this._panel;
-    if (currentPanel) {
+    if (this.editorPanels.size > 0) {
+      const panels = [...this.editorPanels];
+      this.editorPanels.clear();
       this._panel = undefined;
-      currentPanel.dispose();
+      for (const panel of panels) {
+        panel.dispose();
+      }
       this.postTerminalConfig();
       await this.revealSidebarView();
       return;
@@ -296,12 +299,6 @@ export class TerminalProvider
   }
 
   public async openInEditorTab(): Promise<void> {
-    if (this._panel) {
-      this._panel.reveal(vscode.ViewColumn.Active);
-      this.focus();
-      return;
-    }
-
     const config = vscode.workspace.getConfiguration("opencodeTui");
 
     if (config.get<boolean>("collapseSecondaryBarOnEditorOpen", true)) {
@@ -312,7 +309,7 @@ export class TerminalProvider
 
     const panel = vscode.window.createWebviewPanel(
       TerminalProvider.panelViewType,
-      "Open Sidebar Terminal",
+      "ULW Terminal",
       vscode.ViewColumn.Beside,
       this.getEditorPanelOptions(),
     );
@@ -655,12 +652,12 @@ export class TerminalProvider
     return [input.trim()];
   }
 
-  public showAiToolSelector(
+  public async showAiToolSelector(
     sessionId: string,
     sessionName: string,
     forceShow = false,
     targetPaneId?: string,
-  ): void {
+  ): Promise<void> {
     const config = vscode.workspace.getConfiguration("opencodeTui");
     if (forceShow && !config.get<boolean>("promptAiToolOnSession", true)) {
       return;
@@ -676,6 +673,15 @@ export class TerminalProvider
     const tools: AiToolConfig[] = resolveAiToolConfigs(
       config.get("aiTools", []),
     );
+
+    const runningTool = this.tmuxSessionManager
+      ? await this.detectRunningTmuxAiTool(effectiveSessionId, targetPaneId, tools)
+      : undefined;
+    if (runningTool) {
+      this.sessionRuntime.rememberSelectedTool(runningTool, instanceId);
+      return;
+    }
+
     if (!forceShow && savedTool) {
       void this.launchAiTool(
         effectiveSessionId,
@@ -685,6 +691,7 @@ export class TerminalProvider
       );
       return;
     }
+
     this.postWebviewMessage({
       type: "showAiToolSelector",
       sessionId: effectiveSessionId,
@@ -693,6 +700,28 @@ export class TerminalProvider
       tools,
       targetPaneId,
     });
+  }
+
+  private async detectRunningTmuxAiTool(
+    sessionId: string,
+    targetPaneId: string | undefined,
+    tools: AiToolConfig[],
+  ): Promise<string | undefined> {
+    if (!this.tmuxSessionManager || !sessionId) {
+      return undefined;
+    }
+
+    try {
+      const panes = await this.tmuxSessionManager.listPanes(sessionId, {
+        activeWindowOnly: true,
+      });
+      const targetPane = targetPaneId
+        ? panes.find((pane) => pane.paneId === targetPaneId)
+        : panes.find((pane) => pane.isActive);
+      return detectAiToolName(targetPane?.currentCommand, tools);
+    } catch {
+      return undefined;
+    }
   }
 
   private getNativeRestoreRecord():
@@ -939,33 +968,45 @@ export class TerminalProvider
   }
 
   private postWebviewMessageNow(message: unknown): void {
-    const webview = this._panel?.webview ?? this._view?.webview;
-    if (webview) {
-      const postResult = webview.postMessage(message) as
-        | boolean
-        | Thenable<boolean>;
-      if (this.isThenablePostResult(postResult)) {
-        if (this.isQueueableHostMessage(message)) {
-          this.pendingQueueablePostChecks += 1;
-        }
-        void postResult.then((delivered) => {
+    const webviews = this.getTargetWebviews();
+    if (webviews.length > 0) {
+      let deliveredSynchronously = false;
+      let pendingAsyncDelivery = false;
+      for (const webview of webviews) {
+        const postResult = webview.postMessage(message) as
+          | boolean
+          | Thenable<boolean>;
+        if (this.isThenablePostResult(postResult)) {
+          pendingAsyncDelivery = true;
           if (this.isQueueableHostMessage(message)) {
-            this.pendingQueueablePostChecks = Math.max(
-              0,
-              this.pendingQueueablePostChecks - 1,
-            );
+            this.pendingQueueablePostChecks += 1;
           }
-          if (!delivered && this.isQueueableHostMessage(message)) {
-            this.replacePendingWebviewMessage(message);
-            if (this.isWebviewVisible()) {
-              this.flushPendingWebviewMessages(webview);
+          void postResult.then((delivered) => {
+            if (this.isQueueableHostMessage(message)) {
+              this.pendingQueueablePostChecks = Math.max(
+                0,
+                this.pendingQueueablePostChecks - 1,
+              );
             }
-          }
-        });
-        return;
-      }
+            if (!delivered && this.isQueueableHostMessage(message)) {
+              this.replacePendingWebviewMessage(message);
+              if (this.isWebviewVisible()) {
+                this.flushPendingWebviewMessages(webview);
+              }
+            }
+          });
+          continue;
+        }
 
-      if (!postResult && this.isQueueableHostMessage(message)) {
+        if (postResult) {
+          deliveredSynchronously = true;
+        }
+      }
+      if (
+        !deliveredSynchronously &&
+        !pendingAsyncDelivery &&
+        this.isQueueableHostMessage(message)
+      ) {
         this.replacePendingWebviewMessage(message);
       }
       return;
@@ -977,7 +1018,21 @@ export class TerminalProvider
   }
 
   private isWebviewVisible(): boolean {
-    return this._panel?.visible === true || this._view?.visible === true;
+    return (
+      [...this.editorPanels].some((panel) => panel.visible === true) ||
+      this._view?.visible === true
+    );
+  }
+
+  private getTargetWebviews(): vscode.Webview[] {
+    const webviews: vscode.Webview[] = [];
+    if (this._view?.webview) {
+      webviews.push(this._view.webview);
+    }
+    for (const panel of this.editorPanels) {
+      webviews.push(panel.webview);
+    }
+    return webviews;
   }
 
   private isThenablePostResult(
@@ -1159,6 +1214,7 @@ export class TerminalProvider
 
   private initializeEditorPanel(panel: vscode.WebviewPanel): void {
     this._panel = panel;
+    this.editorPanels.add(panel);
     panel.webview.options = this.getEditorPanelOptions();
     this.ensureDefaultPaneState();
     panel.webview.html = this.getHtmlForWebview(panel.webview);
@@ -1181,8 +1237,10 @@ export class TerminalProvider
     this.flushPendingWebviewMessages(panel.webview);
 
     panel.onDidDispose(() => {
+      this.editorPanels.delete(panel);
       if (this._panel === panel) {
-        this._panel = undefined;
+        const remainingPanels = [...this.editorPanels];
+        this._panel = remainingPanels[remainingPanels.length - 1];
         if (this._view) {
           this.postTerminalConfig();
           this.postWebviewVisibleForKnownPanes();

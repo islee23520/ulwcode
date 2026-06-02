@@ -1,22 +1,22 @@
-# Open Sidebar TUI
+# ULW
 
 [![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/islee23520.opencode-sidebar-tui?logo=visual-studio-code&label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=islee23520.opencode-sidebar-tui)
 [![Open VSX](https://img.shields.io/open-vsx/v/islee23520/opencode-sidebar-tui?logo=open-vsx&label=Open%20VSX)](https://open-vsx.org/extension/islee23520/opencode-sidebar-tui)
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?logo=githubsponsors)](https://github.com/sponsors/islee23520)
 
-Automatically render Open Sidebar Terminal in VS Code sidebar with full terminal support.
+Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support.
 
 If this project helps your workflow, you can [support it on GitHub Sponsors](https://github.com/sponsors/islee23520).
 
 ## Features
 
-- **Auto-launch OpenCode**: Opens OpenCode automatically when the sidebar is activated
+- **Auto-launch AI tools**: Opens the configured AI tool automatically when the sidebar is activated
 - **Full TUI Support**: Complete terminal emulation with xterm.js and WebGL rendering
 - **Multi-AI Tool Support**: Configure and switch between OpenCode, Claude, Codex, or custom AI tools
-- **Terminal Managers**: Dedicated tmux session management surface with inline pane and window controls
+- **ULW Terminal Manager**: Dedicated tmux session management surface with inline pane and window controls
 - **Tmux Integration**: Automatic tmux session discovery, workspace-scoped session filtering, and tmux status bar hidden in sidebar
 - **Native Shell Switching**: Toggle between OpenCode and a native shell in the same terminal
-- **Return to Workspace Banner**: Quick navigation back to the active workspace from Terminal Managers
+- **Return to Workspace Banner**: Quick navigation back to the active workspace from ULW Terminal Manager
 - **HTTP API Integration**: Bidirectional communication with OpenCode CLI via HTTP API
 - **Auto-Context Sharing**: Automatically shares editor context when terminal opens
 - **File References with Line Numbers**: Send file references with `@filename#L10-L20` syntax
@@ -29,12 +29,12 @@ If this project helps your workflow, you can [support it on GitHub Sponsors](htt
 
 ## Architecture
 
-This extension provides a **sidebar-only** terminal experience. OpenCode runs embedded in the VS Code sidebar Activity Bar, not in the native VS Code terminal panel.
+This extension provides a **sidebar-only** terminal MUX experience. OpenCode, Claude, Codex, or a native shell can run embedded in the VS Code sidebar Activity Bar instead of the native VS Code terminal panel.
 
 The extension consists of two primary sidebar views:
 
-1. **OpenCode Terminal** (secondary sidebar): The main interactive TUI session.
-2. **Terminal Managers**: A dedicated surface for managing tmux sessions, panes, and windows.
+1. **ULW Terminal** (secondary sidebar): The main interactive TUI session.
+2. **ULW Terminal Manager**: A dedicated surface for managing tmux sessions, panes, and windows.
 
 ### Communication Architecture
 
@@ -55,7 +55,7 @@ The extension uses a hybrid communication approach:
 
 1. Open VS Code
 2. Go to Extensions (`Cmd+Shift+X` / `Ctrl+Shift+X`)
-3. Search for "Open Sidebar TUI"
+3. Search for "ULW"
 4. Click **Install**
 
 ### From OpenVSX Registry
@@ -63,7 +63,7 @@ The extension uses a hybrid communication approach:
 For VSCodium, Gitpod, Eclipse Theia, and other VS Code-compatible IDEs:
 
 1. Open your IDE's extension view
-2. Search for "Open Sidebar TUI"
+2. Search for "ULW"
 3. Click **Install**
 
 Or visit the [OpenVSX page](https://open-vsx.org/extension/islee23520/opencode-sidebar-tui).
@@ -104,17 +104,17 @@ npx @vscode/vsce package
 
 ## Usage
 
-1. Click the OpenCode icon in the Activity Bar (sidebar) to open Terminal Managers
-2. The Open Sidebar Terminal is available in the secondary sidebar
-3. Open Sidebar Terminal automatically starts when the terminal view is activated
+1. Click the ULW icon in the Activity Bar (sidebar) to open ULW Terminal Manager
+2. The ULW Terminal is available in the secondary sidebar
+3. ULW Terminal automatically starts when the terminal view is activated
 4. Interact with OpenCode directly in the sidebar
 
 ## Commands
 
 ### Basic Commands
 
-- **Open Sidebar Terminal: Start OpenCode** - Manually start OpenCode
-- **Open Sidebar Terminal: Paste** - Paste text into the terminal
+- **Start ULW Terminal** - Manually start the configured AI tool terminal
+- **ULW Terminal: Paste** - Paste text into the terminal
 
 ### File Reference Commands
 
@@ -134,7 +134,7 @@ npx @vscode/vsce package
 - **Switch Tmux Session** - Switch to a different tmux session
 - **Browse Tmux Sessions** (`Cmd+Alt+T` / `Ctrl+Alt+T`) - Browse and switch between tmux sessions
 - **Switch to Native Shell** - Toggle between OpenCode and a native shell
-- **Open Terminal Managers** - Open the Terminal Managers view
+- **Open ULW Terminal Manager** - Open the ULW Terminal Manager view
 
 ### Tmux Pane Commands
 
@@ -155,7 +155,7 @@ npx @vscode/vsce package
 - **Select Window** - Choose from available tmux windows
 - **Kill Window** - Close the current tmux window
 - **Kill Session** - Kill the current tmux session
-- **Refresh Terminal Manager** - Refresh Terminal Managers
+- **Refresh ULW Terminal Manager** - Refresh ULW Terminal Manager
 
 ### Keyboard Shortcuts
 
@@ -176,9 +176,9 @@ npx @vscode/vsce package
 
 - Hold **Shift** and drag files/folders to the terminal to send as `@file` references
 
-## Terminal Managers
+## ULW Terminal Manager
 
-The Terminal Managers view provides advanced tmux session and pane management directly within the VS Code sidebar:
+The ULW Terminal Manager view provides advanced tmux session and pane management directly within the VS Code sidebar:
 
 - **Session Discovery**: Automatically detects existing tmux sessions on your system.
 - **Workspace Filtering**: Filters sessions to show those relevant to your current workspace.
@@ -335,7 +335,7 @@ src/
 ├── providers/
 │   ├── TerminalProvider.ts              # Main sidebar terminal webview provider
 │   ├── TerminalProvider.test.ts         # Provider tests
-│   ├── TerminalDashboardProvider.ts     # Terminal Managers provider
+│   ├── TerminalDashboardProvider.ts     # ULW Terminal Manager provider
 │   ├── TerminalDashboardProvider.test.ts # Dashboard tests
 │   ├── CodeActionProvider.ts            # Diagnostic code action provider
 │   ├── CodeActionProvider.test.ts       # Code action tests
@@ -378,7 +378,7 @@ src/
 
 ## Implementation Details
 
-Based on the [vscode-sidebar-terminal](https://github.com/s-hiraoku/vscode-sidebar-terminal) extension, streamlined specifically for Open Sidebar Terminal:
+Based on the [vscode-sidebar-terminal](https://github.com/s-hiraoku/vscode-sidebar-terminal) extension, streamlined specifically for ULW Terminal:
 
 - **Terminal Backend**: node-pty for PTY support
 - **Terminal Frontend**: xterm.js with WebGL rendering

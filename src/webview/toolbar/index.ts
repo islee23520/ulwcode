@@ -30,8 +30,16 @@ export function setupBackendToggleButton(
 
 export function setupTmuxWindowButtons(): void {
   bindTmuxCommandButton(
-    "btn-tmux-new-session",
-    "opencodeTui.createTmuxSession",
+    "btn-new-editor-terminal",
+    "opencodeTui.openNewSessionTerminalInEditor",
+  );
+  bindTmuxCommandButton(
+    "btn-tmux-split-horizontal",
+    "opencodeTui.tmuxSplitPaneH",
+  );
+  bindTmuxCommandButton(
+    "btn-tmux-split-vertical",
+    "opencodeTui.tmuxSplitPaneV",
   );
   bindTmuxCommandButton("btn-tmux-prev-window", "opencodeTui.tmuxPrevWindow");
   bindTmuxCommandButton("btn-tmux-new-window", "opencodeTui.tmuxCreateWindow");
@@ -85,6 +93,10 @@ function updateTmuxWindowButtonState(
     ["btn-tmux-new-window", "New tmux window"],
     ["btn-tmux-next-window", "Next tmux window"],
   ] as const;
+  const paneButtons = [
+    ["btn-tmux-split-horizontal", "Split pane horizontally"],
+    ["btn-tmux-split-vertical", "Split pane vertically"],
+  ] as const;
 
   const isTmuxActive = activeBackend === "tmux" && availability.tmux;
   windowButtons.forEach(([id, activeTitle]) => {
@@ -96,6 +108,18 @@ function updateTmuxWindowButtonState(
       : activeBackend === "zellij"
         ? "Use tab controls from commands"
         : "Switch to tmux to manage windows";
+  });
+
+  const canSplitPanes =
+    (activeBackend === "tmux" && availability.tmux) ||
+    (activeBackend === "zellij" && availability.zellij);
+  paneButtons.forEach(([id, activeTitle]) => {
+    const button = document.getElementById(id) as HTMLButtonElement | null;
+    if (!button) return;
+    button.disabled = !canSplitPanes;
+    button.title = canSplitPanes
+      ? activeTitle
+      : "Switch to tmux or zellij to split panes";
   });
 }
 

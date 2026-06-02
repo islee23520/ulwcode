@@ -27,10 +27,12 @@ const commandCategories = {
   ],
   "tmux-session": [
     "opencode.openInNewWindow",
+    "opencodeTui.openSessionInNewWindow",
     "opencode.spawnForWorkspace",
     "opencodeTui.selectInstance",
     "opencodeTui.switchTmuxSession",
     "opencodeTui.createTmuxSession",
+    "opencodeTui.openNewSessionTerminalInEditor",
     "opencodeTui.browseTmuxSessions",
     "opencodeTui.switchNativeShell",
     "opencodeTui.killNativeShell",
@@ -91,7 +93,7 @@ suite("Comprehensive command registration", () => {
       packageJSON.contributes?.commands?.map(({ command }) => command) ?? [];
     const expectedCommands = allExpectedCommands();
 
-    assert.strictEqual(expectedCommands.length, 37);
+    assert.strictEqual(expectedCommands.length, 39);
     assert.deepStrictEqual(
       [...new Set(expectedCommands)].sort(),
       [...expectedCommands].sort(),

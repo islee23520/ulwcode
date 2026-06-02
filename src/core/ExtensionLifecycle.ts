@@ -10,6 +10,7 @@ import { InstanceDiscoveryService } from "../services/InstanceDiscoveryService";
 import { OpenCodeApiClient } from "../services/OpenCodeApiClient";
 import { InstanceStore } from "../services/InstanceStore";
 import { InstanceRegistry } from "../services/InstanceRegistry";
+import { ThreadHistoryStore } from "../services/ThreadHistoryStore";
 import { InstanceQuickPick } from "../services/InstanceQuickPick";
 import { InstanceController } from "../services/InstanceController";
 import { SessionWindowHandoffService } from "../services/SessionWindowHandoffService";
@@ -44,6 +45,7 @@ export class ExtensionLifecycle {
   private codeActionProvider: OpenCodeCodeActionProvider | undefined;
   private instanceStore: InstanceStore | undefined;
   private instanceRegistry: InstanceRegistry | undefined;
+  private threadHistoryStore: ThreadHistoryStore | undefined;
   private instanceQuickPick: InstanceQuickPick | undefined;
   private instanceController: InstanceController | undefined;
   private portManager: PortManager | undefined;
@@ -105,7 +107,7 @@ export class ExtensionLifecycle {
       return;
     }
     this.activated = true;
-    logger.info("Initializing Open Sidebar TUI...");
+    logger.info("Initializing ULW...");
 
     // One-time setup on fresh install: auto-enable sendKeybindingsToShell
     // so Ctrl+P / Ctrl+other keys go to the sidebar opencode terminal immediately.
@@ -121,6 +123,7 @@ export class ExtensionLifecycle {
       this.instanceDiscoveryService = new InstanceDiscoveryService();
 
       this.instanceStore = new InstanceStore();
+      this.threadHistoryStore = new ThreadHistoryStore(context.globalState);
       this.portManager = PortManager.getInstance(this.instanceStore);
       const tmuxSessionManager = new TmuxSessionManager(logger);
       if (await tmuxSessionManager.isAvailable()) {
@@ -245,6 +248,7 @@ export class ExtensionLifecycle {
           this.instanceStore,
           this.tuiProvider,
           this.zellijSessionManager,
+          this.threadHistoryStore,
         );
 
         context.subscriptions.push(
@@ -284,13 +288,13 @@ export class ExtensionLifecycle {
       // commands are registered. This prevents "command not found" errors.
       await vscode.commands.executeCommand("setContext", "opencodeTui.active", true);
 
-      logger.info("Open Sidebar TUI activated successfully");
+      logger.info("ULW activated successfully");
     } catch (error) {
       logger.error(
-        `Failed to activate Open Sidebar TUI: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to activate ULW: ${error instanceof Error ? error.message : String(error)}`,
       );
       vscode.window.showErrorMessage(
-        `Failed to activate Open Sidebar TUI: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to activate ULW: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -549,7 +553,7 @@ export class ExtensionLifecycle {
   }
 
   async deactivate(): Promise<void> {
-    this.outputChannelService?.info("Deactivating Open Sidebar TUI...");
+    this.outputChannelService?.info("Deactivating ULW...");
     this.activated = false;
 
     await this.promptKillTmuxSessions();
@@ -625,7 +629,7 @@ export class ExtensionLifecycle {
       // intentionally empty: setContext during deactivation is best-effort
     }
 
-    logger?.info("Open Sidebar TUI deactivated");
+    logger?.info("ULW deactivated");
   }
 
   /**

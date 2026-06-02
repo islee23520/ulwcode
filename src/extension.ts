@@ -1,5 +1,5 @@
 /**
- * Main entry point for the Open Sidebar TUI VS Code extension.
+ * Main entry point for the ULW VS Code extension.
  */
 
 import * as vscode from "vscode";
@@ -10,12 +10,12 @@ const lifecycle = new ExtensionLifecycle();
 
 export function activate(context: vscode.ExtensionContext): Promise<void> {
   const logger = OutputChannelService.getInstance();
-  logger.info("Open Sidebar TUI extension activating...");
+  logger.info("ULW extension activating...");
   return lifecycle.activate(context);
 }
 
 export async function deactivate(): Promise<void> {
   const logger = OutputChannelService.getInstance();
-  logger.info("Open Sidebar TUI extension deactivating...");
+  logger.info("ULW extension deactivating...");
   await lifecycle.deactivate();
 }

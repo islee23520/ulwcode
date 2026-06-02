@@ -212,7 +212,7 @@ const commands: TmuxCommand[] = [
   },
   {
     id: "refresh",
-    label: "Refresh Terminal Manager",
+    label: "Refresh ULW Terminal Manager",
     category: "Utility",
     requiresSession: false,
     buildMessage: () => ({

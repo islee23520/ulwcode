@@ -267,7 +267,7 @@ export class TmuxSessionManager {
         "-c",
         workspacePath,
       ]);
-      await this.runTmux(["set-option", "-t", sessionName, "mouse", "on"]);
+      await this.configureMouseAndClipboard(sessionName);
     } catch (error) {
       if (this.isTmuxUnavailable(error)) {
         throw new TmuxUnavailableError();
@@ -314,6 +314,37 @@ export class TmuxSessionManager {
   public async setMouseOn(sessionId: string): Promise<void> {
     try {
       await this.runTmux(["set-option", "-t", sessionId, "mouse", "on"]);
+    } catch (error) {
+      if (this.isTmuxUnavailable(error)) {
+        throw new TmuxUnavailableError();
+      }
+
+      throw error;
+    }
+  }
+
+  public async configureMouseAndClipboard(sessionId: string): Promise<void> {
+    try {
+      await this.runTmux(["set-option", "-t", sessionId, "mouse", "on"]);
+      await this.runTmux(["set-option", "-t", sessionId, "set-clipboard", "on"]);
+      await this.runTmux([
+        "bind-key",
+        "-T",
+        "copy-mode",
+        "MouseDragEnd1Pane",
+        "send-keys",
+        "-X",
+        "copy-selection-and-cancel",
+      ]);
+      await this.runTmux([
+        "bind-key",
+        "-T",
+        "copy-mode-vi",
+        "MouseDragEnd1Pane",
+        "send-keys",
+        "-X",
+        "copy-selection-and-cancel",
+      ]);
     } catch (error) {
       if (this.isTmuxUnavailable(error)) {
         throw new TmuxUnavailableError();

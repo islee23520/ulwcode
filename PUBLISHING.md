@@ -1,6 +1,6 @@
 # Publishing Guide
 
-This guide will help you publish the **Open Sidebar TUI** extension to both the VS Code Marketplace and the OpenVSX Registry.
+This guide will help you publish the **ULW** extension to both the VS Code Marketplace and the OpenVSX Registry.
 
 ## Supported Marketplaces
 
@@ -112,7 +112,7 @@ npx @vscode/vsce publish major
 
 1. Wait 5-10 minutes for marketplace indexing
 2. Visit: https://marketplace.visualstudio.com/items?itemName=ilseoblee.opencode-sidebar-tui
-3. Search in VS Code: "Open Sidebar TUI"
+3. Search in VS Code: "ULW"
 
 ---
 

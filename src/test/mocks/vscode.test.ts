@@ -75,7 +75,7 @@ describe("vscode mock", () => {
     const serializerDisposable = vscode.window.registerWebviewPanelSerializer();
     serializerDisposable.dispose();
 
-    const channel = vscode.window.createOutputChannel("Open Sidebar TUI", {
+    const channel = vscode.window.createOutputChannel("ULW", {
       log: true,
     });
     channel.append("a");
@@ -88,7 +88,7 @@ describe("vscode mock", () => {
     channel.info("info");
     channel.warn("warn");
     channel.error("error");
-    expect(channel.name).toBe("Open Sidebar TUI");
+    expect(channel.name).toBe("ULW");
     channel.dispose();
   });
 

@@ -294,9 +294,16 @@ export class ExtensionContext {
   extensionPath = "/test/extension";
   extensionUri = { fsPath: "/test/extension", path: "/test/extension" };
   storageUri = undefined;
+  storagePath = "/test/storage";
   globalStorageUri = { fsPath: "/test/global", path: "/test/global" };
+  globalStoragePath = "/test/global";
   logUri = { fsPath: "/test/log", path: "/test/log" };
+  logPath = "/test/log";
   extensionMode = 1;
+  environmentVariableCollection = {};
+  asAbsolutePath = vi.fn(
+    (relativePath: string) => `/test/extension/${relativePath}`,
+  );
   globalState = {
     get: vi.fn(),
     update: vi.fn(),

@@ -75,9 +75,11 @@ describe("toolbar backend toggle", () => {
     expect(listText).not.toContain("Swap Pane");
   });
 
-  it("dispatches direct tmux session and window commands from toolbar buttons", () => {
+  it("dispatches direct terminal, pane, and tmux window commands from toolbar buttons", () => {
     document.body.innerHTML = `
-      <button id="btn-tmux-new-session"></button>
+      <button id="btn-new-editor-terminal"></button>
+      <button id="btn-tmux-split-horizontal"></button>
+      <button id="btn-tmux-split-vertical"></button>
       <button id="btn-tmux-prev-window"></button>
       <button id="btn-tmux-new-window"></button>
       <button id="btn-tmux-next-window"></button>
@@ -85,24 +87,34 @@ describe("toolbar backend toggle", () => {
 
     setupTmuxWindowButtons();
 
-    document.getElementById("btn-tmux-new-session")?.click();
+    document.getElementById("btn-new-editor-terminal")?.click();
+    document.getElementById("btn-tmux-split-horizontal")?.click();
+    document.getElementById("btn-tmux-split-vertical")?.click();
     document.getElementById("btn-tmux-prev-window")?.click();
     document.getElementById("btn-tmux-new-window")?.click();
     document.getElementById("btn-tmux-next-window")?.click();
 
     expect(postMessageMock).toHaveBeenNthCalledWith(1, {
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.createTmuxSession",
+      commandId: "opencodeTui.openNewSessionTerminalInEditor",
     });
     expect(postMessageMock).toHaveBeenNthCalledWith(2, {
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxPrevWindow",
+      commandId: "opencodeTui.tmuxSplitPaneH",
     });
     expect(postMessageMock).toHaveBeenNthCalledWith(3, {
       type: "executeTmuxCommand",
-      commandId: "opencodeTui.tmuxCreateWindow",
+      commandId: "opencodeTui.tmuxSplitPaneV",
     });
     expect(postMessageMock).toHaveBeenNthCalledWith(4, {
+      type: "executeTmuxCommand",
+      commandId: "opencodeTui.tmuxPrevWindow",
+    });
+    expect(postMessageMock).toHaveBeenNthCalledWith(5, {
+      type: "executeTmuxCommand",
+      commandId: "opencodeTui.tmuxCreateWindow",
+    });
+    expect(postMessageMock).toHaveBeenNthCalledWith(6, {
       type: "executeTmuxCommand",
       commandId: "opencodeTui.tmuxNextWindow",
     });
@@ -110,7 +122,8 @@ describe("toolbar backend toggle", () => {
 
   it("disables direct tmux window movement outside the tmux backend", () => {
     document.body.innerHTML = `
-      <button id="btn-tmux-new-session"></button>
+      <button id="btn-tmux-split-horizontal" title="Split pane horizontally"></button>
+      <button id="btn-tmux-split-vertical" title="Split pane vertically"></button>
       <button id="btn-tmux-prev-window" title="Previous tmux window"></button>
       <button id="btn-tmux-new-window" title="New tmux window"></button>
       <button id="btn-tmux-next-window" title="Next tmux window"></button>
@@ -123,10 +136,6 @@ describe("toolbar backend toggle", () => {
     });
 
     expect(
-      (document.getElementById("btn-tmux-new-session") as HTMLButtonElement)
-        .disabled,
-    ).toBe(false);
-    expect(
       (document.getElementById("btn-tmux-prev-window") as HTMLButtonElement)
         .disabled,
     ).toBe(true);
@@ -136,6 +145,41 @@ describe("toolbar backend toggle", () => {
     ).toBe(true);
     expect(
       (document.getElementById("btn-tmux-next-window") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (document.getElementById("btn-tmux-split-horizontal") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (document.getElementById("btn-tmux-split-vertical") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
+
+  it("keeps direct split buttons enabled for zellij", () => {
+    document.body.innerHTML = `
+      <button id="btn-tmux-split-horizontal" title="Split pane horizontally"></button>
+      <button id="btn-tmux-split-vertical" title="Split pane vertically"></button>
+      <button id="btn-tmux-prev-window" title="Previous tmux window"></button>
+    `;
+
+    updateBackendToggleButtonState("zellij", {
+      native: true,
+      tmux: true,
+      zellij: true,
+    });
+
+    expect(
+      (document.getElementById("btn-tmux-split-horizontal") as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    expect(
+      (document.getElementById("btn-tmux-split-vertical") as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    expect(
+      (document.getElementById("btn-tmux-prev-window") as HTMLButtonElement)
         .disabled,
     ).toBe(true);
   });

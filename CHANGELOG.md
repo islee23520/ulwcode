@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the "Open Sidebar TUI" extension will be documented in this file.
+All notable changes to the "ULW" extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -17,14 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Change `opencodeTui.autoStartOnOpen` default to `false` so users can choose which AI tool to launch when opening the sidebar.
-- Rename dashboard command labels to `Open Terminal Managers` for clearer VS Code command palette and menu wording.
+- Rename dashboard command labels to `Open ULW Terminal Manager` for clearer VS Code command palette and menu wording.
 - Improve Windows compatibility and terminal UX around shell handling, paths, clipboard behavior, and terminal focus.
 - Expand automated test coverage across core commands, providers, services, terminals, webview keyboard handling, and VS Code mocks.
 
 ### Fixed
 
 - Fix Shift+Enter newline handling in the sidebar terminal.
-- Fix editor title actions so `Open Terminal in Editor` and `Open Terminal Managers` only appear after the extension is fully active.
+- Fix editor title actions so `Open Terminal in Editor` and `Open ULW Terminal Manager` only appear after the extension is fully active.
 - Fix package repository URL metadata by removing the leading whitespace.
 
 ### Security

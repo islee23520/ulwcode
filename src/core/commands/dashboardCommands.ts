@@ -51,7 +51,7 @@ async function openDashboardInEditor(
 
   const panel = vscode.window.createWebviewPanel(
     "opencodeTui.dashboardEditor",
-    "Terminal Managers",
+    "ULW Terminal Manager",
     vscode.ViewColumn.One,
     {
       enableScripts: true,
@@ -142,7 +142,7 @@ function getDashboardHtml(): string {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Terminal Dashboard</title>
+  <title>ULW Terminal Manager</title>
   <style>
     body {
       margin: 0;
@@ -210,7 +210,7 @@ function getDashboardHtml(): string {
 <body>
   <div class="header">
     <div class="header-main">
-      <div class="title">Terminal Dashboard</div>
+      <div class="title">ULW Terminal Manager</div>
       <div class="workspace" id="workspace">Workspace: -</div>
     </div>
     <div class="actions">

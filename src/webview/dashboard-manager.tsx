@@ -87,10 +87,12 @@ function renderDashboard(): void {
   if (toggleScope instanceof HTMLButtonElement) {
     if (lastPayload.showingAll) {
       toggleScope.classList.add("active-scope");
-      toggleScope.textContent = "Workspace";
+      toggleScope.textContent = "Opened";
+      toggleScope.title = "Show opened projects";
     } else {
       toggleScope.classList.remove("active-scope");
-      toggleScope.textContent = "Global";
+      toggleScope.textContent = "All";
+      toggleScope.title = "Show all projects";
     }
   }
 
@@ -176,7 +178,11 @@ document.addEventListener("click", (event) => {
     );
 
     if (matching) {
-      postAction({ action: "activate", sessionId: matching.id });
+      postAction({
+        action: "activate",
+        sessionId: matching.id,
+        workspaceUri: matching.workspaceUri,
+      });
     } else {
       postAction({ action: "create" });
     }
@@ -192,11 +198,16 @@ document.addEventListener("click", (event) => {
     const card = target.closest(".session-card");
 
     if (card instanceof HTMLElement && card.dataset.sessionId) {
-      postAction({ action: "activate", sessionId: card.dataset.sessionId });
+      postAction({
+        action: "activate",
+        sessionId: card.dataset.sessionId,
+        workspaceUri: card.dataset.workspaceUri,
+      });
     } else if (card instanceof HTMLElement && card.dataset.nativeShellId) {
       postAction({
         action: "activateNativeShell",
         instanceId: card.dataset.nativeShellId,
+        workspaceUri: card.dataset.workspaceUri,
       });
     }
 

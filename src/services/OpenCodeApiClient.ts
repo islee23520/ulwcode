@@ -74,7 +74,7 @@ export class OpenCodeApiClient {
   }
 
   /**
-   * Appends a prompt to the Open Sidebar Terminal
+   * Appends a prompt to the ULW terminal
    * @param prompt - The prompt text to append
    * @returns Promise<void>
    * @throws ApiError if the request fails after all retries

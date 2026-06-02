@@ -44,6 +44,10 @@ describe("ExtensionLifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    vscode.workspace.workspaceFolders = undefined;
+    vi.mocked(vscode.window.registerWebviewViewProvider).mockImplementation(
+      () => ({ dispose: vi.fn() }),
+    );
     OutputChannelService.resetInstance();
     vi.spyOn(TmuxSessionManager.prototype, "isAvailable").mockResolvedValue(
       true,
@@ -145,6 +149,78 @@ describe("ExtensionLifecycle", () => {
       );
     });
 
+    it("should consume selected project handoff into the active instance", async () => {
+      const selectedWorkspaceUri = "file:///workspace/selected";
+      const otherWorkspaceUri = "file:///workspace/other";
+      const pendingHandoffsKey = "opencodeTui.pendingSessionWindowHandoffs";
+      let storedHandoffs: readonly unknown[] = [
+        {
+          id: "other-handoff",
+          workspaceUri: otherWorkspaceUri,
+          sessionId: "other-session",
+          backend: "tmux",
+          label: "Other Project",
+          createdAt: Date.now(),
+        },
+        {
+          id: "selected-handoff",
+          workspaceUri: selectedWorkspaceUri,
+          sessionId: "selected-session",
+          backend: "zellij",
+          label: "Selected Project",
+          createdAt: Date.now() + 1,
+        },
+      ];
+      vscode.workspace.workspaceFolders = [
+        { uri: vscode.Uri.parse(selectedWorkspaceUri) },
+      ];
+      vi.mocked(mockContext.globalState.get).mockImplementation(
+        (key: string, defaultValue: unknown) => {
+          if (key === pendingHandoffsKey) {
+            return storedHandoffs;
+          }
+          if (key === "opencodeTui.hasAutoEnabledKeybindings") {
+            return true;
+          }
+          return defaultValue;
+        },
+      );
+      vi.mocked(mockContext.globalState.update).mockImplementation(
+        async (key: string, value: unknown) => {
+          if (key === pendingHandoffsKey && Array.isArray(value)) {
+            storedHandoffs = value;
+          }
+        },
+      );
+
+      await lifecycle.activate(mockContext);
+
+      const maybeStore = Reflect.get(lifecycle, "instanceStore");
+      expect(maybeStore).toBeInstanceOf(InstanceStore);
+      if (!(maybeStore instanceof InstanceStore)) {
+        throw new Error("Expected ExtensionLifecycle to initialize InstanceStore");
+      }
+      const activeRecord = maybeStore.getActive();
+
+      expect(activeRecord.config.workspaceUri).toBe(selectedWorkspaceUri);
+      expect(activeRecord.config.label).toBe("Selected Project");
+      expect(activeRecord.config.terminalBackend).toBe("zellij");
+      expect(activeRecord.runtime.zellijSessionId).toBe("selected-session");
+      expect(activeRecord.runtime.tmuxSessionId).toBeUndefined();
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+        "opencodeTui.focus",
+      );
+      expect(mockContext.globalState.update).toHaveBeenCalledWith(
+        pendingHandoffsKey,
+        [
+          expect.objectContaining({
+            id: "other-handoff",
+            workspaceUri: otherWorkspaceUri,
+          }),
+        ],
+      );
+    });
+
     it("should skip duplicate activation attempts", async () => {
       await lifecycle.activate(mockContext);
       const registrationCount = vi.mocked(vscode.window.registerWebviewViewProvider)
@@ -189,7 +265,7 @@ describe("ExtensionLifecycle", () => {
       await lifecycle.activate(mockContext);
 
       expect(vscode.window.createOutputChannel).toHaveBeenCalledWith(
-        "Open Sidebar TUI",
+        "ULW",
         { log: true },
       );
     });
@@ -399,9 +475,7 @@ describe("ExtensionLifecycle", () => {
       expect(Reflect.get(lifecycle, "tuiProviderRegistration")).toBeUndefined();
       expect(Reflect.get(lifecycle, "tmuxPaneSyncService")).toBeUndefined();
       expect(Reflect.get(lifecycle, "zellijPaneSyncService")).toBeUndefined();
-      expect(logger.info).toHaveBeenLastCalledWith(
-        "Open Sidebar TUI deactivated",
-      );
+      expect(logger.info).toHaveBeenLastCalledWith("ULW deactivated");
     });
   });
 

@@ -77,6 +77,14 @@ export interface MessageRouterProviderBridge {
   switchPaneBackend(paneId: string, backend: TerminalBackendType): Promise<void>;
 }
 
+function quoteShellPath(filePath: string): string {
+  return `'${filePath.replace(/'/g, "'\\''")}'`;
+}
+
+function formatDroppedPathsForTerminal(filePaths: string[]): string {
+  return filePaths.map((filePath) => quoteShellPath(filePath)).join(" ");
+}
+
 export class MessageRouter {
   private static readonly DEFAULT_PANE_ID = "default";
 
@@ -449,8 +457,11 @@ export class MessageRouter {
     ];
 
     if (dedupedFiles.length === 0 && blobFiles && blobFiles.length > 0) {
+      const resolvedBlobPaths = await this.resolveDroppedBlobFilePaths(blobFiles);
       const materializedBlobPaths =
-        await this.materializeDroppedBlobFiles(blobFiles);
+        resolvedBlobPaths.length > 0
+          ? resolvedBlobPaths
+          : await this.materializeDroppedBlobFiles(blobFiles);
       dedupedFiles = [
         ...new Set(materializedBlobPaths.map((p) => path.normalize(p))),
       ];
@@ -461,16 +472,17 @@ export class MessageRouter {
       return;
     }
 
+    const relativeFiles = dedupedFiles.map((file) =>
+      vscode.workspace.asRelativePath(file),
+    );
+    const droppedText = formatDroppedPathsForTerminal(relativeFiles);
+
     if (shiftKey) {
-      const fileRefs = this.provider.formatDroppedFiles(
-        dedupedFiles.map((file) => vscode.workspace.asRelativePath(file)),
-        true,
-      );
-      this.logger.info(`[PROVIDER] Writing with @: ${fileRefs}`);
+      this.logger.info(`[PROVIDER] Writing dropped files: ${droppedText}`);
 
       if (dropCell) {
         void this.provider
-          .routeDroppedTextToTmuxPane(fileRefs + " ", dropCell)
+          .routeDroppedTextToTmuxPane(droppedText + " ", dropCell)
           .then((routed) => {
             if (!routed) {
               this.logger.info(
@@ -478,25 +490,21 @@ export class MessageRouter {
               );
               this.terminalManager.writeToTerminal(
                 this.resolveTerminalTarget(paneId),
-                fileRefs + " ",
+                droppedText + " ",
               );
             }
           });
       } else {
         this.terminalManager.writeToTerminal(
           this.resolveTerminalTarget(paneId),
-          fileRefs + " ",
+          droppedText + " ",
         );
       }
     } else {
-      const filePaths = this.provider.formatDroppedFiles(
-        dedupedFiles.map((file) => vscode.workspace.asRelativePath(file)),
-        false,
-      );
-      this.logger.info(`[PROVIDER] Writing without @: ${filePaths}`);
+      this.logger.info(`[PROVIDER] Writing dropped files: ${droppedText}`);
       this.terminalManager.writeToTerminal(
         this.resolveTerminalTarget(paneId),
-        filePaths + " ",
+        droppedText + " ",
       );
     }
   }
@@ -665,6 +673,30 @@ export class MessageRouter {
     return materializedPaths;
   }
 
+  private async resolveDroppedBlobFilePaths(
+    blobFiles: DroppedBlobFile[],
+  ): Promise<string[]> {
+    const resolvedPaths: string[] = [];
+
+    for (const blobFile of blobFiles) {
+      const fileName = blobFile.name.split(/[\\/]/).pop()?.trim();
+      if (!fileName) {
+        continue;
+      }
+      const matches = await vscode.workspace.findFiles(
+        `**/${fileName}`,
+        null,
+        2,
+      );
+
+      if (matches.length === 1) {
+        resolvedPaths.push(matches[0].fsPath);
+      }
+    }
+
+    return resolvedPaths.length === blobFiles.length ? resolvedPaths : [];
+  }
+
   public async handleListTerminals(): Promise<void> {
     const terminals = await this.getTerminalEntries();
     this.provider.postWebviewMessage({
@@ -726,7 +758,7 @@ export class MessageRouter {
     const entries: Array<{ name: string; cwd: string }> = [];
 
     for (const terminal of vscode.window.terminals) {
-      if (terminal.name === "Open Sidebar Terminal") {
+      if (terminal.name === "ULW Terminal") {
         continue;
       }
 

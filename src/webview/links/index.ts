@@ -1,4 +1,3 @@
-import type { Terminal } from "@xterm/xterm";
 import { postMessage } from "../shared/vscode-api";
 
 interface Link {
@@ -10,18 +9,36 @@ interface Link {
   activate: () => void;
 }
 
+interface LinkTerminal {
+  buffer: {
+    active: {
+      getLine: (lineNumber: number) =>
+        | {
+            translateToString: (trimRight?: boolean) => string;
+          }
+        | undefined;
+    };
+  };
+}
+
 const MAX_LINE_LENGTH = 10000;
 
-const PATH_REGEX =
-  /(?:^[\s"'])(@?((?:file:\/\/|\/|[A-Za-z]:\\|\.?\.?\/)[^\s"'#]+|[^\s":\/]+(?:\/[^\s":\/]+)+)(?:#L(\d+)(?:-L?(\d+))?)?)(?=[\s"']|$)/gi;
+const FILE_NAME_PATTERN =
+  "[A-Za-z0-9_.-]+\\.(?:c|cc|cpp|cs|css|cts|env|fish|go|h|hpp|html|java|js|json|jsx|kt|lock|lua|md|mjs|mts|php|py|rb|rs|scss|sh|swift|toml|ts|tsx|txt|yaml|yml|zsh)";
 
-export function createLinkProvider(terminal: Terminal) {
+const PATH_REGEX =
+  new RegExp(
+    `(^|[\\s"'\\\`([{<])(@?((?:(?:file:\\/\\/|\\/|[A-Za-z]:\\\\|\\.?\\.?\\/)[^\\s"'#:]+|[^\\s":\\/]+(?:\\/[^\\s":\\/]+)+|${FILE_NAME_PATTERN}))(?::(\\d+)(?::(\\d+))?)?(?:#L(\\d+)(?:-L?(\\d+))?)?)(?=[\\s"'\\\`\\])}>]|$)`,
+    "gi",
+  );
+
+export function createLinkProvider(terminal: LinkTerminal) {
   return {
     provideLinks(
       bufferLineNumber: number,
       callback: (links: Link[] | undefined) => void,
     ) {
-      const line = terminal.buffer.active.getLine(bufferLineNumber);
+      const line = terminal.buffer.active.getLine(bufferLineNumber - 1);
       if (!line) {
         callback(undefined);
         return;
@@ -35,6 +52,7 @@ export function createLinkProvider(terminal: Terminal) {
       }
 
       const links: Link[] = [];
+      PATH_REGEX.lastIndex = 0;
       let match: RegExpExecArray | null = PATH_REGEX.exec(lineText);
       let lastIndex = -1;
 
@@ -46,11 +64,13 @@ export function createLinkProvider(terminal: Terminal) {
         }
         lastIndex = match.index;
 
-        const fullMatch = match[1];
+        const fullMatch = match[2];
         const hasAtPrefix = fullMatch.startsWith("@");
-        let path = match[2];
-        const lineNumStr = match[3];
-        const endLineStr = match[4];
+        let path = match[3];
+        const suffixLineStr = match[4];
+        const suffixColumnStr = match[5];
+        const anchorLineStr = match[6];
+        const endLineStr = match[7];
 
         if (!path) continue;
 
@@ -70,32 +90,27 @@ export function createLinkProvider(terminal: Terminal) {
           }
         }
 
-        if (lineNumStr) {
-          lineNumber = parseInt(lineNumStr, 10);
+        if (suffixLineStr) {
+          lineNumber = parseInt(suffixLineStr, 10);
+        }
+        if (suffixColumnStr) {
+          columnNumber = parseInt(suffixColumnStr, 10);
+        }
+        if (anchorLineStr) {
+          lineNumber = parseInt(anchorLineStr, 10);
         }
         if (endLineStr) {
           endLineNumber = parseInt(endLineStr, 10);
         }
 
-        if (!hasAtPrefix && !lineNumStr) {
-          const posRegex = /^(.*?):(\d+)(?::(\d+))?$/;
-          const posMatch = path.match(posRegex);
-          if (posMatch) {
-            path = posMatch[1];
-            lineNumber = parseInt(posMatch[2], 10);
-            if (posMatch[3]) {
-              columnNumber = parseInt(posMatch[3], 10);
-            }
-          }
-        }
-
-        const index = match.index + (match[0].length - fullMatch.length);
+        const index = match.index + match[1].length;
+        const linkText = hasAtPrefix ? `@${path}` : path;
 
         links.push({
-          text: fullMatch,
+          text: linkText,
           range: {
             start: { x: index + 1, y: bufferLineNumber },
-            end: { x: index + fullMatch.length, y: bufferLineNumber },
+            end: { x: index + linkText.length, y: bufferLineNumber },
           },
           activate: () => {
             postMessage({

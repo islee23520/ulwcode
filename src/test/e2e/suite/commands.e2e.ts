@@ -20,6 +20,7 @@ suite("Command registration", () => {
     assert.ok(commands.includes("opencodeTui.start"));
     assert.ok(commands.includes("opencodeTui.focus"));
     assert.ok(commands.includes("opencodeTui.openTerminalInEditor"));
+    assert.ok(commands.includes("opencodeTui.openNewSessionTerminalInEditor"));
     assert.ok(commands.includes("opencodeTui.toggleDashboard"));
   });
 

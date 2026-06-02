@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  copyOsc52ToClipboard,
   copySelectionToClipboard,
   handlePasteEventWithImageSupport,
 } from "./index";
@@ -37,6 +38,24 @@ describe("clipboard helpers", () => {
       type: "setClipboard",
       text: "selected text",
     });
+  });
+
+  it("passes OSC52 clipboard payloads to the host clipboard bridge", () => {
+    const payload = btoa("remote copied text");
+
+    expect(copyOsc52ToClipboard(`c;${payload}`)).toBe(true);
+
+    expect(mockPostMessage).toHaveBeenCalledWith({
+      type: "setClipboard",
+      text: "remote copied text",
+    });
+  });
+
+  it("ignores invalid OSC52 clipboard payloads", () => {
+    expect(copyOsc52ToClipboard("c;not-base64!")).toBe(false);
+    expect(copyOsc52ToClipboard("c;?")).toBe(false);
+
+    expect(mockPostMessage).not.toHaveBeenCalled();
   });
 
   it("does not intercept plain-text paste events", () => {

@@ -5,6 +5,7 @@ import type { ILogger } from "../services/ILogger";
 import { TmuxSessionManager } from "../services/TmuxSessionManager";
 import { ZellijSessionManager } from "../services/ZellijSessionManager";
 import { InstanceStore } from "../services/InstanceStore";
+import { ThreadHistoryStore } from "../services/ThreadHistoryStore";
 import type { TerminalProvider } from "./TerminalProvider";
 import {
   TmuxDashboardActionMessage,
@@ -13,8 +14,11 @@ import {
   TmuxDashboardSessionDto,
   TmuxDashboardWindowDto,
   NativeShellDto,
+  ThreadHistoryDashboardDto,
+  ThreadHistoryEntryDto,
   AiToolConfig,
   TerminalBackendType,
+  detectAiToolName,
   resolveAiToolConfigs,
 } from "../types";
 
@@ -26,6 +30,10 @@ interface DashboardSessionSource {
   workspace: string;
   isActive: boolean;
   backend: DashboardBackend;
+}
+
+interface ResolvedDashboardSession extends DashboardSessionSource {
+  workspaceUri?: string;
 }
 
 export class TerminalDashboardProvider
@@ -41,6 +49,7 @@ export class TerminalDashboardProvider
   private static readonly POLL_INTERVAL_MS = 3000;
   private static readonly HTML_VERSION = 16;
   private showAllSessions = false;
+  private showThreadHistory = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -49,6 +58,7 @@ export class TerminalDashboardProvider
     private readonly instanceStore?: InstanceStore,
     private readonly terminalProvider?: TerminalProvider,
     private readonly zellijSessionManager?: ZellijSessionManager,
+    private readonly threadHistoryStore?: ThreadHistoryStore,
   ) {}
 
   public resolveWebviewView(
@@ -92,7 +102,7 @@ export class TerminalDashboardProvider
 
     const panel = vscode.window.createWebviewPanel(
       TerminalDashboardProvider.viewType,
-      "Terminal Manager",
+      "ULW Terminal Manager",
       {
         preserveFocus: true,
         viewColumn: vscode.ViewColumn.Beside,
@@ -133,7 +143,7 @@ export class TerminalDashboardProvider
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     try {
-      const sessions = await this.discoverDashboardSessions();
+      const sessions = Array.from(await this.discoverDashboardSessions());
       const workspaceName = workspacePath
         ? path.basename(workspacePath)
         : undefined;
@@ -147,12 +157,29 @@ export class TerminalDashboardProvider
         );
       }
 
-      let filtered = workspaceName
-        ? sessions.filter((session) => session.workspace === workspaceName)
-        : sessions;
+      const workspaceUri = this.resolveCurrentWorkspaceUri(workspacePath);
+      const workspaceKey = this.normalizeWorkspaceUri(workspaceUri);
+      const resolvedSessions = sessions.map((session) => ({
+        ...session,
+        workspaceUri: this.resolveSessionWorkspaceUri(
+          session,
+          workspacePath,
+          workspaceName,
+        ),
+      }));
+
+      let filtered = workspaceKey
+        ? resolvedSessions.filter((session) => {
+            const sessionKey = this.normalizeWorkspaceUri(session.workspaceUri);
+            if (sessionKey) {
+              return sessionKey === workspaceKey;
+            }
+            return workspaceName ? session.workspace === workspaceName : true;
+          })
+        : resolvedSessions;
 
       if (this.showAllSessions) {
-        filtered = sessions;
+        filtered = resolvedSessions;
       }
 
       this.logger?.debug(
@@ -205,19 +232,29 @@ export class TerminalDashboardProvider
         id: session.id,
         name: session.backend === "zellij" ? `Zellij: ${session.name}` : session.name,
         workspace: session.workspace,
+        workspaceUri: session.workspaceUri,
         isActive: session.isActive,
         paneCount: panesMap[session.id]?.length ?? 0,
       }));
 
       const nativeShells = this.buildNativeShellDtos(
-        this.showAllSessions ? undefined : workspacePath,
+        this.showAllSessions ? undefined : workspaceUri,
+      );
+      await this.recordThreadHistory(
+        payload,
+        nativeShells,
+        workspaceName,
+        this.showAllSessions ? undefined : workspaceUri,
       );
 
       const message: TmuxDashboardHostMessage = {
         type: "updateTmuxSessions",
         sessions: payload,
         nativeShells,
+        threadHistory: this.buildThreadHistoryDto(),
+        showingThreadHistory: this.showThreadHistory || undefined,
         workspace: workspaceName ?? "No workspace",
+        workspaceUri,
         panes: panesMap,
         windows: windowsMap,
         showingAll: this.showAllSessions || undefined,
@@ -240,7 +277,9 @@ export class TerminalDashboardProvider
         type: "updateTmuxSessions",
         sessions: [],
         nativeShells: this.buildNativeShellDtos(
-          this.showAllSessions ? undefined : workspacePath,
+          this.showAllSessions
+            ? undefined
+            : this.resolveCurrentWorkspaceUri(workspacePath),
         ),
         workspace: "No workspace",
         panes: {},
@@ -384,12 +423,37 @@ export class TerminalDashboardProvider
         this.showAllSessions = !this.showAllSessions;
         await this.postSessionsToWebview();
         return;
+      case "toggleThreadHistory":
+        this.showThreadHistory = !this.showThreadHistory;
+        await this.postSessionsToWebview();
+        return;
+      case "archiveThread":
+        await this.threadHistoryStore?.archive(message.threadId);
+        await this.postSessionsToWebview();
+        return;
+      case "restoreThread":
+        await this.threadHistoryStore?.restore(message.threadId);
+        await this.postSessionsToWebview();
+        return;
+      case "deleteThread":
+        await this.threadHistoryStore?.delete(message.threadId);
+        await this.postSessionsToWebview();
+        return;
       case "activate": {
         const backend = await this.getSessionBackend(message.sessionId);
+        if (!message.workspaceUri) {
+          vscode.window.showWarningMessage("No workspace folder available");
+          await this.postSessionsToWebview();
+          return;
+        }
         await vscode.commands.executeCommand(
           "opencodeTui.openSessionInNewWindow",
-          message.sessionId,
-          backend,
+          {
+            sessionId: message.sessionId,
+            backend,
+            workspaceUri: message.workspaceUri,
+            label: `${message.sessionId} (${backend})`,
+          },
         );
         await this.postSessionsToWebview();
         return;
@@ -432,25 +496,36 @@ export class TerminalDashboardProvider
         }
         return;
       case "activateNativeShell":
-        if (this.instanceStore) {
-          try {
-            this.instanceStore.setActive(message.instanceId);
-          await vscode.commands.executeCommand(
-            "opencodeTui.switchNativeShell",
-          );
-        } catch {
-          }
+        if (!message.workspaceUri) {
+          vscode.window.showWarningMessage("No workspace folder available");
+          await this.postSessionsToWebview();
+          return;
         }
+        await vscode.commands.executeCommand(
+          "opencodeTui.openSessionInNewWindow",
+          {
+            sessionId: message.instanceId,
+            backend: "native",
+            workspaceUri: message.workspaceUri,
+            label: this.resolveNativeShellLabel(message.instanceId),
+          },
+        );
         await this.postSessionsToWebview();
         return;
       case "showAiToolSelector": {
         let targetPaneId: string | undefined;
+        let resolvedTool: string | undefined;
         try {
+          const config = vscode.workspace.getConfiguration("opencodeTui");
+          const tools: AiToolConfig[] = resolveAiToolConfigs(
+            config.get("aiTools", []),
+          );
           if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
             await this.ensureZellijSession(message.sessionId);
             const panes = await this.zellijSessionManager?.listPanes();
             const activePane = panes?.find((pane) => pane.isFocused);
             targetPaneId = activePane?.id;
+            resolvedTool = detectAiToolName(activePane?.title, tools);
           } else {
             const panes = await this.tmuxSessionManager.listPanes(
               message.sessionId,
@@ -459,12 +534,16 @@ export class TerminalDashboardProvider
             const activePane = panes.find((pane) => pane.isActive);
             if (activePane) {
               targetPaneId = activePane.paneId;
+              resolvedTool = detectAiToolName(activePane.currentCommand, tools);
             }
           }
         } catch (error) {
           this.logger?.debug(
             `[TerminalDashboard] Unable to resolve active pane for AI selector: ${error instanceof Error ? error.message : String(error)}`,
           );
+        }
+        if (resolvedTool) {
+          return;
         }
         await this.showAiToolSelector(
           message.sessionId,
@@ -671,6 +750,7 @@ export class TerminalDashboardProvider
         await this.postSessionsToWebview();
         return;
       case "killNativeShell": {
+        await this.threadHistoryStore?.removeTerminal(message.instanceId);
         await vscode.commands.executeCommand(
           "opencodeTui.killNativeShell",
           message.instanceId,
@@ -695,6 +775,7 @@ export class TerminalDashboardProvider
             message.sessionId,
           );
         }
+        await this.threadHistoryStore?.complete(message.sessionId);
 
         if (wasActive && killedWorkspace) {
           const sessionsAfter = await this.discoverDashboardSessions();
@@ -823,7 +904,209 @@ export class TerminalDashboardProvider
     }
   }
 
-  private buildNativeShellDtos(workspacePath?: string): NativeShellDto[] {
+  private resolveCurrentWorkspaceUri(workspacePath?: string): string | undefined {
+    const workspaceFolderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const value = workspaceFolderUri?.toString();
+    if (value && value !== "[object Object]") {
+      return value;
+    }
+    return workspacePath ? vscode.Uri.file(workspacePath).toString() : undefined;
+  }
+
+  private resolveSessionWorkspaceUri(
+    session: DashboardSessionSource,
+    workspacePath: string | undefined,
+    workspaceName: string | undefined,
+  ): string | undefined {
+    const recordWorkspaceUri = this.findSessionRecordWorkspaceUri(session);
+    if (recordWorkspaceUri) {
+      return recordWorkspaceUri;
+    }
+    if (workspacePath && session.workspace === workspaceName) {
+      return vscode.Uri.file(workspacePath).toString();
+    }
+    return undefined;
+  }
+
+  private findSessionRecordWorkspaceUri(
+    session: DashboardSessionSource,
+  ): string | undefined {
+    if (!this.instanceStore) {
+      return undefined;
+    }
+
+    try {
+      return this.instanceStore
+        .getAll()
+        .find(
+          (record) =>
+            record.runtime.tmuxSessionId === session.id ||
+            record.runtime.zellijSessionId === session.id ||
+            record.config.id === session.id,
+        )?.config.workspaceUri;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private resolveNativeShellLabel(instanceId: string): string {
+    if (!this.instanceStore) {
+      return instanceId;
+    }
+
+    try {
+      return (
+        this.instanceStore.get(instanceId)?.config.label ??
+        this.instanceStore
+          .getAll()
+          .find((record) => record.config.id === instanceId)?.config.label ??
+        instanceId
+      );
+    } catch {
+      return instanceId;
+    }
+  }
+
+  private normalizeWorkspaceUri(
+    workspaceUri: string | undefined,
+  ): string | undefined {
+    if (!workspaceUri) {
+      return undefined;
+    }
+
+    try {
+      const parsed = vscode.Uri.parse(workspaceUri);
+      if (parsed.scheme === "file") {
+        return path.normalize(parsed.fsPath);
+      }
+    } catch {
+      return workspaceUri;
+    }
+
+    return workspaceUri;
+  }
+
+  private async recordThreadHistory(
+    sessions: readonly TmuxDashboardSessionDto[],
+    nativeShells: readonly NativeShellDto[],
+    workspaceName: string | undefined,
+    reconciliationWorkspaceUri: string | undefined,
+  ): Promise<void> {
+    if (!this.threadHistoryStore) {
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const observedIds = new Set<string>();
+    for (const session of sessions) {
+      observedIds.add(session.id);
+      await this.threadHistoryStore.record({
+        id: session.id,
+        kind: "agent",
+        sessionId: session.id,
+        title: session.name,
+        workspaceUri: session.workspaceUri,
+        workspaceName: session.workspace || workspaceName,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        status: "running",
+      });
+    }
+
+    for (const shell of nativeShells) {
+      observedIds.add(shell.id);
+      await this.threadHistoryStore.record({
+        id: shell.id,
+        kind: "terminal",
+        terminalId: shell.id,
+        title: shell.label ?? shell.id,
+        workspaceUri: shell.workspaceUri,
+        workspaceName:
+          this.workspaceNameFromUri(shell.workspaceUri) ?? workspaceName,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        status: this.resolveNativeShellThreadStatus(shell.state),
+      });
+    }
+
+    await this.threadHistoryStore.completeUnobserved(
+      observedIds,
+      reconciliationWorkspaceUri,
+    );
+  }
+
+  private resolveNativeShellThreadStatus(
+    state: string,
+  ): ThreadHistoryEntryDto["status"] {
+    if (state === "error") {
+      return "error";
+    }
+    if (state === "disconnected" || state === "stopping") {
+      return "completed";
+    }
+    return "running";
+  }
+
+  private workspaceNameFromUri(workspaceUri: string | undefined): string | undefined {
+    if (!workspaceUri) {
+      return undefined;
+    }
+
+    try {
+      const parsed = vscode.Uri.parse(workspaceUri);
+      return parsed.fsPath ? path.basename(parsed.fsPath) : undefined;
+    } catch {
+      const parts = workspaceUri.split("/").filter((part) => part.length > 0);
+      return parts.length > 0 ? parts[parts.length - 1] : undefined;
+    }
+  }
+
+  private buildThreadHistoryDto(): ThreadHistoryDashboardDto | undefined {
+    if (!this.threadHistoryStore) {
+      return undefined;
+    }
+
+    return {
+      active: this.threadHistoryStore
+        .listActive()
+        .map((entry) => this.toThreadHistoryEntryDto(entry)),
+      projects: this.threadHistoryStore.groupByProject().map((group) => ({
+        workspaceName: group.workspaceName,
+        workspaceUri: group.workspaceUri,
+        entries: group.entries.map((entry) =>
+          this.toThreadHistoryEntryDto(entry),
+        ),
+      })),
+      buckets: this.threadHistoryStore.groupByTimeBucket().map((bucket) => ({
+        bucket: bucket.bucket,
+        entries: bucket.entries.map((entry) =>
+          this.toThreadHistoryEntryDto(entry),
+        ),
+      })),
+      archivedOnly: false,
+    };
+  }
+
+  private toThreadHistoryEntryDto(
+    entry: ThreadHistoryEntryDto,
+  ): ThreadHistoryEntryDto {
+    return {
+      id: entry.id,
+      kind: entry.kind,
+      title: entry.titleOverride ?? entry.title,
+      titleOverride: entry.titleOverride,
+      sessionId: entry.sessionId,
+      terminalId: entry.terminalId,
+      workspaceUri: entry.workspaceUri,
+      workspaceName: entry.workspaceName,
+      updatedAt: entry.updatedAt,
+      createdAt: entry.createdAt,
+      status: entry.status,
+      archived: entry.archived,
+    };
+  }
+
+  private buildNativeShellDtos(workspaceUri?: string): NativeShellDto[] {
     if (!this.instanceStore) {
       return [];
     }
@@ -831,6 +1114,7 @@ export class TerminalDashboardProvider
     try {
       const activeRecord = this.instanceStore.getActive();
       const activeId = activeRecord?.config.id;
+      const targetWorkspaceKey = this.normalizeWorkspaceUri(workspaceUri);
 
       return this.instanceStore
         .getAll()
@@ -838,19 +1122,20 @@ export class TerminalDashboardProvider
           if (record.runtime.tmuxSessionId) {
             return false;
           }
-          if (!workspacePath) {
+          if (!targetWorkspaceKey) {
             return true;
           }
 
-          const recordWorkspace = record.config.workspaceUri
-            ? vscode.Uri.parse(record.config.workspaceUri).fsPath
-            : undefined;
+          const recordWorkspace = this.normalizeWorkspaceUri(
+            record.config.workspaceUri,
+          );
 
-          return recordWorkspace === workspacePath;
+          return recordWorkspace === targetWorkspaceKey;
         })
         .map((record) => ({
           id: record.config.id,
           label: record.config.label,
+          workspaceUri: record.config.workspaceUri,
           state: record.state,
           isActive: record.config.id === activeId,
         }));

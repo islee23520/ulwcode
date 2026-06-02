@@ -351,7 +351,7 @@ describe("TmuxSessionManager", () => {
         isActive: true,
       },
     });
-    expect(execFile).toHaveBeenCalledTimes(3);
+    expect(execFile).toHaveBeenCalledTimes(6);
     expect(vi.mocked(execFile).mock.calls[1]?.[1]).toEqual([
       "new-session",
       "-d",
@@ -391,7 +391,7 @@ describe("TmuxSessionManager", () => {
         isActive: true,
       },
     });
-    expect(execFile).toHaveBeenCalledTimes(3);
+    expect(execFile).toHaveBeenCalledTimes(6);
     expect(vi.mocked(execFile).mock.calls[1]?.[1]).toEqual([
       "new-session",
       "-d",
@@ -463,8 +463,14 @@ describe("TmuxSessionManager", () => {
     );
   });
 
-  it("creates a tmux session and enables mouse support", async () => {
-    mockExecSequence([{ stdout: "" }, { stdout: "" }]);
+  it("creates a tmux session and enables mouse and clipboard support", async () => {
+    mockExecSequence([
+      { stdout: "" },
+      { stdout: "" },
+      { stdout: "" },
+      { stdout: "" },
+      { stdout: "" },
+    ]);
 
     await expect(
       manager.createSession("repo-a", "/workspaces/repo-a"),
@@ -483,6 +489,31 @@ describe("TmuxSessionManager", () => {
       "repo-a",
       "mouse",
       "on",
+    ]);
+    expect(vi.mocked(execFile).mock.calls[2]?.[1]).toEqual([
+      "set-option",
+      "-t",
+      "repo-a",
+      "set-clipboard",
+      "on",
+    ]);
+    expect(vi.mocked(execFile).mock.calls[3]?.[1]).toEqual([
+      "bind-key",
+      "-T",
+      "copy-mode",
+      "MouseDragEnd1Pane",
+      "send-keys",
+      "-X",
+      "copy-selection-and-cancel",
+    ]);
+    expect(vi.mocked(execFile).mock.calls[4]?.[1]).toEqual([
+      "bind-key",
+      "-T",
+      "copy-mode-vi",
+      "MouseDragEnd1Pane",
+      "send-keys",
+      "-X",
+      "copy-selection-and-cancel",
     ]);
   });
 
@@ -514,6 +545,41 @@ describe("TmuxSessionManager", () => {
       "repo-a",
       "mouse",
       "on",
+    ]);
+  });
+
+  it("configures mouse, OSC52 clipboard, and mouse copy-mode bindings", async () => {
+    mockExecSequence([
+      { stdout: "" },
+      { stdout: "" },
+      { stdout: "" },
+      { stdout: "" },
+    ]);
+
+    await expect(
+      manager.configureMouseAndClipboard("repo-a"),
+    ).resolves.toBeUndefined();
+    expect(vi.mocked(execFile).mock.calls.map((call) => call[1])).toEqual([
+      ["set-option", "-t", "repo-a", "mouse", "on"],
+      ["set-option", "-t", "repo-a", "set-clipboard", "on"],
+      [
+        "bind-key",
+        "-T",
+        "copy-mode",
+        "MouseDragEnd1Pane",
+        "send-keys",
+        "-X",
+        "copy-selection-and-cancel",
+      ],
+      [
+        "bind-key",
+        "-T",
+        "copy-mode-vi",
+        "MouseDragEnd1Pane",
+        "send-keys",
+        "-X",
+        "copy-selection-and-cancel",
+      ],
     ]);
   });
 

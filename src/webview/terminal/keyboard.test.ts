@@ -52,6 +52,29 @@ describe("createKeyboardHandler", () => {
       }, false, false);
     });
 
+    it("passes Cmd+P through while keeping Ctrl+P in the terminal when shell keybindings are enabled", () => {
+      const keyboard = createKeyboardHandler({
+        isMac: true,
+        sendKeybindingsToShell: true,
+      });
+      const cmdEvent = createKeyboardEvent({
+        metaKey: true,
+        key: "p",
+        code: "KeyP",
+      });
+      const stopCmdPropagation = vi.spyOn(cmdEvent, "stopPropagation");
+
+      expect(keyboard.handler(cmdEvent)).toBe(false);
+      expect(cmdEvent.defaultPrevented).toBe(false);
+      expect(stopCmdPropagation).not.toHaveBeenCalled();
+
+      expectKeyboardHandling(keyboard, {
+        ctrlKey: true,
+        key: "p",
+        code: "KeyP",
+      }, true, true);
+    });
+
     it("passes Cmd+digit chords through to VS Code", () => {
       expectKeyboardHandling(makeKeyboard(), {
         metaKey: true,

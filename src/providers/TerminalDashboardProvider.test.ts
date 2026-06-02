@@ -60,6 +60,18 @@ describe("TerminalDashboardProvider", () => {
       switchToZellijSession?: ReturnType<typeof vi.fn>;
       killTmuxSession?: ReturnType<typeof vi.fn>;
     };
+    threadHistoryStore?: {
+      record: ReturnType<typeof vi.fn>;
+      listActive: ReturnType<typeof vi.fn>;
+      groupByProject: ReturnType<typeof vi.fn>;
+      groupByTimeBucket: ReturnType<typeof vi.fn>;
+      archive: ReturnType<typeof vi.fn>;
+      restore: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
+      complete: ReturnType<typeof vi.fn>;
+      completeUnobserved: ReturnType<typeof vi.fn>;
+      removeTerminal: ReturnType<typeof vi.fn>;
+    };
     logger?: {
       debug: ReturnType<typeof vi.fn>;
       warn: ReturnType<typeof vi.fn>;
@@ -74,6 +86,7 @@ describe("TerminalDashboardProvider", () => {
       options?.listWindowPaneGeometry ?? vi.fn().mockResolvedValue([]);
     const instanceStore = options?.instanceStore;
     const terminalProvider = options?.terminalProvider;
+    const threadHistoryStore = options?.threadHistoryStore;
     const zellijDiscoverSessions = options?.zellijDiscoverSessions;
     const zellijListPanes = options?.zellijListPanes ?? vi.fn().mockResolvedValue([]);
     const zellijListTabs = options?.zellijListTabs ?? vi.fn().mockResolvedValue([]);
@@ -146,6 +159,7 @@ describe("TerminalDashboardProvider", () => {
         instanceStore as never,
         terminalProvider as never,
         zellijSessionManager as never,
+        threadHistoryStore as never,
       ),
     };
   }
@@ -226,6 +240,7 @@ describe("TerminalDashboardProvider", () => {
             id: "repo-a",
             name: "repo-a",
             workspace: "repo-a",
+            workspaceUri: "file:///workspaces/repo-a",
             isActive: true,
             paneCount: 0,
           },
@@ -256,6 +271,194 @@ describe("TerminalDashboardProvider", () => {
             label: "Codex",
           }),
         ]),
+      }),
+    );
+  });
+
+  it("records open dashboard sessions as thread history and posts project history", async () => {
+    const threadHistoryStore = {
+      record: vi.fn().mockResolvedValue(undefined),
+      listActive: vi.fn().mockReturnValue([
+        {
+          id: "repo-a",
+          kind: "agent",
+          title: "repo-a",
+          sessionId: "repo-a",
+          workspaceName: "repo-a",
+          workspaceUri: "file:///workspaces/repo-a",
+          createdAt: "2026-06-02T08:00:00.000Z",
+          updatedAt: "2026-06-02T09:00:00.000Z",
+          status: "running",
+        },
+      ]),
+      groupByProject: vi.fn().mockReturnValue([
+        {
+          workspaceName: "repo-a",
+          workspaceUri: "file:///workspaces/repo-a",
+          entries: [
+            {
+              id: "repo-a",
+              kind: "agent",
+              title: "repo-a",
+              sessionId: "repo-a",
+              workspaceName: "repo-a",
+              workspaceUri: "file:///workspaces/repo-a",
+              createdAt: "2026-06-02T08:00:00.000Z",
+              updatedAt: "2026-06-02T09:00:00.000Z",
+              status: "running",
+            },
+          ],
+        },
+      ]),
+      groupByTimeBucket: vi.fn().mockReturnValue([]),
+      archive: vi.fn().mockResolvedValue(undefined),
+      restore: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+      complete: vi.fn().mockResolvedValue(undefined),
+      completeUnobserved: vi.fn().mockResolvedValue(undefined),
+      removeTerminal: vi.fn().mockResolvedValue(undefined),
+    };
+    const { provider } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([
+        {
+          id: "repo-a",
+          name: "repo-a",
+          workspace: "repo-a",
+          isActive: true,
+        },
+        {
+          id: "repo-a-background",
+          name: "repo-a-background",
+          workspace: "repo-a",
+          isActive: false,
+        },
+      ]),
+      threadHistoryStore,
+    });
+
+    const { view } = resolveProvider(provider);
+    await flushPromises();
+    await flushPromises();
+
+    expect(threadHistoryStore.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "repo-a",
+        kind: "agent",
+        sessionId: "repo-a",
+        workspaceUri: "file:///workspaces/repo-a",
+        status: "running",
+      }),
+    );
+    expect(threadHistoryStore.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "repo-a-background",
+        kind: "agent",
+        status: "running",
+      }),
+    );
+    expect(threadHistoryStore.completeUnobserved).toHaveBeenCalledWith(
+      expect.any(Set),
+      "file:///workspaces/repo-a",
+    );
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        threadHistory: expect.objectContaining({
+          projects: [
+            expect.objectContaining({
+              workspaceName: "repo-a",
+            }),
+          ],
+        }),
+      }),
+    );
+  });
+
+  it("routes thread history archive restore and delete actions", async () => {
+    const threadHistoryStore = {
+      record: vi.fn().mockResolvedValue(undefined),
+      listActive: vi.fn().mockReturnValue([]),
+      groupByProject: vi.fn().mockReturnValue([]),
+      groupByTimeBucket: vi.fn().mockReturnValue([]),
+      archive: vi.fn().mockResolvedValue(undefined),
+      restore: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+      complete: vi.fn().mockResolvedValue(undefined),
+      completeUnobserved: vi.fn().mockResolvedValue(undefined),
+      removeTerminal: vi.fn().mockResolvedValue(undefined),
+    };
+    const { provider } = createProvider({ threadHistoryStore });
+    const { messageHandler } = resolveProvider(provider);
+    await flushPromises();
+
+    await messageHandler({ action: "archiveThread", threadId: "thread-a" });
+    await messageHandler({ action: "restoreThread", threadId: "thread-a" });
+    await messageHandler({ action: "deleteThread", threadId: "thread-a" });
+
+    expect(threadHistoryStore.archive).toHaveBeenCalledWith("thread-a");
+    expect(threadHistoryStore.restore).toHaveBeenCalledWith("thread-a");
+    expect(threadHistoryStore.delete).toHaveBeenCalledWith("thread-a");
+  });
+
+  it("filters sessions by workspace URI when same-named project folders exist", async () => {
+    vscode.workspace.workspaceFolders = [
+      { uri: vscode.Uri.file("/workspaces/alpha/repo") },
+    ];
+    const instanceStore = {
+      getAll: vi.fn().mockReturnValue([
+        {
+          config: {
+            id: "alpha-record",
+            workspaceUri: "file:///workspaces/alpha/repo",
+          },
+          runtime: { tmuxSessionId: "repo-alpha" },
+          state: "connected",
+        },
+        {
+          config: {
+            id: "beta-record",
+            workspaceUri: "file:///workspaces/beta/repo",
+          },
+          runtime: { tmuxSessionId: "repo-beta" },
+          state: "connected",
+        },
+      ]),
+      getActive: vi.fn().mockReturnValue({
+        config: { id: "alpha-record" },
+      }),
+      get: vi.fn(),
+      upsert: vi.fn(),
+      setActive: vi.fn(),
+    };
+    const { provider } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([
+        {
+          id: "repo-alpha",
+          name: "repo-alpha",
+          workspace: "repo",
+          isActive: true,
+        },
+        {
+          id: "repo-beta",
+          name: "repo-beta",
+          workspace: "repo",
+          isActive: false,
+        },
+      ]),
+      instanceStore,
+    });
+
+    const { view } = resolveProvider(provider);
+    await flushPromises();
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessions: [
+          expect.objectContaining({
+            id: "repo-alpha",
+            workspace: "repo",
+            workspaceUri: "file:///workspaces/alpha/repo",
+          }),
+        ],
       }),
     );
   });
@@ -303,6 +506,7 @@ describe("TerminalDashboardProvider", () => {
             id: "repo-a",
             name: "Zellij: repo-a",
             workspace: "repo-a",
+            workspaceUri: "file:///workspaces/repo-a",
             isActive: true,
             paneCount: 1,
           },
@@ -349,15 +553,23 @@ describe("TerminalDashboardProvider", () => {
     await flushPromises();
     vi.mocked(view.webview.postMessage).mockClear();
 
-    await messageHandler({ action: "activate", sessionId: "repo-a" });
+    await messageHandler({
+      action: "activate",
+      sessionId: "repo-a",
+      workspaceUri: "file:///workspaces/repo-a",
+    });
     await messageHandler({ action: "create" });
     await messageHandler({ action: "switchNativeShell" });
     await flushPromises();
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "opencodeTui.openSessionInNewWindow",
-      "repo-a",
-      "tmux",
+      {
+        sessionId: "repo-a",
+        backend: "tmux",
+        workspaceUri: "file:///workspaces/repo-a",
+        label: "repo-a (tmux)",
+      },
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "opencodeTui.createTmuxSession",
@@ -375,6 +587,7 @@ describe("TerminalDashboardProvider", () => {
             id: "repo-a",
             name: "repo-a",
             workspace: "repo-a",
+            workspaceUri: "file:///workspaces/repo-a",
             isActive: false,
             paneCount: 0,
           },
@@ -573,7 +786,7 @@ describe("TerminalDashboardProvider", () => {
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
       "opencodeTui.terminalDashboard",
-      "Terminal Manager",
+      "ULW Terminal Manager",
       {
         preserveFocus: true,
         viewColumn: vscode.ViewColumn.Beside,
@@ -620,6 +833,7 @@ describe("TerminalDashboardProvider", () => {
             id: "repo-a",
             name: "repo-a",
             workspace: "repo-a",
+            workspaceUri: "file:///workspaces/repo-a",
             isActive: true,
             paneCount: 0,
           },
@@ -811,6 +1025,7 @@ describe("TerminalDashboardProvider", () => {
           {
             id: "shell-1",
             label: "Shell 1",
+            workspaceUri: "file:///workspaces/repo-a",
             state: "connected",
             isActive: true,
           },
@@ -822,6 +1037,7 @@ describe("TerminalDashboardProvider", () => {
     await messageHandler({
       action: "activateNativeShell",
       instanceId: "shell-1",
+      workspaceUri: "file:///workspaces/repo-a",
     });
     await messageHandler({ action: "killNativeShell", instanceId: "shell-1" });
 
@@ -835,7 +1051,15 @@ describe("TerminalDashboardProvider", () => {
         state: "disconnected",
       }),
     );
-    expect(instanceStore.setActive).toHaveBeenCalledWith("shell-1");
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "opencodeTui.openSessionInNewWindow",
+      {
+        sessionId: "shell-1",
+        backend: "native",
+        workspaceUri: "file:///workspaces/repo-a",
+        label: "Shell 1",
+      },
+    );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "opencodeTui.killNativeShell",
       "shell-1",
@@ -869,6 +1093,35 @@ describe("TerminalDashboardProvider", () => {
 
     expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
       "opencodeTui.switchNativeShell",
+    );
+  });
+
+  it("warns when a native shell project activation has no workspace URI", async () => {
+    const { provider } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      instanceStore: {
+        getAll: vi.fn().mockReturnValue([]),
+        getActive: vi.fn().mockReturnValue(undefined),
+        get: vi.fn(),
+        upsert: vi.fn(),
+        setActive: vi.fn(),
+      },
+    });
+
+    const { messageHandler } = resolveProvider(provider);
+    await flushPromises();
+
+    await messageHandler({
+      action: "activateNativeShell",
+      instanceId: "shell-1",
+    });
+
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+      "No workspace folder available",
+    );
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "opencodeTui.openSessionInNewWindow",
+      expect.anything(),
     );
   });
 
@@ -1016,7 +1269,11 @@ describe("TerminalDashboardProvider", () => {
     await flushPromises();
     vi.mocked(view.webview.postMessage).mockClear();
 
-    await messageHandler({ action: "activate", sessionId: "repo-a" });
+    await messageHandler({
+      action: "activate",
+      sessionId: "repo-a",
+      workspaceUri: "file:///workspaces/repo-a",
+    });
     await messageHandler({ action: "createWindow", sessionId: "repo-a" });
     await messageHandler({ action: "nextWindow", sessionId: "repo-a" });
     await messageHandler({ action: "prevWindow", sessionId: "repo-a" });
@@ -1053,8 +1310,12 @@ describe("TerminalDashboardProvider", () => {
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "opencodeTui.openSessionInNewWindow",
-      "repo-a",
-      "zellij",
+      {
+        sessionId: "repo-a",
+        backend: "zellij",
+        workspaceUri: "file:///workspaces/repo-a",
+        label: "repo-a (zellij)",
+      },
     );
     expect(zellijSessionManager?.createTab).toHaveBeenCalledWith({
       workingDirectory: "/workspaces/repo-a",
@@ -1153,6 +1414,89 @@ describe("TerminalDashboardProvider", () => {
         targetPaneId: undefined,
       }),
     );
+  });
+
+  it("does not relaunch a detected tmux AI tool when it is already running", async () => {
+    const terminalProvider = {
+      showAiToolSelector: vi.fn(),
+      launchAiTool: vi.fn().mockResolvedValue(undefined),
+    };
+    const { provider } = createProvider({
+      discoverSessions: vi
+        .fn()
+        .mockResolvedValue([
+          { id: "repo-a", name: "Repo A", workspace: "repo-a", isActive: true },
+        ]),
+      listPanes: vi.fn().mockResolvedValue([
+        {
+          paneId: "%9",
+          index: 1,
+          title: "active",
+          isActive: true,
+          currentCommand: "opencode",
+          currentPath: "/workspaces/repo-a",
+        },
+      ]),
+      terminalProvider,
+    });
+
+    const { view, messageHandler } = resolveProvider(provider);
+    await flushPromises();
+    vi.mocked(view.webview.postMessage).mockClear();
+
+    await messageHandler({
+      action: "showAiToolSelector",
+      sessionId: "repo-a",
+      sessionName: "Repo A",
+    });
+
+    expect(view.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "showAiToolSelector" }),
+    );
+    expect(terminalProvider.showAiToolSelector).not.toHaveBeenCalled();
+    expect(terminalProvider.launchAiTool).not.toHaveBeenCalled();
+  });
+
+  it("does not relaunch a detected zellij AI tool when pane metadata includes it", async () => {
+    const terminalProvider = {
+      showAiToolSelector: vi.fn(),
+      launchAiTool: vi.fn().mockResolvedValue(undefined),
+    };
+    const { provider, zellijSwitchSession } = createProvider({
+      discoverSessions: vi.fn().mockResolvedValue([]),
+      zellijDiscoverSessions: vi.fn().mockResolvedValue([
+        { id: "repo-a", name: "Repo A", workspace: "repo-a", isActive: true },
+      ]),
+      zellijListPanes: vi.fn().mockResolvedValue([
+        {
+          id: "terminal_1",
+          title: "Claude Code",
+          isFocused: true,
+          isFloating: false,
+        },
+      ]),
+      zellijListTabs: vi.fn().mockResolvedValue([
+        { index: 1, name: "main", isActive: true },
+      ]),
+      terminalProvider,
+    });
+
+    const { view, messageHandler } = resolveProvider(provider);
+    await flushPromises();
+    vi.mocked(view.webview.postMessage).mockClear();
+
+    await messageHandler({
+      action: "showAiToolSelector",
+      sessionId: "repo-a",
+      sessionName: "Repo A",
+    });
+
+    expect(view.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "showAiToolSelector" }),
+    );
+    expect(terminalProvider.showAiToolSelector).not.toHaveBeenCalled();
+    expect(zellijSwitchSession).toHaveBeenCalledWith("repo-a");
+    expect(terminalProvider.launchAiTool).not.toHaveBeenCalled();
   });
 
   it("falls back to TerminalProvider for selector display before the dashboard webview resolves", async () => {
@@ -1559,7 +1903,13 @@ describe("TerminalDashboardProvider", () => {
       expect.objectContaining({
         nativeShells: [
           { id: "shell-1", label: "Shell 1", state: "connected", isActive: false },
-          { id: "shell-2", label: "Shell 2", state: "disconnected", isActive: true },
+          {
+            id: "shell-2",
+            label: "Shell 2",
+            workspaceUri: "file:///other",
+            state: "disconnected",
+            isActive: true,
+          },
         ],
         showingAll: true,
       }),
@@ -1827,7 +2177,11 @@ describe("TerminalDashboardProvider", () => {
     vi.mocked(vscode.commands.executeCommand).mockRejectedValueOnce("boom");
     vi.mocked(view.webview.postMessage).mockClear();
 
-    await messageHandler({ action: "activate", sessionId: "repo-a" });
+    await messageHandler({
+      action: "activate",
+      sessionId: "repo-a",
+      workspaceUri: "file:///workspaces/repo-a",
+    });
 
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('Error handling "activate" action: boom'),

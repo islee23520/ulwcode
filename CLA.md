@@ -1,6 +1,6 @@
 # Contributor License Agreement
 
-By submitting a pull request or other contribution to Open Sidebar TUI, you agree to the following terms.
+By submitting a pull request or other contribution to ULW, you agree to the following terms.
 
 ## Grant of Rights
 

@@ -78,3 +78,33 @@ export function copySelectionToClipboard(selection: string): void {
     text: selection,
   });
 }
+
+export function copyOsc52ToClipboard(data: string): boolean {
+  const payloadSeparator = data.indexOf(";");
+  if (payloadSeparator === -1) {
+    return false;
+  }
+
+  const payload = data.slice(payloadSeparator + 1).replace(/\s/g, "");
+  if (!payload || payload === "?") {
+    return false;
+  }
+
+  try {
+    const binary = atob(payload);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    const text = new TextDecoder().decode(bytes);
+    if (!text) {
+      return false;
+    }
+
+    copySelectionToClipboard(text);
+    return true;
+  } catch {
+    return false;
+  }
+}

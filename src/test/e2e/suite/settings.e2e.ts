@@ -36,6 +36,16 @@ function getConfigurationProperties(
 }
 
 suite("AI tool settings", () => {
+  test("projectList.openedOnly defaults to true", async () => {
+    const extension = await activateExtension();
+    const properties = getConfigurationProperties(extension);
+
+    assert.strictEqual(
+      properties["opencodeTui.projectList.openedOnly"]?.default,
+      true,
+    );
+  });
+
   test("promptAiToolOnSession defaults to true", async () => {
     const extension = await activateExtension();
     const properties = getConfigurationProperties(extension);

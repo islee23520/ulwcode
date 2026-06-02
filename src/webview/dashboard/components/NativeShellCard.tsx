@@ -5,7 +5,7 @@ import { escapeHtml } from "../utils";
 
 export interface NativeShellCardProps {
   shell: NativeShellDto;
-  onActivate: (instanceId: string) => void;
+  onActivate: (instanceId: string, workspaceUri: string | undefined) => void;
   onKill: (instanceId: string) => void;
 }
 
@@ -23,8 +23,9 @@ export const NativeShellCard: FunctionComponent<NativeShellCardProps> = ({
     {
       class: `session-card${activeClass}`,
       "data-native-shell-id": shell.id,
+      "data-workspace-uri": shell.workspaceUri,
       onClick: (): void => {
-        onActivate(shell.id);
+        onActivate(shell.id, shell.workspaceUri);
       },
     },
     h(

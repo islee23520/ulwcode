@@ -19,10 +19,10 @@ export class OutputChannelService implements ILogger {
 
   /**
    * Private constructor to enforce singleton pattern.
-   * Creates a LogOutputChannel named 'Open Sidebar Terminal'.
+   * Creates a LogOutputChannel named 'ULW'.
    */
   private constructor() {
-    this.channel = vscode.window.createOutputChannel("Open Sidebar TUI", {
+    this.channel = vscode.window.createOutputChannel("ULW", {
       log: true,
     });
   }

@@ -116,6 +116,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       killSession: vi.fn(),
       registerSessionHooks: vi.fn(),
       setMouseOn: vi.fn(),
+      configureMouseAndClipboard: vi.fn(),
       showBuffer: vi.fn(),
       onExternalPaneChange: vi.fn(),
       selectPane: vi.fn(),
@@ -1801,7 +1802,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
       await sessionRuntime.startOpenCode();
 
-      expect(mockTmuxSessionManager.setMouseOn).toHaveBeenCalledWith(
+      expect(mockTmuxSessionManager.configureMouseAndClipboard).toHaveBeenCalledWith(
         "workspace-session",
       );
       expect(mockTmuxSessionManager.registerSessionHooks).toHaveBeenCalledWith(
@@ -3711,7 +3712,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
           isActive: true,
         },
       });
-      vi.mocked(mockTmuxSessionManager.setMouseOn).mockRejectedValueOnce(
+      vi.mocked(
+        mockTmuxSessionManager.configureMouseAndClipboard,
+      ).mockRejectedValueOnce(
         new Error("mouse"),
       );
       vi.mocked(mockTmuxSessionManager.registerSessionHooks).mockRejectedValueOnce(
@@ -3722,7 +3725,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       );
       await sessionRuntime.startOpenCode();
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to enable tmux mouse mode"),
+        expect.stringContaining("Failed to enable tmux mouse and clipboard integration"),
       );
 
       const runtimeWithoutZellij = new SessionRuntime(
@@ -3966,7 +3969,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       (
         sessionRuntime as unknown as { selectedTmuxSessionId?: string }
       ).selectedTmuxSessionId = "explicit-tmux";
-      vi.mocked(mockTmuxSessionManager.setMouseOn).mockRejectedValueOnce(
+      vi.mocked(
+        mockTmuxSessionManager.configureMouseAndClipboard,
+      ).mockRejectedValueOnce(
         "mouse down",
       );
       vi.mocked(mockTmuxSessionManager.registerSessionHooks).mockRejectedValueOnce(

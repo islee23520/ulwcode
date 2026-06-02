@@ -1,20 +1,20 @@
-# Open Sidebar TUI Guide
+# ULW Guide
 
 [English (default)](../README.md) · [한국어](../ko/README.md) · [日本語](../ja/README.md)
 
 - [Default English guide](../README.md)
 - [Root README](../../README.md)
 
-This guide explains how to install and use **Open Sidebar TUI** as a sidebar-only terminal experience inside VS Code.
+This guide explains how to install and use **ULW** as an Open TUI terminal MUX inside VS Code.
 
 ## Overview
 
-Open Sidebar TUI embeds **OpenCode** directly in the VS Code sidebar instead of the native terminal panel.
+ULW embeds OpenCode, Claude, Codex, custom AI tools, or a native shell directly in the VS Code sidebar instead of the native terminal panel.
 
 It provides two main sidebar views:
 
-1. **OpenCode Terminal** in the secondary sidebar for the interactive TUI session.
-2. **Terminal Managers** for managing `tmux` sessions, panes, and windows.
+1. **ULW Terminal** in the secondary sidebar for the interactive TUI session.
+2. **ULW Terminal Manager** for managing `tmux` sessions, panes, and windows.
 
 ## Key Features
 
@@ -33,7 +33,7 @@ It provides two main sidebar views:
 
 1. Open VS Code.
 2. Open Extensions with `Cmd+Shift+X` or `Ctrl+Shift+X`.
-3. Search for **Open Sidebar TUI**.
+3. Search for **ULW**.
 4. Click **Install**.
 
 ### Install from OpenVSX
@@ -41,7 +41,7 @@ It provides two main sidebar views:
 For VSCodium, Gitpod, Eclipse Theia, and other compatible IDEs:
 
 1. Open the extension view.
-2. Search for **Open Sidebar TUI**.
+2. Search for **ULW**.
 3. Click **Install**.
 
 You can also use the [OpenVSX page](https://open-vsx.org/extension/islee23520/opencode-sidebar-tui).
@@ -60,9 +60,9 @@ Then install the generated VSIX from the Extensions view with **Install from VSI
 
 ## Quick Start
 
-1. Open **Terminal Managers** when you need to manage `tmux` sessions.
-2. Open **Open Sidebar Terminal** in the secondary sidebar.
-3. Let Open Sidebar TUI auto-start OpenCode, or start it manually.
+1. Open **ULW Terminal Manager** when you need to manage `tmux` sessions.
+2. Open **ULW Terminal** in the secondary sidebar.
+3. Let ULW auto-start OpenCode, or start it manually.
 4. Work with OpenCode directly inside the sidebar.
 
 ### Common Shortcuts
@@ -76,7 +76,7 @@ Then install the generated VSIX from the Extensions view with **Install from VSI
 
 ## Working with Files and Context
 
-Open Sidebar TUI supports several ways to share context with OpenCode:
+ULW supports several ways to share context with OpenCode:
 
 - **File reference command**: send `@filename`, `@filename#L10`, or `@filename#L10-L20`.
 - **Context menu integration**: send files, folders, or editor selections.
@@ -89,9 +89,9 @@ The file-reference syntax stays the same in every language guide:
 - `@filename#L10`
 - `@filename#L10-L20`
 
-## Terminal Managers and tmux
+## ULW Terminal Manager and tmux
 
-**Terminal Managers** is the control center for `tmux` workflows.
+**ULW Terminal Manager** is the control center for `tmux` workflows.
 
 It includes:
 
@@ -113,7 +113,7 @@ It includes:
 
 ## HTTP API Integration
 
-Open Sidebar TUI uses an HTTP API to communicate with OpenCode more reliably.
+ULW uses an HTTP API to communicate with OpenCode more reliably.
 
 ### What it does
 
@@ -137,8 +137,8 @@ The most important settings stay in English because they must match the real VS 
 
 | Setting                       | Description                                             |
 | ----------------------------- | ------------------------------------------------------- |
-| `opencodeTui.autoStart`       | Start OpenCode automatically when the view is activated |
-| `opencodeTui.autoStartOnOpen` | Start OpenCode when the sidebar opens                   |
+| `opencodeTui.autoStart`       | Start the configured AI tool automatically when the view is activated |
+| `opencodeTui.autoStartOnOpen` | Start the configured AI tool when the sidebar opens                   |
 | `opencodeTui.fontSize`        | Terminal font size                                      |
 | `opencodeTui.fontFamily`      | Terminal font family                                    |
 | `opencodeTui.autoFocusOnSend` | Focus the sidebar after sending file references         |

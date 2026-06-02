@@ -25,6 +25,23 @@ describe("renderTerminalHtml", () => {
     expect(html).toContain('id="tmux-prompt"');
   });
 
+  it("renders ULW Terminal as the document title", () => {
+    const html = renderTerminalHtml({
+      cspSource: "vscode-resource:",
+      nonce: "nonce-123",
+      cssUri: "terminal.css",
+      scriptUri: "webview.js",
+      fontSize: "14",
+      fontFamily: "monospace",
+      cursorBlink: "true",
+      cursorStyle: "block",
+      scrollback: "10000",
+      showTmuxWindowControls: "true",
+    });
+
+    expect(html).toContain("<title>ULW Terminal</title>");
+  });
+
   it("injects runtime values into CSP, asset URLs, and terminal data attributes", () => {
     const html = renderTerminalHtml({
       cspSource: "vscode-webview-resource:",

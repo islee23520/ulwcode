@@ -1,16 +1,36 @@
 <div id="tmux-toolbar" class="tmux-toolbar hidden">
   <span id="tmux-session-label" class="tmux-session-label"></span>
   <div class="toolbar-controls">
-    <div class="tmux-window-controls" data-tmux-window-controls>
+    <div class="tmux-terminal-controls">
       <button
         type="button"
-        id="btn-tmux-new-session"
+        id="btn-new-editor-terminal"
         class="tmux-btn tmux-btn--primary"
-        aria-label="Create tmux session"
-        title="New tmux session"
+        aria-label="Open new editor terminal"
+        title="New editor terminal"
       >
-        +S
+        +T
       </button>
+      <button
+        type="button"
+        id="btn-tmux-split-horizontal"
+        class="tmux-btn"
+        aria-label="Split pane horizontally"
+        title="Split pane horizontally"
+      >
+        ⇆
+      </button>
+      <button
+        type="button"
+        id="btn-tmux-split-vertical"
+        class="tmux-btn"
+        aria-label="Split pane vertically"
+        title="Split pane vertically"
+      >
+        ⇅
+      </button>
+    </div>
+    <div class="tmux-window-controls" data-tmux-window-controls>
       <button
         type="button"
         id="btn-tmux-prev-window"

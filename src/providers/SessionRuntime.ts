@@ -623,10 +623,10 @@ export class SessionRuntime {
 
       if (tmuxSessionId && this.tmuxSessionManager) {
         try {
-          await this.tmuxSessionManager.setMouseOn(tmuxSessionId);
+          await this.tmuxSessionManager.configureMouseAndClipboard(tmuxSessionId);
         } catch (error) {
           this.logger.debug(
-            `[SessionRuntime] Failed to enable tmux mouse mode: ${error instanceof Error ? error.message : String(error)}`,
+            `[SessionRuntime] Failed to enable tmux mouse and clipboard integration: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
 

@@ -240,7 +240,7 @@ describe("multi-pane regression coverage", () => {
     });
   });
 
-  it("still sends dropped file references to the default pane using @ syntax", async () => {
+  it("still sends dropped file paths to the default pane using shell quotes", async () => {
     mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
     provider = createProvider();
     const writeSpy = vi.spyOn(terminalManager, "writeToTerminal");
@@ -256,7 +256,7 @@ describe("multi-pane regression coverage", () => {
     });
     await flushAsyncStartup();
 
-    expect(writeSpy).toHaveBeenCalledWith("opencode-main", "@/tmp/regression.ts ");
+    expect(writeSpy).toHaveBeenCalledWith("opencode-main", "'/tmp/regression.ts' ");
   });
 
   it("enables pane creation for the tmux backend (Phase 2: all backends support multi-pane)", async () => {

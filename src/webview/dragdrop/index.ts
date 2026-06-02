@@ -115,6 +115,11 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+function extractFileObjectPath(file: File): string | null {
+  const candidate = file as File & { path?: unknown };
+  return typeof candidate.path === "string" ? candidate.path : null;
+}
+
 export async function handleDrop(
   event: DragEvent,
   options: {
@@ -188,6 +193,10 @@ export async function handleDrop(
         }
       }
     }
+  }
+
+  for (const file of droppedFileObjects) {
+    addFile(extractFileObjectPath(file));
   }
 
   if (files.length > 0) {

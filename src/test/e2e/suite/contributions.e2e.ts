@@ -27,9 +27,15 @@ interface KeybindingContribution {
 }
 
 interface ExtensionPackageJSON {
+  name?: string;
+  publisher?: string;
+  displayName?: string;
+  description?: string;
   contributes?: {
     viewsContainers?: Record<string, ViewContainerContribution[]>;
     views?: Record<string, ViewContribution[]>;
+    commands?: Array<{ command?: string; title?: string; category?: string }>;
+    configuration?: { title?: string };
     menus?: Record<string, MenuContribution[]>;
     keybindings?: KeybindingContribution[];
   };
@@ -51,7 +57,7 @@ async function getPackageJSON(): Promise<ExtensionPackageJSON> {
 }
 
 suite("Package contribution metadata", () => {
-  test("contributes the Open Sidebar Terminal view container", async () => {
+  test("contributes the ULW view container without changing extension identity", async () => {
     const packageJSON = await getPackageJSON();
     const secondarySidebar =
       packageJSON.contributes?.viewsContainers?.secondarySidebar ?? [];
@@ -60,8 +66,37 @@ suite("Package contribution metadata", () => {
     );
 
     assert.ok(container, "opencodeTuiContainer should be contributed");
-    assert.strictEqual(container.title, "Open Sidebar Terminal");
+    assert.strictEqual(packageJSON.name, "opencode-sidebar-tui");
+    assert.strictEqual(packageJSON.publisher, "islee23520");
+    assert.strictEqual(packageJSON.displayName, "ULW");
+    assert.strictEqual(
+      packageJSON.description,
+      "Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support",
+    );
+    assert.strictEqual(container.title, "ULW");
     assert.strictEqual(container.icon, "resources/opencode-activity-bar.svg");
+    assert.strictEqual(packageJSON.contributes?.configuration?.title, "ULW");
+  });
+
+  test("contributes ULW command palette labels while preserving command IDs", async () => {
+    const packageJSON = await getPackageJSON();
+    const commands = packageJSON.contributes?.commands ?? [];
+    const start = commands.find(({ command }) => command === "opencodeTui.start");
+    const focus = commands.find(({ command }) => command === "opencodeTui.focus");
+
+    assert.deepStrictEqual(start, {
+      command: "opencodeTui.start",
+      title: "Start ULW Terminal",
+      category: "ULW",
+    });
+    assert.deepStrictEqual(focus, {
+      command: "opencodeTui.focus",
+      title: "ULW: Focus Terminal",
+    });
+    assert.ok(
+      commands.every(({ category }) => category !== "Open Sidebar Terminal"),
+      "commands should not use old product category",
+    );
   });
 
   test("contributes terminal view metadata", async () => {
