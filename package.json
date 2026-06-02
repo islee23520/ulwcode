@@ -664,7 +664,7 @@
     "@types/vscode": "^1.106.1",
     "@typescript-eslint/eslint-plugin": "^8.55.0",
     "@typescript-eslint/parser": "^8.55.0",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.8",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "copy-webpack-plugin": "^14.0.0",
@@ -678,7 +678,7 @@
     "style-loader": "^4.0.0",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18",
+    "vitest": "^4.1.8",
     "webpack": "^5.105.2",
     "webpack-cli": "^6.0.0"
   }
