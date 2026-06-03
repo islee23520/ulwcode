@@ -70,7 +70,7 @@ describe("package manifest branding", () => {
   it("uses ULW product branding while preserving extension identity", () => {
     const manifest = readManifest();
 
-    expect(manifest.name).toBe("ulwcode");
+    expect(manifest.name).toBe("opencode-sidebar-tui");
     expect(manifest.publisher).toBe("islee23520");
     expect(manifest.version).toBe("1.11.0");
     expect(manifest.displayName).toBe("ULW");

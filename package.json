@@ -1,5 +1,5 @@
 {
-  "name": "ulwcode",
+  "name": "opencode-sidebar-tui",
   "displayName": "ULW",
   "description": "Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support",
   "version": "1.11.0",

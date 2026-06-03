@@ -44,7 +44,7 @@ interface ExtensionPackageJSON {
 
 async function activateExtension(): Promise<vscode.Extension<unknown>> {
   const extension = vscode.extensions.getExtension(
-    "islee23520.ulwcode",
+    "islee23520.opencode-sidebar-tui",
   );
 
   assert.ok(extension, "Extension should be available in the test host");
@@ -67,7 +67,7 @@ suite("Package contribution metadata", () => {
     );
 
     assert.ok(container, "ulwContainer should be contributed");
-    assert.strictEqual(packageJSON.name, "ulwcode");
+    assert.strictEqual(packageJSON.name, "opencode-sidebar-tui");
     assert.strictEqual(packageJSON.publisher, "islee23520");
     assert.strictEqual(packageJSON.displayName, "ULW");
     assert.strictEqual(
