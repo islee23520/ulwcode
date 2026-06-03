@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 async function activateExtension(): Promise<vscode.Extension<unknown>> {
   const extension = vscode.extensions.getExtension(
-    "islee23520.opencode-sidebar-tui",
+    "islee23520.ulwcode",
   );
 
   assert.ok(extension, "Extension should be available in the test host");
