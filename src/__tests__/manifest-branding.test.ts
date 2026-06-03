@@ -13,6 +13,7 @@ interface PackageManifest {
   readonly publisher: string;
   readonly displayName: string;
   readonly description: string;
+  readonly version: string;
   readonly keywords: readonly string[];
   readonly contributes: {
     readonly viewsContainers: {
@@ -69,8 +70,9 @@ describe("package manifest branding", () => {
   it("uses ULW product branding while preserving extension identity", () => {
     const manifest = readManifest();
 
-    expect(manifest.name).toBe("ulwcode");
+    expect(manifest.name).toBe("opencode-sidebar-tui");
     expect(manifest.publisher).toBe("islee23520");
+    expect(manifest.version).toBe("1.11.0");
     expect(manifest.displayName).toBe("ULW");
     expect(manifest.description).toBe(
       "Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support",
@@ -86,7 +88,7 @@ describe("package manifest branding", () => {
     expect(manifest.contributes.configuration.title).toBe("ULW");
   });
 
-  it("uses ULW command palette labels without renaming command IDs", () => {
+  it("uses ULW command palette labels with ulw command IDs", () => {
     const commands = readManifest().contributes.commands;
 
     expect(findCommand(commands, "ulw.start")).toMatchObject({

@@ -89,7 +89,7 @@ npm ci
 npm run test -- src/webview/terminal/index.test.ts src/webview/terminal/keyboard.test.ts
 npm run compile
 npm run lint -- src/webview/terminal/index.ts src/webview/terminal/index.test.ts src/webview/terminal/keyboard.ts src/webview/terminal/keyboard.test.ts
-gh pr checks 44 --repo islee23520/open-sidebar-terminal
+gh pr checks 44 --repo islee23520/ulwcode
 ```
 
 ### 수동 QA

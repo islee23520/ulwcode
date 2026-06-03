@@ -648,7 +648,7 @@ describe("TerminalProvider", () => {
     );
     provider.focus();
     expect(panel.webview.postMessage).toHaveBeenCalledWith({
-      paneId: "default",
+      paneId: "ulw-editor-1",
       type: "focusTerminal",
     });
   });
@@ -694,7 +694,7 @@ describe("TerminalProvider", () => {
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
     expect(panel.reveal).toHaveBeenCalledWith(vscode.ViewColumn.Active);
     expect(panel.webview.postMessage).toHaveBeenCalledWith({
-      paneId: "default",
+      paneId: "ulw-editor-1",
       type: "focusTerminal",
     });
   });
@@ -2498,6 +2498,54 @@ describe("TerminalProvider", () => {
     );
   });
 
+  it("creates independent tmux-backed pane sessions for separate editor terminal panels", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    resolveProvider(provider);
+    const runtime = provider["sessionRuntime"];
+    vi.spyOn(runtime, "getActiveBackend").mockReturnValue("tmux");
+    vi.spyOn(runtime, "getSession").mockImplementation((paneId: string) =>
+      paneId === "default"
+        ? ({
+            paneId: "default",
+            instanceId: "opencode-main",
+            terminalKey: "opencode-main",
+            backend: "tmux",
+            tmuxSessionId: "shared-session",
+          } as never)
+        : undefined,
+    );
+    const createSessionSpy = vi
+      .spyOn(runtime, "createSession")
+      .mockResolvedValue(undefined);
+
+    await provider.openInEditorTab();
+    await provider.openInEditorTab();
+    const firstPanel = vi.mocked(vscode.window.createWebviewPanel).mock
+      .results[0]?.value as any;
+    const secondPanel = vi.mocked(vscode.window.createWebviewPanel).mock
+      .results[1]?.value as any;
+    const firstHandler = vi.mocked(firstPanel.webview.onDidReceiveMessage).mock
+      .calls[0]?.[0] as (message: any) => void;
+    const secondHandler = vi.mocked(secondPanel.webview.onDidReceiveMessage).mock
+      .calls[0]?.[0] as (message: any) => void;
+
+    firstHandler({ type: "ready", cols: 120, rows: 40 });
+    secondHandler({ type: "ready", cols: 120, rows: 40 });
+    await flushAsyncStartup();
+
+    expect(createSessionSpy).toHaveBeenCalledWith("ulw-editor-1", {
+      paneId: "ulw-editor-1",
+      backend: "tmux",
+      backendConfig: { tmux: { sessionId: "shared-session" } },
+    });
+    expect(createSessionSpy).toHaveBeenCalledWith("ulw-editor-2", {
+      paneId: "ulw-editor-2",
+      backend: "tmux",
+      backendConfig: { tmux: { sessionId: "shared-session" } },
+    });
+  });
+
   it("replays the active session state to the editor panel so the toolbar stays visible", async () => {
     mockConfiguration();
     provider = createProvider();
@@ -3347,7 +3395,7 @@ describe("TerminalProvider", () => {
     panelMessageHandler({ type: "terminalInput", data: "ls\n" });
 
     expect(resetSpy).toHaveBeenCalledTimes(1);
-    expect(writeSpy).toHaveBeenCalledWith("raw-validate", "ls\n");
+    expect(writeSpy).toHaveBeenCalledWith("ulw-editor-1", "ls\n");
   });
 
   describe("multi-pane backend integration", () => {

@@ -34,6 +34,17 @@ let backendAvailability: TerminalBackendAvailability = {
   zellij: false,
 };
 
+type UlwSurfaceWindow = Window & {
+  __ULW_SURFACE_PANE_ID__?: string;
+};
+
+function getSurfacePaneId(): string {
+  const surfacePaneId = (window as UlwSurfaceWindow).__ULW_SURFACE_PANE_ID__;
+  return surfacePaneId && surfacePaneId.trim().length > 0
+    ? surfacePaneId
+    : "default";
+}
+
 function toggleTmuxCommandMenu(): void {
   if (!currentSessionId) {
     return;
@@ -136,13 +147,14 @@ const messageHandler = createMessageHandler(callbacks);
 function initApp(): void {
   const container = document.getElementById("terminal-container");
   if (!container) return;
+  const surfacePaneId = getSurfacePaneId();
 
   const instance = initTerminal(container, {
     onData: (data) => {
-      postMessage({ type: "terminalInput", data });
+      postMessage({ type: "terminalInput", data, paneId: surfacePaneId });
     },
     onResize: (cols, rows) => {
-      postMessage({ type: "terminalResize", cols, rows });
+      postMessage({ type: "terminalResize", cols, rows, paneId: surfacePaneId });
     },
     onToggleTmuxCommands: () => {
       toggleTmuxCommandMenu();
@@ -174,9 +186,9 @@ function initApp(): void {
     document.getElementById("pane-actions-container") ?? undefined,
   );
 
-  paneManager.registerPane("default", instance?.terminal ?? null, container);
-  focusManager.registerPane("default", container);
-  tabBar.addTab("default", "Terminal");
+  paneManager.registerPane(surfacePaneId, instance?.terminal ?? null, container);
+  focusManager.registerPane(surfacePaneId, container);
+  tabBar.addTab(surfacePaneId, "Terminal");
 
   tabBar.onTabAdd(() => {
     postMessage({ type: "paneCreate" });
@@ -223,7 +235,7 @@ function initApp(): void {
       const paneId = msg.paneId as string;
       const direction = (msg.direction as string) || "horizontal";
       layoutEngine.splitPane(
-        "default",
+        surfacePaneId,
         direction as "horizontal" | "vertical",
         paneId,
       );

@@ -5,6 +5,19 @@ All notable changes to the "ULW" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-06-03
+
+### Added
+
+- Add independent editor-terminal pane identities so each editor tab gets its own `ulw-editor-N` surface.
+
+### Fixed
+
+- Preserve the existing `islee23520.opencode-sidebar-tui` extension ID so current Marketplace/Open VSX users receive the ULW update in place.
+- Fix tmux-backed editor terminal tabs reusing the sidebar/default pane session.
+- Fix editor terminal input and resize messages so they target the correct editor pane.
+- Correct the triage plan GitHub checks command to use the `islee23520/ulwcode` repository.
+
 ## [1.8.0] - 2026-05-18
 
 ### Added

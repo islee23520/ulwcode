@@ -41,6 +41,7 @@ export class TerminalProvider
   private _view?: vscode.WebviewView;
   private _panel?: vscode.WebviewPanel;
   private readonly editorPanels = new Set<vscode.WebviewPanel>();
+  private readonly editorPanelPaneIds = new Map<vscode.WebviewPanel, string>();
   private readonly contextSharingService: ContextSharingService;
   private readonly logger = OutputChannelService.getInstance();
   private readonly aiToolRegistry: AiToolOperatorRegistry;
@@ -50,7 +51,9 @@ export class TerminalProvider
   private readonly paneStore = new PaneStore();
   private readonly pendingWebviewMessages: HostMessage[] = [];
   private pendingQueueablePostChecks = 0;
+  private nextEditorPaneIndex = 1;
   private static readonly DEFAULT_PANE_ID = "default";
+  private static readonly EDITOR_PANE_PREFIX = "ulw-editor";
   private static readonly DEFAULT_TAB_ID = "default";
 
   public constructor(
@@ -215,7 +218,7 @@ export class TerminalProvider
     }
 
     webviewView.webview.onDidReceiveMessage((message) => {
-      this.handleMessage(message);
+      this.handleMessage(message, TerminalProvider.DEFAULT_PANE_ID);
     });
 
     if (processAlive) {
@@ -615,27 +618,28 @@ export class TerminalProvider
     }
   }
 
-  private handleMessage(message: unknown): void {
-    if (this.isPaneScopedWebviewMessage(message)) {
-      this.dataThrottleService.setFocusedPane(this.normalizePaneId(message.paneId));
+  private handleMessage(message: unknown, surfacePaneId?: string): void {
+    const scopedMessage = this.withSurfacePaneId(message, surfacePaneId);
+    if (this.isPaneScopedWebviewMessage(scopedMessage)) {
+      this.dataThrottleService.setFocusedPane(this.normalizePaneId(scopedMessage.paneId));
     }
 
-    if (this.isPaneCreateWebviewMessage(message)) {
-      void this.handlePaneCreate(message);
+    if (this.isPaneCreateWebviewMessage(scopedMessage)) {
+      void this.handlePaneCreate(scopedMessage);
       return;
     }
 
-    if (this.isPaneDeleteWebviewMessage(message)) {
-      this.handlePaneDelete(message);
+    if (this.isPaneDeleteWebviewMessage(scopedMessage)) {
+      this.handlePaneDelete(scopedMessage);
       return;
     }
 
-    if (this.isNonDefaultReadyMessage(message)) {
-      void this.handleNonDefaultPaneReady(message);
+    if (this.isNonDefaultReadyMessage(scopedMessage)) {
+      void this.handleNonDefaultPaneReady(scopedMessage);
       return;
     }
 
-    this.messageRouter.handleMessage(message);
+    this.messageRouter.handleMessage(scopedMessage);
   }
 
   private isTmuxRawSubcommand(value: string): value is TmuxRawSubcommand {
@@ -934,9 +938,11 @@ export class TerminalProvider
     this.setFocusedPane(paneId);
 
     if (!this.sessionRuntime.getSession(paneId)) {
+      const activeBackend = this.sessionRuntime.getActiveBackend();
       await this.sessionRuntime.createSession(paneId, {
         paneId,
-        backend: "native",
+        backend: activeBackend,
+        backendConfig: this.resolveBackendConfig(activeBackend),
       });
     }
 
@@ -1120,6 +1126,37 @@ export class TerminalProvider
     return paneId ?? TerminalProvider.DEFAULT_PANE_ID;
   }
 
+  private assignEditorPanelPaneId(panel: vscode.WebviewPanel): string {
+    const existingPaneId = this.editorPanelPaneIds.get(panel);
+    if (existingPaneId) {
+      return existingPaneId;
+    }
+
+    const paneId = `${TerminalProvider.EDITOR_PANE_PREFIX}-${this.nextEditorPaneIndex}`;
+    this.nextEditorPaneIndex += 1;
+    this.editorPanelPaneIds.set(panel, paneId);
+    return paneId;
+  }
+
+  private withSurfacePaneId(
+    message: unknown,
+    surfacePaneId: string | undefined,
+  ): unknown {
+    const normalizedSurfacePaneId = this.normalizePaneId(surfacePaneId);
+    if (
+      normalizedSurfacePaneId === TerminalProvider.DEFAULT_PANE_ID ||
+      !this.isPaneScopedWebviewMessage(message) ||
+      typeof message.paneId === "string"
+    ) {
+      return message;
+    }
+
+    return {
+      ...message,
+      paneId: normalizedSurfacePaneId,
+    };
+  }
+
   private isPaneScopedWebviewMessage(
     message: unknown,
   ): message is { paneId?: string } {
@@ -1252,11 +1289,12 @@ export class TerminalProvider
   }
 
   private initializeEditorPanel(panel: vscode.WebviewPanel): void {
+    const paneId = this.assignEditorPanelPaneId(panel);
     this._panel = panel;
     this.editorPanels.add(panel);
     panel.webview.options = this.getEditorPanelOptions();
-    this.ensureDefaultPaneState();
-    panel.webview.html = this.getHtmlForWebview(panel.webview);
+    this.ensurePaneState(paneId);
+    panel.webview.html = this.getHtmlForWebview(panel.webview, paneId);
 
     const processAlive = this.sessionRuntime.hasLiveTerminalProcess();
     if (this.sessionRuntime.isStartedFlag() && !processAlive) {
@@ -1264,7 +1302,7 @@ export class TerminalProvider
     }
 
     panel.webview.onDidReceiveMessage((message) => {
-      this.handleMessage(message);
+      this.handleMessage(message, paneId);
     });
 
     if (processAlive) {
@@ -1276,6 +1314,7 @@ export class TerminalProvider
     this.flushPendingWebviewMessages(panel.webview);
 
     panel.onDidDispose(() => {
+      this.editorPanelPaneIds.delete(panel);
       this.editorPanels.delete(panel);
       if (this._panel === panel) {
         const remainingPanels = [...this.editorPanels];
@@ -1340,7 +1379,10 @@ export class TerminalProvider
     };
   }
 
-  private getHtmlForWebview(webview: vscode.Webview): string {
+  private getHtmlForWebview(
+    webview: vscode.Webview,
+    surfacePaneId = TerminalProvider.DEFAULT_PANE_ID,
+  ): string {
     const scriptUri = webview
       .asWebviewUri(
         vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview.js"),
@@ -1421,7 +1463,7 @@ export class TerminalProvider
     ]
       .map((uri) => `<link rel="stylesheet" href="${uri}" />`)
       .join("\n    ");
-    const bootstrapScript = `<script nonce="${nonce}">(() => {\n  const container = document.getElementById("terminal-container");\n  if (!container) {\n    return;\n  }\n\n  if (!document.getElementById("terminal-layout-root")) {\n    const root = document.createElement("div");\n    root.id = "terminal-layout-root";\n    root.className = "layout-root";\n    root.dataset.defaultPaneId = "${TerminalProvider.DEFAULT_PANE_ID}";\n    container.parentElement?.insertBefore(root, container);\n    root.appendChild(container);\n  }\n\n  document.body.dataset.multiPaneBootstrap = "enabled";\n  window.__OPENCODE_TUI_MULTI_PANE__ = Object.freeze({\n    defaultPaneId: "${TerminalProvider.DEFAULT_PANE_ID}",\n    components: [\n      "PaneManager",\n      "PaneMessageRouter",\n      "LayoutEngine",\n      "TabBar",\n      "PaneActions",\n      "FocusManager"\n    ]\n  });\n})();</script>`;
+    const bootstrapScript = `<script nonce="${nonce}">(() => {\n  const container = document.getElementById("terminal-container");\n  if (!container) {\n    return;\n  }\n\n  const surfacePaneId = "${surfacePaneId}";\n  window.__ULW_SURFACE_PANE_ID__ = surfacePaneId;\n\n  if (!document.getElementById("terminal-layout-root")) {\n    const root = document.createElement("div");\n    root.id = "terminal-layout-root";\n    root.className = "layout-root";\n    root.dataset.defaultPaneId = surfacePaneId;\n    container.parentElement?.insertBefore(root, container);\n    root.appendChild(container);\n  }\n\n  document.body.dataset.multiPaneBootstrap = "enabled";\n  window.__OPENCODE_TUI_MULTI_PANE__ = Object.freeze({\n    defaultPaneId: surfacePaneId,\n    components: [\n      "PaneManager",\n      "PaneMessageRouter",\n      "LayoutEngine",\n      "TabBar",\n      "PaneActions",\n      "FocusManager"\n    ]\n  });\n})();</script>`;
 
     return html
       .replace("</head>", `    ${multiPaneCssLinks}\n  </head>`)
@@ -1432,17 +1474,22 @@ export class TerminalProvider
   }
 
   private ensureDefaultPaneState(): void {
-    if (this.paneStore.getPane(TerminalProvider.DEFAULT_PANE_ID)) {
+    this.ensurePaneState(TerminalProvider.DEFAULT_PANE_ID);
+  }
+
+  private ensurePaneState(paneId: string): void {
+    const normalizedPaneId = this.normalizePaneId(paneId);
+    if (this.paneStore.getPane(normalizedPaneId)) {
       return;
     }
 
     this.paneStore.addPane({
-      paneId: TerminalProvider.DEFAULT_PANE_ID,
+      paneId: normalizedPaneId,
       tabId: TerminalProvider.DEFAULT_TAB_ID,
       isActive: true,
       size: 100,
     });
-    this.dataThrottleService.setFocusedPane(TerminalProvider.DEFAULT_PANE_ID);
+    this.dataThrottleService.setFocusedPane(normalizedPaneId);
   }
 
   private getKnownPaneIds(): string[] {
