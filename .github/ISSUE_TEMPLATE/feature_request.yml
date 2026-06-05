@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest an improvement for ULW.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share the workflow you want to improve and the outcome you need.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is blocked, slow, or awkward today?
+      placeholder: When using the sidebar terminal...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you would like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternate designs have you tried?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Sidebar terminal
+        - Terminal dashboard
+        - tmux
+        - zellij
+        - Native terminal
+        - AI tool integration
+        - Extension commands
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues before opening this request.
+          required: true

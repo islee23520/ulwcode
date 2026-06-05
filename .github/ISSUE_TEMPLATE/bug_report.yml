@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a reproducible problem with ULW.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please include enough detail for someone else to reproduce it.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect to happen?
+      placeholder: The sidebar terminal...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps that trigger the problem.
+      placeholder: |
+        1. Open VS Code...
+        2. Run command...
+        3. See error...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant output from the ULW output channel, developer tools, or terminal.
+      render: shell
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension version
+      placeholder: "1.11.1"
+    validations:
+      required: true
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code version
+      placeholder: "1.101.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Terminal backend
+      options:
+        - Native terminal
+        - tmux
+        - zellij
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15.5, Ubuntu 24.04, Windows 11"
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues before opening this report.
+          required: true
+        - label: I can reproduce this with the latest released version.
+          required: true
