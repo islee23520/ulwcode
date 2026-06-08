@@ -1,8 +1,8 @@
 {
   "name": "opencode-sidebar-tui",
-  "displayName": "ULW",
-  "description": "Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support",
-  "version": "1.11.1",
+  "displayName": "ulwcode-sidebar-terminal",
+  "description": "sidebar terminal Extension for VS Code with tmux, zellij, and native terminal support",
+  "version": "1.11.2",
   "publisher": "islee23520",
   "icon": "icon.png",
   "engines": {
@@ -13,10 +13,6 @@
     "Other"
   ],
   "keywords": [
-    "opencode",
-    "ulw",
-    "open-tui",
-    "mux",
     "terminal",
     "sidebar",
     "tui",
@@ -37,7 +33,7 @@
         {
           "id": "ulwContainer",
           "title": "ULW",
-          "icon": "resources/ulwcode-activity-bar.svg"
+          "icon": "resources/ulwcode-sidebar.svg"
         }
       ]
     },
@@ -47,8 +43,7 @@
           "id": "ulw",
           "name": "Terminal",
           "type": "webview",
-          "icon": "resources/ulwcode-activity-bar.svg",
-          "when": "config.ulw.terminal.defaultLocation == 'sidebar'",
+          "icon": "resources/ulwcode-sidebar.svg",
           "initialOrder": 1
         }
       ]
@@ -603,11 +598,6 @@
           "type": "string",
           "default": "opencode",
           "description": "Name of the default AI tool to launch when creating a new terminal session"
-        },
-        "ulw.promptAiToolOnSession": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show the AI tool selector popup when attaching to or creating a tmux/zellij session"
         },
         "ulw.projectList.openedOnly": {
           "type": "boolean",
