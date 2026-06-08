@@ -1,6 +1,5 @@
 import "@xterm/xterm/css/xterm.css";
 import * as TmuxPrompt from "./tmux-prompt";
-import * as AiSelector from "./ai-tool-selector";
 import * as TmuxCmd from "./tmux-command-dropdown";
 import { HostMessage } from "../types";
 import { PaneManager } from "./pane-manager";
@@ -112,16 +111,6 @@ const callbacks: MessageHandlerCallbacks = {
 
   onToggleTmuxCommandToolbar() {
     toggleTmuxCommandMenu();
-  },
-
-  onShowAiToolSelector(message) {
-    AiSelector.show(
-      message.sessionId,
-      message.sessionName,
-      message.defaultTool,
-      message.tools,
-      message.targetPaneId,
-    );
   },
 
   onShowTmuxPrompt(message) {
@@ -264,21 +253,6 @@ function initApp(): void {
 
   setupAiToolSelectorEvents();
 }
-const aiCallbacks = {
-  postMessage: (msg: unknown) => {
-    const m = msg as Record<string, unknown>;
-    if (m && m.action === "launchAiTool") {
-      postMessage({
-        type: "launchAiTool",
-        sessionId: String(m.sessionId ?? ""),
-        tool: String(m.tool ?? ""),
-        savePreference: Boolean(m.savePreference),
-        targetPaneId: m.targetPaneId ? String(m.targetPaneId) : undefined,
-      });
-    }
-  },
-};
-
 const tmuxPromptCallbacks = {
   postMessage: (msg: unknown) => {
     const m = msg as Record<string, unknown>;
@@ -315,9 +289,6 @@ function setupAiToolSelectorEvents(): void {
         return;
       }
     }
-    if (AiSelector.isVisible()) {
-      AiSelector.handleKeydown(event, aiCallbacks);
-    }
   });
 
   document.addEventListener("click", (event) => {
@@ -325,10 +296,6 @@ function setupAiToolSelectorEvents(): void {
       .composedPath()
       .find((el): el is Element => el instanceof Element);
     if (!target) return;
-    if (AiSelector.isVisible()) {
-      AiSelector.handleClick(target, aiCallbacks);
-    }
-
     if (TmuxPrompt.isVisible()) {
       TmuxPrompt.handleClick(target, tmuxPromptCallbacks);
     }

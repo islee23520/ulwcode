@@ -1,18 +1,16 @@
 import { h, FunctionComponent } from "preact";
-import * as AiTool from "../../ai-tool-selector";
+import type { AiToolConfig } from "../../../types";
 
 import { TmuxDashboardSessionDto, TmuxDashboardWindowDto } from "../types";
 import { escapeHtml, renderToolBadge } from "../utils";
 import { SessionMinimap } from "./SessionPreview";
-
-type AiToolConfig = AiTool.AiToolConfig;
 
 export interface SessionCardProps {
   session: TmuxDashboardSessionDto;
   windows?: TmuxDashboardWindowDto[];
   tools?: AiToolConfig[];
   onActivate: (sessionId: string, workspaceUri: string | undefined) => void;
-  onShowAiToolSelector: (sessionId: string, sessionName: string) => void;
+  onLaunchDefaultAiTool: (sessionId: string, sessionName: string) => void;
   onKill: (sessionId: string) => void;
 }
 
@@ -21,7 +19,7 @@ export const SessionCard: FunctionComponent<SessionCardProps> = ({
   windows,
   tools = [],
   onActivate,
-  onShowAiToolSelector,
+  onLaunchDefaultAiTool,
   onKill,
 }) => {
   const activeClass = session.isActive ? " active" : "";
@@ -80,12 +78,12 @@ export const SessionCard: FunctionComponent<SessionCardProps> = ({
           "button",
           {
             type: "button",
-            "data-action": "showAiToolSelector",
+            "data-action": "launchDefaultAiTool",
             "data-session-id": session.id,
             title: "Launch AI Tool",
             onClick: (event: MouseEvent): void => {
               event.stopPropagation();
-              onShowAiToolSelector(session.id, session.name);
+              onLaunchDefaultAiTool(session.id, session.name);
             },
           },
           "AI",

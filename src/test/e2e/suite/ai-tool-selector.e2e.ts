@@ -46,16 +46,7 @@ function getConfigurationProperties(
   return properties;
 }
 
-suite("AI tool selector E2E surface", () => {
-  test("contributes promptAiToolOnSession with expected type and default", async () => {
-    const extension = await activateExtension();
-    const properties = getConfigurationProperties(extension);
-    const promptAiToolOnSession = properties["ulw.promptAiToolOnSession"];
-
-    assert.strictEqual(promptAiToolOnSession?.type, "boolean");
-    assert.strictEqual(promptAiToolOnSession?.default, true);
-  });
-
+suite("AI tool CLI configuration E2E surface", () => {
   test("contributes defaultAiTool as opencode", async () => {
     const extension = await activateExtension();
     const properties = getConfigurationProperties(extension);
@@ -65,7 +56,7 @@ suite("AI tool selector E2E surface", () => {
     assert.strictEqual(defaultAiTool?.default, "opencode");
   });
 
-  test("defines the default AI tool selector entries", async () => {
+  test("defines the default AI tool CLI entries", async () => {
     const extension = await activateExtension();
     const properties = getConfigurationProperties(extension);
     const aiTools = properties["ulw.aiTools"];

@@ -46,16 +46,6 @@ suite("AI tool settings", () => {
     );
   });
 
-  test("promptAiToolOnSession defaults to true", async () => {
-    const extension = await activateExtension();
-    const properties = getConfigurationProperties(extension);
-
-    assert.strictEqual(
-      properties["ulw.promptAiToolOnSession"]?.default,
-      true,
-    );
-  });
-
   test('defaultAiTool defaults to "opencode"', async () => {
     const extension = await activateExtension();
     const properties = getConfigurationProperties(extension);

@@ -1,7 +1,5 @@
-import * as AiTool from "../ai-tool-selector";
 import { detectAiToolName } from "../../types";
-
-type AiToolConfig = AiTool.AiToolConfig;
+import type { AiToolConfig } from "../../types";
 
 function findToolConfig(
   toolName: string,

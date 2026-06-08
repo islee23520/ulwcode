@@ -130,7 +130,6 @@ export type WebviewMessage =
       backend: TerminalBackendType;
     }
   | { type: "cycleTerminalBackend"; paneId?: string }
-  | { type: "requestAiToolSelector"; paneId?: string }
   | {
       type: "executeTmuxCommand";
       commandId: TmuxWebviewCommandId;
@@ -315,7 +314,7 @@ export type TmuxDashboardActionMessage =
   | { action: "killNativeShell"; instanceId: string }
   | { action: "activate"; sessionId: string; workspaceUri?: string }
   | {
-      action: "showAiToolSelector";
+      action: "launchDefaultAiTool";
       sessionId: string;
       sessionName: string;
       targetPaneId?: string;
@@ -416,14 +415,6 @@ export type TmuxDashboardHostMessage =
       showingAll?: boolean;
       tools?: AiToolConfig[];
       tmuxAvailable?: boolean;
-    }
-  | {
-      type: "showAiToolSelector";
-      sessionId: string;
-      sessionName: string;
-      defaultTool?: string;
-      tools?: AiToolConfig[];
-      targetPaneId?: string;
     };
 
 export const ALLOWED_IMAGE_TYPES = [
@@ -491,14 +482,6 @@ export type HostMessage =
       backend?: TerminalBackendType;
     }
   | { type: "activeSession"; backend?: TerminalBackendType }
-  | {
-      type: "showAiToolSelector";
-      sessionId: string;
-      sessionName: string;
-      defaultTool?: string;
-      tools?: AiToolConfig[];
-      targetPaneId?: string;
-    }
   | {
       type: "updateDashboard";
       sessions: TmuxDashboardSessionDto[];

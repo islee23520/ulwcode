@@ -1,6 +1,4 @@
-import * as AiTool from "../ai-tool-selector";
-
-type AiToolConfig = AiTool.AiToolConfig;
+import type { AiToolConfig } from "../../types";
 
 export interface TmuxDashboardSessionDto {
   id: string;

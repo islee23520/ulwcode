@@ -116,7 +116,6 @@ describe("MessageRouter", () => {
       ),
       formatPastedImage: vi.fn((tempPath: string) => `@img:${tempPath}`),
       launchAiTool: vi.fn(async () => undefined),
-      showAiToolSelector: vi.fn(async () => undefined),
       executeRawTmuxCommand: vi.fn(async () => ""),
       zoomTmuxPane: vi.fn(async () => undefined),
       getSelectedTmuxSessionId: vi.fn(() => "tmux-selected"),
@@ -343,7 +342,6 @@ describe("MessageRouter", () => {
       backend: "native",
     });
     await router.handleMessage({ type: "cycleTerminalBackend" });
-    await router.handleMessage({ type: "requestAiToolSelector" });
     await router.handleMessage({
       type: "executeTmuxCommand",
       commandId: "ulw.tmuxCreateWindow",
@@ -374,11 +372,6 @@ describe("MessageRouter", () => {
       true,
       "%1",
       "tmux",
-    );
-    expect(provider.showAiToolSelector).toHaveBeenCalledWith(
-      "tmux-selected",
-      "tmux-selected",
-      true,
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "ulw.tmuxCreateWindow",

@@ -1,4 +1,3 @@
-import { renderAiSelector } from "./ai-selector";
 import {
   renderTerminalContainer,
   type TerminalContainerParams,
@@ -48,7 +47,6 @@ export function renderTerminalHtml({
       scrollback,
       sendKeybindingsToShell,
     })}
-    ${renderAiSelector()}
     ${renderTmuxPrompt()}
     <script nonce="${nonce}" src="${scriptUri}"></script>
   </body>

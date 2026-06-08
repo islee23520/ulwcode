@@ -7,6 +7,7 @@ import { OutputCaptureManager } from "../services/OutputCaptureManager";
 import { OpenCodeApiClient } from "../services/OpenCodeApiClient";
 import { OutputChannelService } from "../services/OutputChannelService";
 import { PortManager } from "../services/PortManager";
+import type { TmuxSessionManager } from "../services/TmuxSessionManager";
 import { TerminalManager } from "../terminals/TerminalManager";
 import { TerminalProvider } from "../providers/TerminalProvider";
 import { DEFAULT_AI_TOOLS } from "../types";
@@ -30,7 +31,6 @@ interface MockConfigOptions {
   autoShareContext?: boolean;
   defaultAiTool?: string;
   aiTools?: readonly unknown[];
-  promptAiToolOnSession?: boolean;
 }
 
 describe("multi-pane regression coverage", () => {
@@ -65,7 +65,6 @@ describe("multi-pane regression coverage", () => {
       autoShareContext = true,
       defaultAiTool = "opencode",
       aiTools = DEFAULT_AI_TOOLS,
-      promptAiToolOnSession = false,
     } = options ?? {};
 
     const configuration = {
@@ -90,9 +89,6 @@ describe("multi-pane regression coverage", () => {
         }
         if (key === "logLevel") {
           return "error" as T;
-        }
-        if (key === "promptAiToolOnSession") {
-          return promptAiToolOnSession as T;
         }
         if (key === "collapseSecondaryBarOnEditorOpen") {
           return false as T;

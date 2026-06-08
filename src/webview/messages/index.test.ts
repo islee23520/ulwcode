@@ -17,7 +17,6 @@ describe("createMessageHandler", () => {
   it("routes requestPaste messages through image-aware paste handling", () => {
     const handler = createMessageHandler({
       onActiveSession: vi.fn(),
-      onShowAiToolSelector: vi.fn(),
       onToggleTmuxCommandToolbar: vi.fn(),
       onShowTmuxPrompt: vi.fn(),
       onPlatformInfo: vi.fn(),
@@ -37,7 +36,6 @@ describe("createMessageHandler", () => {
     ) as HTMLElement;
     const handler = createMessageHandler({
       onActiveSession: vi.fn(),
-      onShowAiToolSelector: vi.fn(),
       onToggleTmuxCommandToolbar: vi.fn(),
       onShowTmuxPrompt: vi.fn(),
       onPlatformInfo: vi.fn(),

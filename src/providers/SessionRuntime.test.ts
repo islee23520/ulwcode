@@ -59,21 +59,11 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     typeof vi.fn<(instanceId: string) => void>
   >;
   let requestStartOpenCodeMock: ReturnType<typeof vi.fn<() => Promise<void>>>;
-  let showAiToolSelectorMock: ReturnType<
-    typeof vi.fn<
-      (sessionId: string, sessionName: string, forceShow?: boolean) => void
-    >
-  >;
   let exitHandler: ((id: string) => void) | undefined;
   let mockCallbacks: {
     postMessage: (message: unknown) => void;
     onActiveInstanceChanged: (instanceId: string) => void;
     requestStartOpenCode: () => Promise<void>;
-    showAiToolSelector: (
-      sessionId: string,
-      sessionName: string,
-      forceShow?: boolean,
-    ) => void;
   };
 
   const setConfiguration = (values: Record<string, unknown> = {}): void => {
@@ -216,7 +206,6 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     postMessageMock = vi.fn();
     onActiveInstanceChangedMock = vi.fn();
     requestStartOpenCodeMock = vi.fn().mockResolvedValue(undefined);
-    showAiToolSelectorMock = vi.fn();
     mockCallbacks = {
       postMessage: (message) => {
         postMessageMock(message);
@@ -225,9 +214,6 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         onActiveInstanceChangedMock(instanceId);
       },
       requestStartOpenCode: () => requestStartOpenCodeMock(),
-      showAiToolSelector: (sessionId, sessionName, forceShow) => {
-        showAiToolSelectorMock(sessionId, sessionName, forceShow);
-      },
     };
 
     sessionRuntime = new SessionRuntime(
@@ -837,7 +823,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       );
     });
 
-    it("does not show AI tool selector on startOpenCode for newly created tmux session", async () => {
+    it("starts OpenCode without prompting for newly created tmux sessions", async () => {
       setConfiguration({
         terminalBackend: "tmux" satisfies TerminalBackendType,
         defaultAiTool: "opencode",
@@ -863,7 +849,6 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
       await sessionRuntime.startOpenCode();
 
-      expect(showAiToolSelectorMock).not.toHaveBeenCalled();
     });
 
     it("warns and returns when tmux session has no panes", async () => {
@@ -957,134 +942,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       );
     });
 
-    it("shows AI tool selector on startOpenCode when attaching to existing tmux session", async () => {
-      setConfiguration({
-        terminalBackend: "tmux" satisfies TerminalBackendType,
-        defaultAiTool: "opencode",
-        aiTools: [{ name: "opencode", label: "OpenCode", path: "", args: [] }],
-      });
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
-        action: "attached" as const,
-        session: {
-          id: "existing-session",
-          name: "existing-session",
-          workspace: "/workspace/project-a",
-          isActive: true,
-        },
-      });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
-        },
-        "startExternalChangeMonitoring",
-      ).mockResolvedValue();
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "opencode"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
-
-      await sessionRuntime.startOpenCode();
-
-      expect(showAiToolSelectorMock).toHaveBeenCalledWith(
-        "existing-session",
-        "existing-session",
-        true,
-      );
-    });
-
-    it("does not show AI tool selector on startOpenCode when promptAiToolOnSession is disabled", async () => {
-      setConfiguration({
-        terminalBackend: "tmux" satisfies TerminalBackendType,
-        defaultAiTool: "opencode",
-        aiTools: [{ name: "opencode", label: "OpenCode", path: "", args: [] }],
-        promptAiToolOnSession: false,
-      });
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
-        action: "attached" as const,
-        session: {
-          id: "existing-session",
-          name: "existing-session",
-          workspace: "/workspace/project-a",
-          isActive: true,
-        },
-      });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
-        },
-        "startExternalChangeMonitoring",
-      ).mockResolvedValue();
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "opencode"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
-
-      await sessionRuntime.startOpenCode();
-
-      expect(showAiToolSelectorMock).not.toHaveBeenCalled();
-    });
-
-    it("does not show duplicate AI tool selector when switching tmux sessions via command palette", async () => {
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
-        },
-        "startExternalChangeMonitoring",
-      ).mockResolvedValue();
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "opencode"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
-
-      await sessionRuntime.switchToTmuxSession("manual-tmux");
-
-      expect(showAiToolSelectorMock).toHaveBeenCalledTimes(1);
-      expect(showAiToolSelectorMock).toHaveBeenCalledWith(
-        "manual-tmux",
-        "manual-tmux",
-        true,
-      );
-    });
-
-    it("prompts for an AI tool after a user attaches a tmux session", async () => {
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
-        },
-        "startExternalChangeMonitoring",
-      ).mockResolvedValue();
-
-      await sessionRuntime.switchToTmuxSession("manual-tmux");
-
-      expect(showAiToolSelectorMock).toHaveBeenCalledWith(
-        "manual-tmux",
-        "manual-tmux",
-        true,
-      );
-    });
-
-    it("does not prompt for an AI tool when forceToolPrompt is disabled", async () => {
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
-        },
-        "startExternalChangeMonitoring",
-      ).mockResolvedValue();
-
-      await sessionRuntime.switchToTmuxSessionWithTool("manual-tmux", undefined, {
-        forceToolPrompt: false,
-        respectPromptAiToolOnSession: true,
-      });
-
-      expect(showAiToolSelectorMock).not.toHaveBeenCalled();
-    });
-
-    it("does not prompt for an AI tool when a preferred tool is already selected", async () => {
+    it("persists a preferred tool when switching tmux sessions", async () => {
       upsertInstance({ workspaceUri: "file:///workspace/project-a" });
       vi.spyOn(
         sessionRuntime as unknown as {
@@ -1102,74 +960,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         },
       );
 
-      expect(showAiToolSelectorMock).not.toHaveBeenCalled();
-    });
-
-    it("does not prompt for an AI tool when the session prompt setting is disabled", async () => {
-      setConfiguration({
-        promptAiToolOnSession: false,
-      });
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
-        },
-        "startExternalChangeMonitoring",
-      ).mockResolvedValue();
-
-      await sessionRuntime.switchToTmuxSessionWithTool("manual-tmux", undefined, {
-        forceToolPrompt: true,
-        respectPromptAiToolOnSession: true,
-      });
-
-      expect(showAiToolSelectorMock).not.toHaveBeenCalled();
-    });
-
-    it("shows the AI tool selector when prompt preference is not respected", async () => {
-      setConfiguration({
-        promptAiToolOnSession: false,
-      });
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
-        },
-        "startExternalChangeMonitoring",
-      ).mockResolvedValue();
-
-      await sessionRuntime.switchToTmuxSessionWithTool("manual-tmux", undefined, {
-        forceToolPrompt: true,
-        respectPromptAiToolOnSession: false,
-      });
-
-      expect(showAiToolSelectorMock).toHaveBeenCalledWith(
-        "manual-tmux",
-        "manual-tmux",
-        true,
-      );
-    });
-
-    it("shows the AI tool selector when prompt preference is omitted", async () => {
-      setConfiguration({
-        promptAiToolOnSession: false,
-      });
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
-        },
-        "startExternalChangeMonitoring",
-      ).mockResolvedValue();
-
-      await sessionRuntime.switchToTmuxSessionWithTool("manual-tmux", undefined, {
-        forceToolPrompt: true,
-      });
-
-      expect(showAiToolSelectorMock).toHaveBeenCalledWith(
-        "manual-tmux",
-        "manual-tmux",
-        true,
-      );
+      expect(
+        instanceStore.get("manual-tmux")?.config.selectedAiTool,
+      ).toBeUndefined();
     });
 
     it("reuses an existing terminal for an instance and restores HTTP listeners", async () => {
@@ -2802,7 +2595,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       );
     });
 
-    it("prompts before persisting a picked startup tool as default", async () => {
+    it("returns undefined when the configured startup tool cannot be resolved", async () => {
       const updateMock = vi.fn(async () => undefined);
       setConfiguration({
         aiTools: [
@@ -2822,12 +2615,6 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         inspect: vi.fn(() => undefined),
         update: updateMock,
       } as ReturnType<typeof vscode.workspace.getConfiguration>);
-      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
-        label: "Codex",
-        description: "Launch Codex in the terminal",
-        tool: { name: "codex", label: "Codex", path: "", args: [] },
-      });
-      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue("Yes");
       upsertInstance();
 
       const tool = await (
@@ -2840,22 +2627,13 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         vscode.workspace.getConfiguration() as unknown as vscodeApi.WorkspaceConfiguration,
       );
 
-      expect(tool?.name).toBe("codex");
-      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
-        "Save Codex as default tool?",
-        { modal: false },
-        "Yes",
-        "No",
-      );
-      expect(updateMock).toHaveBeenCalledWith(
-        "defaultAiTool",
-        "codex",
-        vscode.ConfigurationTarget.Global,
-      );
-      expect(instanceStore.get("default")?.config.selectedAiTool).toBe("codex");
+      expect(tool).toBeUndefined();
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+      expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
     });
 
-    it("does not persist a picked startup tool as default when declined", async () => {
+    it("does not persist an unresolved startup tool as default", async () => {
       const updateMock = vi.fn(async () => undefined);
       vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
         get: vi.fn(<T,>(key: string, defaultValue?: T): T => {
@@ -2869,12 +2647,6 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         inspect: vi.fn(() => undefined),
         update: updateMock,
       } as ReturnType<typeof vscode.workspace.getConfiguration>);
-      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
-        label: "Codex",
-        description: "Launch Codex in the terminal",
-        tool: { name: "codex", label: "Codex", path: "", args: [] },
-      });
-      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue("No");
       upsertInstance();
 
       const tool = await (
@@ -2887,9 +2659,10 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         vscode.workspace.getConfiguration() as unknown as vscodeApi.WorkspaceConfiguration,
       );
 
-      expect(tool?.name).toBe("codex");
+      expect(tool).toBeUndefined();
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
       expect(updateMock).not.toHaveBeenCalled();
-      expect(instanceStore.get("default")?.config.selectedAiTool).toBe("codex");
+      expect(instanceStore.get("default")?.config.selectedAiTool).toBeUndefined();
     });
 
     it("returns undefined when startup tool selection is dismissed", async () => {
@@ -3359,26 +3132,12 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
       await sessionRuntime.switchToZellijSession("zellij-session");
 
-      expect(showAiToolSelectorMock).toHaveBeenCalledWith(
-        "zellij-session",
-        "zellij-session",
-        true,
-      );
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining("Failed to switch zellij session"),
       );
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining("Failed to start zellij change monitoring"),
       );
-    });
-
-    it("skips zellij AI tool selector when promptAiToolOnSession is disabled", async () => {
-      setConfiguration({ promptAiToolOnSession: false });
-      vi.spyOn(sessionRuntime, "switchToInstance").mockResolvedValue();
-
-      await sessionRuntime.switchToZellijSession("zellij-session");
-
-      expect(showAiToolSelectorMock).not.toHaveBeenCalled();
     });
 
     it("posts terminalExited when attached tmux restoration fails", async () => {

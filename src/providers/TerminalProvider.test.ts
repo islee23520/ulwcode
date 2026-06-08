@@ -69,7 +69,6 @@ describe("TerminalProvider", () => {
     defaultAiTool?: string;
     aiTools?: readonly unknown[];
     collapseSecondaryBarOnEditorOpen?: boolean;
-    promptAiToolOnSession?: boolean;
     terminalDefaultLocation?: string;
   }) {
     const {
@@ -78,7 +77,6 @@ describe("TerminalProvider", () => {
       defaultAiTool = "opencode",
       aiTools = DEFAULT_AI_TOOLS,
       collapseSecondaryBarOnEditorOpen = false,
-      promptAiToolOnSession = true,
       terminalDefaultLocation = "editor",
     } = options ?? {};
 
@@ -104,9 +102,6 @@ describe("TerminalProvider", () => {
         }
         if (key === "collapseSecondaryBarOnEditorOpen") {
           return collapseSecondaryBarOnEditorOpen;
-        }
-        if (key === "promptAiToolOnSession") {
-          return promptAiToolOnSession;
         }
         if (key === "terminal.defaultLocation") {
           return terminalDefaultLocation;
@@ -220,27 +215,8 @@ describe("TerminalProvider", () => {
     expect(launchSpy).toHaveBeenCalledWith("tmux-a", "codex", true, undefined);
   });
 
-  it("opens the AI tool selector for explicit manual requests", async () => {
-    mockConfiguration();
-    provider = createProvider();
-    const { messageHandler } = resolveProvider(provider);
-    const showSpy = vi
-      .spyOn(provider, "showAiToolSelector")
-      .mockResolvedValue(undefined);
-
-    messageHandler({ type: "requestAiToolSelector" });
-    await Promise.resolve();
-
-    expect(showSpy).toHaveBeenCalledWith(
-      "opencode-main",
-      "opencode-main",
-      true,
-      undefined,
-    );
-  });
-
-  describe("native restore Quick Pick", () => {
-    it("shows Quick Pick for disconnected native instance with selectedAiTool", async () => {
+  describe("native restore", () => {
+    it("restores a disconnected native instance with its selectedAiTool", async () => {
       mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
       const instanceStore = new InstanceStore();
       instanceStore.upsert({
@@ -257,31 +233,18 @@ describe("TerminalProvider", () => {
       const startSpy = vi
         .spyOn(provider["sessionRuntime"], "startOpenCode")
         .mockResolvedValue(undefined);
-      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
-        label: "Claude Code",
-        description: "claude",
-        toolName: "claude",
-      });
 
       resolveProvider(provider);
       await flushAsyncStartup();
 
-      expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({
-            label: "Codex (previously used)",
-            toolName: "codex",
-          }),
-        ]),
-        { placeHolder: "Select AI tool to restore terminal" },
-      );
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
       expect(startSpy).toHaveBeenCalledTimes(1);
       expect(
         instanceStore.get("native-disconnected")?.config.selectedAiTool,
-      ).toBe("claude");
+      ).toBe("codex");
     });
 
-    it("does not show Quick Pick for connected native instance", async () => {
+    it("does not restore a connected native instance", async () => {
       mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
       const instanceStore = new InstanceStore();
       instanceStore.upsert({
@@ -302,7 +265,7 @@ describe("TerminalProvider", () => {
       expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
     });
 
-    it("does not show Quick Pick for disconnected tmux instance", async () => {
+    it("does not restore a disconnected tmux instance", async () => {
       mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
       const instanceStore = new InstanceStore();
       instanceStore.upsert({
@@ -326,7 +289,7 @@ describe("TerminalProvider", () => {
       expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
     });
 
-    it("does not show Quick Pick without selectedAiTool", async () => {
+    it("does not restore without selectedAiTool", async () => {
       mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
       const instanceStore = new InstanceStore();
       instanceStore.upsert({
@@ -344,64 +307,6 @@ describe("TerminalProvider", () => {
       await flushAsyncStartup();
 
       expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
-    });
-
-    it("cancel preserves disconnected state", async () => {
-      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
-      const instanceStore = new InstanceStore();
-      instanceStore.upsert({
-        config: {
-          id: "native-cancelled",
-          selectedAiTool: "codex",
-          terminalBackend: "native",
-        },
-        runtime: { terminalKey: "native-cancelled" },
-        state: "disconnected",
-      });
-
-      provider = createProvider({ instanceStore });
-      const startSpy = vi
-        .spyOn(provider["sessionRuntime"], "startOpenCode")
-        .mockResolvedValue(undefined);
-      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
-
-      resolveProvider(provider);
-      await flushAsyncStartup();
-
-      expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
-      expect(startSpy).not.toHaveBeenCalled();
-      expect(instanceStore.get("native-cancelled")?.state).toBe(
-        "disconnected",
-      );
-    });
-
-    it("shows Quick Pick again when a cancelled native restore is reopened", async () => {
-      mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
-      const instanceStore = new InstanceStore();
-      instanceStore.upsert({
-        config: {
-          id: "native-retry",
-          selectedAiTool: "codex",
-          terminalBackend: "native",
-        },
-        runtime: { terminalKey: "native-retry" },
-        state: "disconnected",
-      });
-
-      provider = createProvider({ instanceStore });
-      const startSpy = vi
-        .spyOn(provider["sessionRuntime"], "startOpenCode")
-        .mockResolvedValue(undefined);
-      vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
-
-      resolveProvider(provider);
-      await flushAsyncStartup();
-      resolveProvider(provider);
-      await flushAsyncStartup();
-
-      expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(2);
-      expect(startSpy).not.toHaveBeenCalled();
-      expect(instanceStore.get("native-retry")?.state).toBe("disconnected");
     });
 
     it("restores a disconnected native instance that already has backendState", async () => {
@@ -435,16 +340,10 @@ describe("TerminalProvider", () => {
       const startSpy = vi
         .spyOn(provider["sessionRuntime"], "startOpenCode")
         .mockResolvedValue(undefined);
-      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
-        label: "Codex (previously used)",
-        description: "codex",
-        toolName: "codex",
-      });
-
       resolveProvider(provider);
       await flushAsyncStartup();
 
-      expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
       expect(startSpy).toHaveBeenCalledTimes(1);
       expect(instanceStore.get("native-with-state")?.runtime.backendState).toEqual(
         expect.objectContaining({
@@ -454,7 +353,7 @@ describe("TerminalProvider", () => {
       );
     });
 
-    it("selected AI tool no longer in config falls back gracefully", async () => {
+    it("selected AI tool no longer in config restores without prompting", async () => {
       mockConfiguration({
         autoStartOnOpen: false,
         enableHttpApi: false,
@@ -483,28 +382,14 @@ describe("TerminalProvider", () => {
       const startSpy = vi
         .spyOn(provider["sessionRuntime"], "startOpenCode")
         .mockResolvedValue(undefined);
-      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
-        label: "Codex",
-        description: "codex",
-        toolName: "codex",
-      });
-
       resolveProvider(provider);
       await flushAsyncStartup();
 
-      expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({
-            label: "Codex",
-            toolName: "codex",
-          }),
-        ]),
-        { placeHolder: "Select AI tool to restore terminal" },
-      );
-    expect(startSpy).toHaveBeenCalledTimes(1);
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+      expect(startSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("multiple disconnected instances only prompts for active", async () => {
+    it("multiple disconnected instances only restores the active one", async () => {
       mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
 
       const instanceStore = new InstanceStore();
@@ -529,32 +414,18 @@ describe("TerminalProvider", () => {
       instanceStore.setActive("native-active");
 
       provider = createProvider({ instanceStore });
-      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
-        label: "Claude Code",
-        description: "claude",
-        toolName: "claude",
-      });
+      const startSpy = vi
+        .spyOn(provider["sessionRuntime"], "startOpenCode")
+        .mockResolvedValue(undefined);
 
       resolveProvider(provider);
       await flushAsyncStartup();
 
-      const quickPickItems = vi.mocked(vscode.window.showQuickPick).mock
-        .calls[0]?.[0];
-
-      expect(quickPickItems).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            label: "Codex (previously used)",
-            toolName: "codex",
-          }),
-        ]),
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+      expect(startSpy).toHaveBeenCalledTimes(1);
+      expect(instanceStore.get("native-active")?.config.selectedAiTool).toBe(
+        "codex",
       );
-      expect(
-        quickPickItems?.some(
-          (item: { label?: string }) =>
-            item.label === "Claude Code (previously used)",
-        ),
-      ).toBe(false);
     });
 
     it("empty instance store does not trigger Quick Pick", async () => {
@@ -1578,7 +1449,7 @@ describe("TerminalProvider", () => {
     });
   });
 
-  it("normalizes workspace session ids when auto-launching a saved AI tool", () => {
+  it("normalizes workspace session ids when launching the default AI tool", async () => {
     mockConfiguration({ defaultAiTool: "opencode" });
     const instanceStore = new InstanceStore();
     instanceStore.upsert({
@@ -1597,22 +1468,18 @@ describe("TerminalProvider", () => {
     provider = createProvider({ instanceStore });
     const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
 
-    provider.showAiToolSelector(
-      "repo-saved-tool",
-      "Repo Saved Tool",
-      false,
-      "%22",
-    );
+    await provider.launchDefaultAiTool("repo-saved-tool", "%22");
 
     expect(launchSpy).toHaveBeenCalledWith(
       "tmux-saved-tool",
       "codex",
       false,
       "%22",
+      undefined,
     );
   });
 
-  it("uses the configured default AI tool when no instance preference exists", () => {
+  it("uses the configured default AI tool when no instance preference exists", async () => {
     mockConfiguration({ defaultAiTool: "claude" });
     const instanceStore = new InstanceStore();
     instanceStore.upsert({
@@ -1630,17 +1497,18 @@ describe("TerminalProvider", () => {
     provider = createProvider({ instanceStore });
     const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
 
-    provider.showAiToolSelector("repo-default-tool", "Repo Default Tool");
+    await provider.launchDefaultAiTool("repo-default-tool");
 
     expect(launchSpy).toHaveBeenCalledWith(
       "tmux-default-tool",
       "claude",
       false,
       undefined,
+      undefined,
     );
   });
 
-  it("forces the AI tool selector to render even when a saved tool exists", () => {
+  it("launches the saved tool directly instead of forcing a selector", async () => {
     mockConfiguration({ defaultAiTool: "opencode" });
     const instanceStore = new InstanceStore();
     instanceStore.upsert({
@@ -1658,286 +1526,17 @@ describe("TerminalProvider", () => {
 
     provider = createProvider({ instanceStore });
     const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
-    const { view } = resolveProvider(provider);
+    resolveProvider(provider);
 
-    provider.showAiToolSelector(
-      "repo-force-show",
-      "Repo Force Show",
-      true,
+    await provider.launchDefaultAiTool("repo-force-show", "%9");
+
+    expect(launchSpy).toHaveBeenCalledWith(
+      "tmux-force-show",
+      "codex",
+      false,
       "%9",
+      undefined,
     );
-
-    expect(launchSpy).not.toHaveBeenCalled();
-    expect(view.webview.postMessage).toHaveBeenCalledWith({
-      type: "showAiToolSelector",
-      sessionId: "tmux-force-show",
-      sessionName: "Repo Force Show",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: "%9",
-    });
-  });
-
-  it("returns early without showing selector when forceShow and promptAiToolOnSession is disabled", () => {
-    mockConfiguration({ promptAiToolOnSession: false });
-    provider = createProvider();
-    const { view } = resolveProvider(provider);
-
-    vi.mocked(view.webview.postMessage).mockClear();
-
-    provider.showAiToolSelector("session-disabled", "Session Disabled", true);
-
-    expect(view.webview.postMessage).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "showAiToolSelector",
-      }),
-    );
-  });
-
-  it("queues forced AI selector messages until the terminal webview resolves", () => {
-    mockConfiguration({ defaultAiTool: "opencode" });
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-pending-selector",
-        workspaceUri: "file:///workspaces/repo-pending-selector",
-        selectedAiTool: "codex",
-      },
-      runtime: {
-        terminalKey: "workspace-pending-selector",
-        tmuxSessionId: "tmux-pending-selector",
-      },
-      state: "connected",
-    });
-
-    provider = createProvider({ instanceStore });
-    const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
-
-    provider.showAiToolSelector(
-      "repo-pending-selector",
-      "Repo Pending Selector",
-      true,
-      "%4",
-    );
-
-    expect(launchSpy).not.toHaveBeenCalled();
-
-    const { view } = resolveProvider(provider);
-
-    expect(view.webview.postMessage).toHaveBeenCalledWith({
-      type: "showAiToolSelector",
-      sessionId: "tmux-pending-selector",
-      sessionName: "Repo Pending Selector",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: "%4",
-    });
-  });
-
-  it("requeues AI selector messages when postMessage reports the webview hidden", async () => {
-    mockConfiguration({ defaultAiTool: "opencode" });
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-hidden-selector",
-        workspaceUri: "file:///workspaces/repo-hidden-selector",
-        selectedAiTool: "codex",
-      },
-      runtime: {
-        terminalKey: "workspace-hidden-selector",
-        tmuxSessionId: "tmux-hidden-selector",
-      },
-      state: "connected",
-    });
-
-    provider = createProvider({ instanceStore });
-    const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
-    const { view } = resolveProvider(provider);
-    const selectorMessage = {
-      type: "showAiToolSelector",
-      sessionId: "tmux-hidden-selector",
-      sessionName: "Repo Hidden Selector",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: "%5",
-    };
-    vi.mocked(view.webview.postMessage).mockClear();
-    vi.mocked(view.webview.postMessage).mockReturnValue(false);
-
-    provider.showAiToolSelector(
-      "repo-hidden-selector",
-      "Repo Hidden Selector",
-      true,
-      "%5",
-    );
-
-    expect(launchSpy).not.toHaveBeenCalled();
-    expect(view.webview.postMessage).toHaveBeenCalledWith(selectorMessage);
-
-    const visibilityListener = vi.mocked(view.onDidChangeVisibility).mock
-      .calls[0]?.[0] as (() => void) | undefined;
-    expect(visibilityListener).toBeDefined();
-    view.visible = true;
-    visibilityListener?.();
-    await Promise.resolve();
-
-    expect(view.webview.postMessage).toHaveBeenCalledTimes(2);
-    expect(view.webview.postMessage).toHaveBeenLastCalledWith(selectorMessage);
-  });
-
-  it("requeues message when postMessage Thenable resolves to false", async () => {
-    mockConfiguration({ defaultAiTool: "opencode" });
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-thenable-selector",
-        workspaceUri: "file:///workspaces/repo-thenable-selector",
-        selectedAiTool: "codex",
-      },
-      runtime: {
-        terminalKey: "workspace-thenable-selector",
-        tmuxSessionId: "tmux-thenable-selector",
-      },
-      state: "connected",
-    });
-
-    provider = createProvider({ instanceStore });
-    const { view } = resolveProvider(provider);
-    view.visible = true;
-    const selectorMessage = {
-      type: "showAiToolSelector",
-      sessionId: "tmux-thenable-selector",
-      sessionName: "Repo Thenable Selector",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: "%6",
-    };
-    vi.mocked(view.webview.postMessage).mockClear();
-    vi.mocked(view.webview.postMessage).mockResolvedValue(false);
-
-    provider.showAiToolSelector(
-      "repo-thenable-selector",
-      "Repo Thenable Selector",
-      true,
-      "%6",
-    );
-
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(view.webview.postMessage).toHaveBeenCalledWith(selectorMessage);
-    expect(provider["pendingWebviewMessages"]).toContainEqual(selectorMessage);
-  });
-
-  it("requeues Thenable selector messages without flushing when the webview is hidden", async () => {
-    mockConfiguration({ defaultAiTool: "opencode" });
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-thenable-hidden",
-        workspaceUri: "file:///workspaces/repo-thenable-hidden",
-        selectedAiTool: "codex",
-      },
-      runtime: {
-        terminalKey: "workspace-thenable-hidden",
-        tmuxSessionId: "tmux-thenable-hidden",
-      },
-      state: "connected",
-    });
-
-    provider = createProvider({ instanceStore });
-    const { view } = resolveProvider(provider);
-    view.visible = false;
-    const selectorMessage = {
-      type: "showAiToolSelector",
-      sessionId: "tmux-thenable-hidden",
-      sessionName: "Repo Thenable Hidden",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: "%7",
-    };
-    vi.mocked(view.webview.postMessage).mockClear();
-    vi.mocked(view.webview.postMessage).mockReturnValue({
-      then: (resolve: (value: boolean) => void) => {
-        resolve(false);
-        return Promise.resolve(false);
-      },
-    } as Thenable<boolean>);
-
-    provider.showAiToolSelector(
-      "repo-thenable-hidden",
-      "Repo Thenable Hidden",
-      true,
-      "%7",
-    );
-
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(view.webview.postMessage).toHaveBeenCalledWith(selectorMessage);
-    expect(provider["pendingWebviewMessages"]).toContainEqual(selectorMessage);
-  });
-
-  it("flushes queued selector messages again when a boolean postMessage reports false", () => {
-    mockConfiguration({ defaultAiTool: "opencode" });
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-boolean-flush",
-        workspaceUri: "file:///workspaces/repo-boolean-flush",
-        selectedAiTool: "codex",
-      },
-      runtime: {
-        terminalKey: "workspace-boolean-flush",
-        tmuxSessionId: "tmux-boolean-flush",
-      },
-      state: "connected",
-    });
-
-    provider = createProvider({ instanceStore });
-    const { view } = resolveProvider(provider);
-    const selectorMessage: any = {
-      type: "showAiToolSelector",
-      sessionId: "tmux-boolean-flush",
-      sessionName: "Repo Boolean Flush",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: "%8",
-    };
-    vi.mocked(view.webview.postMessage).mockClear();
-    vi.mocked(view.webview.postMessage).mockReturnValue(false);
-
-    provider["pendingWebviewMessages"].push(selectorMessage);
-    view.visible = true;
-
-    (provider as any).flushPendingWebviewMessages(view.webview);
-
-    expect(view.webview.postMessage).toHaveBeenCalledWith(selectorMessage);
-    expect(provider["pendingWebviewMessages"]).toContainEqual(selectorMessage);
-  });
-
-  it("queues selector messages when no webview is attached", () => {
-    mockConfiguration({ defaultAiTool: "opencode" });
-    provider = createProvider();
-
-    (provider as any).postWebviewMessage({
-      type: "showAiToolSelector",
-      sessionId: "session-no-webview",
-      sessionName: "No Webview",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: undefined,
-    });
-
-    expect(provider["pendingWebviewMessages"]).toContainEqual({
-      type: "showAiToolSelector",
-      sessionId: "session-no-webview",
-      sessionName: "No Webview",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: undefined,
-    });
   });
 
   it("ignores non-selector messages when a boolean postMessage reports false", () => {
@@ -1984,56 +1583,6 @@ describe("TerminalProvider", () => {
     vi.mocked(view.webview.postMessage).mockReturnValue(false);
 
     provider["pendingWebviewMessages"].push({ type: "output", text: "hello" } as any);
-    (provider as any).flushPendingWebviewMessages(view.webview);
-
-    expect(provider["pendingWebviewMessages"]).toHaveLength(0);
-  });
-
-  it("requeues selector messages again when flush sees a Thenable false result", () => {
-    mockConfiguration();
-    provider = createProvider();
-    const { view } = resolveProvider(provider);
-    const selectorMessage = {
-      type: "showAiToolSelector",
-      sessionId: "tmux-flush-thenable",
-      sessionName: "Flush Thenable",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: "%10",
-    };
-    provider["pendingWebviewMessages"].push(selectorMessage as any);
-    vi.mocked(view.webview.postMessage).mockReturnValue({
-      then: (resolve: (value: boolean) => void) => {
-        resolve(false);
-        return Promise.resolve(false);
-      },
-    } as any);
-
-    (provider as any).flushPendingWebviewMessages(view.webview);
-
-    expect(provider["pendingWebviewMessages"]).toContainEqual(selectorMessage);
-  });
-
-  it("does not requeue selector messages when flush sees a Thenable true result", () => {
-    mockConfiguration();
-    provider = createProvider();
-    const { view } = resolveProvider(provider);
-    const selectorMessage = {
-      type: "showAiToolSelector",
-      sessionId: "tmux-flush-thenable-true",
-      sessionName: "Flush Thenable True",
-      defaultTool: undefined,
-      tools: DEFAULT_AI_TOOLS,
-      targetPaneId: "%11",
-    };
-    provider["pendingWebviewMessages"].push(selectorMessage as any);
-    vi.mocked(view.webview.postMessage).mockReturnValue({
-      then: (resolve: (value: boolean) => void) => {
-        resolve(true);
-        return Promise.resolve(true);
-      },
-    } as any);
-
     (provider as any).flushPendingWebviewMessages(view.webview);
 
     expect(provider["pendingWebviewMessages"]).toHaveLength(0);
@@ -2810,7 +2359,7 @@ describe("TerminalProvider", () => {
     });
   });
 
-  it("handles auto-start visibility paths with restore acceptance and cancellation", async () => {
+  it("handles auto-start visibility paths with direct native restore", async () => {
     mockConfiguration({ autoStartOnOpen: true });
     const instanceStore = new InstanceStore();
     instanceStore.upsert({
@@ -2826,8 +2375,6 @@ describe("TerminalProvider", () => {
     const startSpy = vi
       .spyOn(provider["sessionRuntime"], "startOpenCode")
       .mockResolvedValue(undefined);
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
-
     const view = vscode.WebviewView() as never as ReturnType<typeof vscode.WebviewView>;
     view.visible = false;
     provider.resolveWebviewView(view as never, {} as never, {} as never);
@@ -2838,18 +2385,13 @@ describe("TerminalProvider", () => {
     visibilityListener();
     await flushAsyncStartup();
 
-    expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
-    expect(startSpy).not.toHaveBeenCalled();
+    expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    expect(startSpy).toHaveBeenCalledTimes(1);
 
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
-      label: "Codex (previously used)",
-      description: "codex",
-      toolName: "codex",
-    });
     visibilityListener();
     await flushAsyncStartup();
 
-    expect(startSpy).toHaveBeenCalledTimes(1);
+    expect(startSpy).toHaveBeenCalledTimes(2);
   });
 
   it("logs native restore lookup failures and falls back to autostart", () => {
@@ -3090,28 +2632,6 @@ describe("TerminalProvider", () => {
     });
   });
 
-  it("routes the session runtime AI selector callback through the provider", () => {
-    mockConfiguration();
-    provider = createProvider();
-    resolveProvider(provider);
-    const selectorSpy = vi
-      .spyOn(provider, "showAiToolSelector")
-      .mockResolvedValue(undefined);
-    const runtime = provider["sessionRuntime"] as unknown as {
-      callbacks: {
-        showAiToolSelector: (
-          sessionId: string,
-          sessionName: string,
-          forceShow?: boolean,
-        ) => void;
-      };
-    };
-
-    runtime.callbacks.showAiToolSelector("session-a", "Session A", true);
-
-    expect(selectorSpy).toHaveBeenCalledWith("session-a", "Session A", true);
-  });
-
   it("falls back to start when native restore record disappears during visible autostart", async () => {
     mockConfiguration({ autoStartOnOpen: true });
     const activeStore = new InstanceStore();
@@ -3313,13 +2833,6 @@ describe("TerminalProvider", () => {
       expect.stringContaining("launch down"),
     );
 
-    provider.showAiToolSelector("session-without-runtime", "Session", true);
-    expect(provider["_view"]?.webview.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: "session-without-runtime" }),
-    );
-    expect(logger.info).toHaveBeenCalledWith(
-      expect.stringContaining("native store down"),
-    );
   });
 
   it("covers visible and hidden autostart skip branches", () => {

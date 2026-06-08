@@ -104,8 +104,6 @@ export class TerminalProvider
           void this.switchToInstance(instanceId);
         },
         requestStartOpenCode: () => this.startOpenCode(),
-        showAiToolSelector: (sessionId, sessionName, forceShow) =>
-          this.showAiToolSelector(sessionId, sessionName, forceShow),
       },
       this.nativeTerminalManager,
     );
@@ -140,13 +138,6 @@ export class TerminalProvider
         this.sessionRuntime.formatPastedImage(tempPath),
       launchAiTool: (sessionId, toolName, savePreference, targetPaneId) =>
         this.launchAiTool(sessionId, toolName, savePreference, targetPaneId),
-      showAiToolSelector: (sessionId, sessionName, forceShow, targetPaneId) =>
-        this.showAiToolSelector(
-          sessionId,
-          sessionName,
-          forceShow,
-          targetPaneId,
-        ),
       executeRawTmuxCommand: (subcommand, args) =>
         this.executeRawTmuxCommand(subcommand, args),
       zoomTmuxPane: () => this.zoomTmuxPane(),
@@ -695,16 +686,12 @@ export class TerminalProvider
     return [input.trim()];
   }
 
-  public async showAiToolSelector(
+  public async launchDefaultAiTool(
     sessionId: string,
-    sessionName: string,
-    forceShow = false,
     targetPaneId?: string,
+    backendHint?: TerminalBackendType,
   ): Promise<void> {
     const config = vscode.workspace.getConfiguration("ulw");
-    if (forceShow && !config.get<boolean>("promptAiToolOnSession", true)) {
-      return;
-    }
     const instanceId =
       this.sessionRuntime.resolveInstanceIdFromSessionId(sessionId);
     const effectiveSessionId =
@@ -725,24 +712,15 @@ export class TerminalProvider
       return;
     }
 
-    if (!forceShow && savedTool) {
-      void this.launchAiTool(
+    if (savedTool) {
+      await this.launchAiTool(
         effectiveSessionId,
         savedTool,
         false,
         targetPaneId,
+        backendHint,
       );
-      return;
     }
-
-    this.postWebviewMessage({
-      type: "showAiToolSelector",
-      sessionId: effectiveSessionId,
-      sessionName,
-      defaultTool: undefined,
-      tools,
-      targetPaneId,
-    });
   }
 
   private async detectRunningTmuxAiTool(
@@ -799,33 +777,11 @@ export class TerminalProvider
       return false;
     }
 
-    const config = vscode.workspace.getConfiguration("ulw");
     const selectedAiTool = record.config.selectedAiTool;
-    const items = resolveAiToolConfigs(config.get("aiTools", [])).map((tool) => ({
-      label:
-        tool.name === selectedAiTool
-          ? `${tool.label} (previously used)`
-          : tool.label,
-      description: tool.name,
-      toolName: tool.name,
-    }));
-
     this.logger.info(
-      `[TerminalProvider] Prompting to restore native terminal for ${record.config.id}`,
+      `[TerminalProvider] Restoring native terminal for ${record.config.id}`,
     );
-    const selection = await vscode.window.showQuickPick(items, {
-      placeHolder: "Select AI tool to restore terminal",
-    });
-
-    if (!selection) {
-      this.logger.info("[TerminalProvider] Native terminal restore cancelled");
-      return true;
-    }
-
-    this.sessionRuntime.rememberSelectedTool(
-      selection.toolName,
-      record.config.id,
-    );
+    this.sessionRuntime.rememberSelectedTool(selectedAiTool, record.config.id);
     await this.sessionRuntime.startOpenCode();
     return true;
   }
@@ -1205,15 +1161,8 @@ export class TerminalProvider
     );
   }
 
-  private isQueueableHostMessage(
-    message: unknown,
-  ): message is Extract<HostMessage, { type: "showAiToolSelector" }> {
-    return (
-      typeof message === "object" &&
-      message !== null &&
-      "type" in message &&
-      message.type === "showAiToolSelector"
-    );
+  private isQueueableHostMessage(_message: unknown): _message is never {
+    return false;
   }
 
   private replacePendingWebviewMessage(message: HostMessage): void {

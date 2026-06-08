@@ -88,7 +88,6 @@ describe("Types", () => {
           backend: "tmux",
         },
         { type: "cycleTerminalBackend", paneId: "pane-1" },
-        { type: "requestAiToolSelector", paneId: "pane-1" },
         {
           type: "executeTmuxCommand",
           commandId: "ulw.tmuxCreateWindow",
@@ -103,11 +102,11 @@ describe("Types", () => {
         { type: "requestRestart", paneId: "pane-1" },
       ];
 
-      expect(messages).toHaveLength(25);
+      expect(messages).toHaveLength(24);
       expect(messages[0]).toEqual(
         expect.objectContaining({ paneId: "pane-1" }),
       );
-      expect(messages[23]?.type).toBe("executeTmuxRawCommand");
+      expect(messages[22]?.type).toBe("executeTmuxRawCommand");
     });
 
     it("should accept all variants without paneId for backward compatibility", () => {
@@ -141,7 +140,6 @@ describe("Types", () => {
         { type: "sendTmuxPromptChoice", choice: "tmux" },
         { type: "selectTerminalBackend", backend: "zellij" },
         { type: "cycleTerminalBackend" },
-        { type: "requestAiToolSelector" },
         {
           type: "executeTmuxCommand",
           commandId: "ulw.tmuxCreateWindow",
@@ -154,9 +152,9 @@ describe("Types", () => {
         { type: "requestRestart" },
       ];
 
-      expect(messages).toHaveLength(24);
+      expect(messages).toHaveLength(23);
       expect(messages[0]?.paneId).toBeUndefined();
-      expect(messages[23]?.type).toBe("requestRestart");
+      expect(messages[22]?.type).toBe("requestRestart");
     });
 
     it("should accept terminalInput message", () => {

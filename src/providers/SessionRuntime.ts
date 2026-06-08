@@ -37,11 +37,6 @@ interface SessionRuntimeCallbacks {
   postMessage: (message: unknown) => void;
   onActiveInstanceChanged: (instanceId: InstanceId) => void;
   requestStartOpenCode: () => Promise<void>;
-  showAiToolSelector: (
-    sessionId: string,
-    sessionName: string,
-    forceShow?: boolean,
-  ) => void;
 }
 
 export interface SessionState {
@@ -856,11 +851,6 @@ export class SessionRuntime {
     if (wasManualSessionSelection) {
       return;
     }
-    const config = vscode.workspace.getConfiguration("ulw");
-    if (!config.get<boolean>("promptAiToolOnSession", true)) {
-      return;
-    }
-    this.callbacks.showAiToolSelector(sessionId, sessionId, true);
   }
 
   public restart(): void {
@@ -1401,18 +1391,6 @@ export class SessionRuntime {
       this.persistSelectedTool(preferredToolName, instanceId);
     }
 
-    const shouldShowSelector =
-      options.forceToolPrompt && !preferredToolName;
-    if (shouldShowSelector) {
-      const config = vscode.workspace.getConfiguration("ulw");
-      if (
-        !options.respectPromptAiToolOnSession ||
-        config.get<boolean>("promptAiToolOnSession", true)
-      ) {
-        this.callbacks.showAiToolSelector(sessionId, sessionId, true);
-      }
-    }
-
     await this.switchToInstance(
       this.resolveInstanceIdFromSessionId(sessionId),
       {
@@ -1445,11 +1423,6 @@ export class SessionRuntime {
           `[TerminalProvider] Failed to start zellij change monitoring: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
-    }
-
-    const config = vscode.workspace.getConfiguration("ulw");
-    if (config.get<boolean>("promptAiToolOnSession", true)) {
-      this.callbacks.showAiToolSelector(sessionId, sessionId, true);
     }
 
     await this.switchToInstance(
@@ -2365,33 +2338,9 @@ export class SessionRuntime {
       this.instanceStore?.get(this.activeInstanceId)?.config.selectedAiTool ??
       config.get<string>("defaultAiTool", "");
 
-    let tool = this.resolveToolConfig(preferredToolName, config);
+    const tool = this.resolveToolConfig(preferredToolName, config);
     if (!tool) {
-      const toolItems = this.getConfiguredTools(config).map((candidate) => ({
-        label: candidate.label,
-        description: `Launch ${candidate.label} in the terminal`,
-        tool: candidate,
-      }));
-      const picked = await vscode.window.showQuickPick(toolItems, {
-        placeHolder: "Select AI tool to launch",
-      });
-      if (!picked) {
-        return undefined;
-      }
-      tool = picked.tool;
-      const saveDefault = await vscode.window.showInformationMessage(
-        `Save ${picked.tool.label} as default tool?`,
-        { modal: false },
-        "Yes",
-        "No",
-      );
-      if (saveDefault === "Yes") {
-        await config.update(
-          "defaultAiTool",
-          picked.tool.name,
-          vscode.ConfigurationTarget.Global,
-        );
-      }
+      return undefined;
     }
 
     this.persistSelectedTool(tool.name);

@@ -11,6 +11,7 @@ interface ViewContribution {
   id?: string;
   name?: string;
   type?: string;
+  icon?: string;
   when?: string;
 }
 
@@ -75,7 +76,6 @@ suite("Package contribution metadata", () => {
       "Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support",
     );
     assert.strictEqual(container.title, "ULW");
-    assert.strictEqual(container.icon, "resources/ulwcode-activity-bar.svg");
     assert.strictEqual(packageJSON.contributes?.configuration?.title, "ULW");
   });
 
@@ -107,9 +107,11 @@ suite("Package contribution metadata", () => {
 
     assert.ok(terminalView, "ulw webview should be contributed");
     assert.strictEqual(terminalView.type, "webview");
+    assert.strictEqual(terminalView.icon, "resources/ulwcode-sidebar.svg");
     assert.strictEqual(
       terminalView.when,
-      "config.ulw.terminal.defaultLocation == 'sidebar'",
+      undefined,
+      "ulw terminal view should remain available in the secondary sidebar",
     );
   });
 

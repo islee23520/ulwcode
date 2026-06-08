@@ -39,7 +39,7 @@ describe("tmux command dropdown", () => {
     });
   });
 
-  it("dispatches the ai tool selector message from the dropdown", () => {
+  it("does not expose the removed AI tool selector command", () => {
     document.body.innerHTML = `
       <div id="tmux-command-dropdown" style="display:none"></div>
       <input id="tmux-cmd-search-input" />
@@ -54,15 +54,10 @@ describe("tmux command dropdown", () => {
     searchInput.value = "AI Tool";
     searchInput.dispatchEvent(new Event("input"));
 
-    const commandItem = document.querySelector(".tmux-cmd-item");
-    expect(commandItem).toBeInstanceOf(HTMLDivElement);
-
-    const handled = handleClick(commandItem as Element);
-
-    expect(handled).toBe(true);
-    expect(postMessageMock).toHaveBeenCalledWith({
-      type: "requestAiToolSelector",
-    });
+    expect(document.querySelector(".tmux-cmd-item")?.textContent).toContain(
+      "No commands found",
+    );
+    expect(postMessageMock).not.toHaveBeenCalled();
   });
 
   it("uses zellij tab labels and hides unsupported tmux-only commands", () => {

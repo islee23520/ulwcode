@@ -21,7 +21,6 @@ describe("renderTerminalHtml", () => {
     expect(html).toContain('id="btn-tmux-new-window"');
     expect(html).toContain('id="btn-toggle-editor-attachment"');
     expect(html).toContain('id="terminal-container"');
-    expect(html).toContain('id="ai-selector"');
     expect(html).toContain('id="tmux-prompt"');
   });
 

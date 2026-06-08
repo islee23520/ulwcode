@@ -512,7 +512,7 @@ export class TerminalDashboardProvider
         );
         await this.postSessionsToWebview();
         return;
-      case "showAiToolSelector": {
+      case "launchDefaultAiTool": {
         let targetPaneId: string | undefined;
         let resolvedTool: string | undefined;
         try {
@@ -539,18 +539,13 @@ export class TerminalDashboardProvider
           }
         } catch (error) {
           this.logger?.debug(
-            `[TerminalDashboard] Unable to resolve active pane for AI selector: ${error instanceof Error ? error.message : String(error)}`,
+            `[TerminalDashboard] Unable to resolve active pane for default AI tool launch: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
         if (resolvedTool) {
           return;
         }
-        await this.showAiToolSelector(
-          message.sessionId,
-          message.sessionName,
-          true,
-          targetPaneId,
-        );
+        await this.launchDefaultAiTool(message.sessionId, targetPaneId);
         return;
       }
       case "expandPanes":
@@ -839,40 +834,15 @@ export class TerminalDashboardProvider
       );
   }
 
-  public async showAiToolSelector(
+  public async launchDefaultAiTool(
     sessionId: string,
-    sessionName: string,
-    forceShow = false,
     targetPaneId?: string,
   ): Promise<void> {
-    const webview = this.getActiveWebview();
-    if (webview) {
-      const config = vscode.workspace.getConfiguration("ulw");
-      const tools: AiToolConfig[] = resolveAiToolConfigs(
-        config.get("aiTools", []),
-      );
-
-      const postResult = await webview.postMessage({
-        type: "showAiToolSelector",
-        sessionId,
-        sessionName,
-        defaultTool: undefined,
-        tools,
-        targetPaneId,
-      } satisfies TmuxDashboardHostMessage);
-      if (postResult !== false) {
-        return;
-      }
-    }
-
     if (this.terminalProvider) {
-      this.terminalProvider.showAiToolSelector(
+      await this.terminalProvider.launchDefaultAiTool(
         sessionId,
-        sessionName,
-        forceShow,
         targetPaneId,
       );
-      return;
     }
   }
 

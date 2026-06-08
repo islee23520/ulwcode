@@ -13,15 +13,6 @@ import {
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const aiToolMock = vi.hoisted(() => ({
-  setTools: vi.fn(),
-  show: vi.fn(),
-  hide: vi.fn(),
-  isVisible: vi.fn(() => false),
-  handleClick: vi.fn(),
-  handleKeydown: vi.fn(() => false),
-}));
-
 const tmuxCommandMock = vi.hoisted(() => ({
   isVisible: vi.fn(() => false),
   show: vi.fn(),
@@ -30,7 +21,6 @@ const tmuxCommandMock = vi.hoisted(() => ({
   handleKeydown: vi.fn(() => false),
 }));
 
-vi.mock("./ai-tool-selector", () => aiToolMock);
 vi.mock("./tmux-command-dropdown", () => tmuxCommandMock);
 
 describe("dashboard manager", () => {
@@ -54,7 +44,6 @@ describe("dashboard manager", () => {
       <div id="session-list"></div>
       <div id="return-banner"></div>
       <span id="return-workspace"></span>
-      <div id="ai-selector"></div>
       <div id="tmux-command-dropdown"></div>
     `;
   });

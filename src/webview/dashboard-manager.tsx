@@ -6,12 +6,9 @@ declare function acquireVsCodeApi(): {
 
 import { h, render } from "preact";
 
-import * as AiTool from "./ai-tool-selector";
 import * as TmuxCmd from "./tmux-command-dropdown";
 import { App } from "./dashboard/components/App";
 import { DashboardPayload, HostMessage } from "./dashboard/types";
-
-type AiToolConfig = AiTool.AiToolConfig;
 type DashboardAction = Record<string, unknown>;
 type DashboardHostMessage = HostMessage & Partial<DashboardPayload>;
 
@@ -21,11 +18,6 @@ let lastPayload: DashboardPayload = {
   sessions: [],
   workspace: "",
   tmuxAvailable: true,
-};
-let aiTools: AiToolConfig[] = [];
-
-const aiCallbacks = {
-  postMessage: (message: unknown) => vscode.postMessage(message),
 };
 const pendingActionKeys = new Set<string>();
 
@@ -128,11 +120,6 @@ window.addEventListener("message", (event) => {
   const message = event.data as DashboardHostMessage;
 
   if (message.type === "updateTmuxSessions") {
-    if (Array.isArray(message.tools)) {
-      aiTools = message.tools;
-      AiTool.setTools(message.tools);
-    }
-
     lastPayload = {
       sessions: Array.isArray(message.sessions) ? message.sessions : [],
       nativeShells: Array.isArray(message.nativeShells)
@@ -146,19 +133,6 @@ window.addEventListener("message", (event) => {
     };
     updateTmuxOnlyVisibility(lastPayload.tmuxAvailable !== false);
     renderDashboard();
-  }
-
-  if (message.type === "showAiToolSelector") {
-    const selectorMessage = message as DashboardHostMessage & {
-      targetPaneId?: string;
-    };
-    AiTool.show(
-      selectorMessage.sessionId || "",
-      selectorMessage.sessionName || "",
-      selectorMessage.defaultTool,
-      Array.isArray(selectorMessage.tools) ? selectorMessage.tools : aiTools,
-      selectorMessage.targetPaneId,
-    );
   }
 });
 
@@ -211,16 +185,6 @@ document.addEventListener("click", (event) => {
       });
     }
 
-    return;
-  }
-
-  if (target.closest(".ai-tool-option")) {
-    AiTool.handleClick(target, aiCallbacks);
-    return;
-  }
-
-  if (target.id === "ai-selector" && !target.closest(".ai-selector-card")) {
-    AiTool.hide();
     return;
   }
 
@@ -298,9 +262,6 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("keydown", (event) => {
   if (TmuxCmd.handleKeydown(event)) {
-    return;
-  }
-  if (AiTool.handleKeydown(event, aiCallbacks)) {
     return;
   }
 });

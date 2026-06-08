@@ -24,8 +24,9 @@ interface PackageManifest {
       }[];
     };
     readonly views: {
-        readonly ulwContainer: readonly {
+      readonly ulwContainer: readonly {
         readonly id: string;
+        readonly icon: string;
         readonly when?: string;
       }[];
     };
@@ -72,19 +73,16 @@ describe("package manifest branding", () => {
 
     expect(manifest.name).toBe("opencode-sidebar-tui");
     expect(manifest.publisher).toBe("islee23520");
-    expect(manifest.version).toBe("1.11.0");
-    expect(manifest.displayName).toBe("ULW");
+    expect(manifest.version).toBe("1.11.1");
+    expect(manifest.displayName).toBe("ulwcode");
     expect(manifest.description).toBe(
-      "Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support",
+      "sidebar terminal Extension for VS Code with tmux, zellij, and native terminal support",
     );
-    expect(manifest.keywords).toEqual(
-      expect.arrayContaining(["opencode", "ulw", "open-tui", "mux"]),
-    );
+    expect(manifest.keywords).toEqual(["terminal", "sidebar", "tui", "ai"]);
     const container = manifest.contributes.viewsContainers.secondarySidebar.find(
       ({ id }) => id === "ulwContainer",
     );
     expect(container?.title).toBe("ULW");
-    expect(container?.icon).toBe("resources/ulwcode-activity-bar.svg");
     expect(manifest.contributes.configuration.title).toBe("ULW");
   });
 
@@ -131,7 +129,7 @@ describe("package manifest branding", () => {
     );
   });
 
-  it("defaults the terminal identity to editor while making the sidebar opt-in", () => {
+  it("keeps the sidebar terminal view contributed while defaulting start location to editor", () => {
     const manifest = readManifest();
     const locationSetting =
       manifest.contributes.configuration.properties[
@@ -143,8 +141,25 @@ describe("package manifest branding", () => {
 
     expect(locationSetting.default).toBe("editor");
     expect(locationSetting.enum).toEqual(["editor", "sidebar"]);
-    expect(terminalView?.when).toBe(
-      "config.ulw.terminal.defaultLocation == 'sidebar'",
+    expect(terminalView?.when).toBeUndefined();
+  });
+
+  it("uses the sidebar-optimized icon for the activity container and terminal view", () => {
+    const manifest = readManifest();
+    const iconPath = "resources/ulwcode-sidebar.svg";
+    const container = manifest.contributes.viewsContainers.secondarySidebar.find(
+      ({ id }) => id === "ulwContainer",
     );
+    const terminalView = manifest.contributes.views.ulwContainer.find(
+      ({ id }) => id === "ulw",
+    );
+    const svg = readFileSync(join(process.cwd(), iconPath), "utf-8");
+
+    expect(container?.icon).toBe(iconPath);
+    expect(terminalView?.icon).toBe(iconPath);
+    expect(svg).toContain('width="24"');
+    expect(svg).toContain('height="24"');
+    expect(svg).toContain('fill="currentColor"');
+    expect(svg).not.toContain("<text");
   });
 });

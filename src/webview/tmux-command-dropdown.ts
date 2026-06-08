@@ -9,7 +9,6 @@ type TmuxDropdownMessage = Extract<
     type:
       | "executeTmuxCommand"
       | "executeTmuxRawCommand"
-      | "requestAiToolSelector"
       | "zoomTmuxPane";
   }
 >;
@@ -108,16 +107,6 @@ const commands: TmuxCommand[] = [
     buildMessage: () => ({
       type: "executeTmuxCommand",
       commandId: "ulw.tmuxKillWindow",
-    }),
-  },
-  {
-    id: "select-ai-tool",
-    label: "Select AI Tool",
-    category: "Utility",
-    requiresSession: false,
-    unsupportedBackends: ["native"],
-    buildMessage: () => ({
-      type: "requestAiToolSelector",
     }),
   },
   {

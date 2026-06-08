@@ -136,10 +136,6 @@ const configurationSpecs: Record<string, ConfigurationSpec> = {
   },
   "ulw.aiTools": { type: "array", defaultValue: undefined },
   "ulw.defaultAiTool": { type: "string", defaultValue: "opencode" },
-  "ulw.promptAiToolOnSession": {
-    type: "boolean",
-    defaultValue: true,
-  },
   "ulw.pane.defaultSplitDirection": {
     type: "string",
     defaultValue: "horizontal",
@@ -265,7 +261,6 @@ suite("Runtime configuration defaults", () => {
     const defaultValue = (key: string): unknown =>
       config.inspect(key)?.defaultValue;
 
-    assert.strictEqual(defaultValue("promptAiToolOnSession"), true);
     assert.strictEqual(defaultValue("defaultAiTool"), "opencode");
     assert.deepStrictEqual(defaultValue("aiTools"), [
       {

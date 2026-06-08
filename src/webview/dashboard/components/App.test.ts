@@ -5,23 +5,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 
-const aiToolMock = vi.hoisted(() => ({
-  isVisible: vi.fn(() => false),
-  show: vi.fn(),
-  hide: vi.fn(),
-}));
-
-vi.mock("../../ai-tool-selector", () => aiToolMock);
-
 describe("dashboard App", () => {
   afterEach(() => {
     render(null, document.body);
     document.body.innerHTML = "";
     vi.clearAllMocks();
-    aiToolMock.isVisible.mockReturnValue(false);
   });
 
-  it("forwards the dashboard AI button action through onAction with session name", () => {
+  it("forwards the dashboard AI button as a default tool launch", () => {
     const onAction = vi.fn();
 
     render(
@@ -44,7 +35,7 @@ describe("dashboard App", () => {
     );
 
     const button = document.querySelector(
-      '[data-action="showAiToolSelector"]',
+      '[data-action="launchDefaultAiTool"]',
     );
 
     expect(button).toBeInstanceOf(HTMLButtonElement);
@@ -54,11 +45,10 @@ describe("dashboard App", () => {
     );
 
     expect(onAction).toHaveBeenCalledWith({
-      action: "showAiToolSelector",
+      action: "launchDefaultAiTool",
       sessionId: "repo-a",
       sessionName: "Repo A",
     });
-    expect(aiToolMock.show).not.toHaveBeenCalled();
   });
 
   it("renders resolved pane tool badges for node-based panes", () => {

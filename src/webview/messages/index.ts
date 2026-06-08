@@ -9,9 +9,6 @@ export interface MessageHandlerCallbacks {
   onActiveSession: (
     message: Extract<HostMessage, { type: "activeSession" }>,
   ) => void;
-  onShowAiToolSelector: (
-    message: Extract<HostMessage, { type: "showAiToolSelector" }>,
-  ) => void;
   onToggleTmuxCommandToolbar: (
     message: Extract<HostMessage, { type: "toggleTmuxCommandToolbar" }>,
   ) => void;
@@ -119,10 +116,6 @@ export function createMessageHandler(
 
         case "activeSession":
           callbacks.onActiveSession(message);
-          break;
-
-        case "showAiToolSelector":
-          callbacks.onShowAiToolSelector(message);
           break;
 
         case "toggleTmuxCommandToolbar":

@@ -61,12 +61,6 @@ export interface MessageRouterProviderBridge {
     targetPaneId?: string,
     backendHint?: TerminalBackendType,
   ): Promise<void>;
-  showAiToolSelector(
-    sessionId: string,
-    sessionName: string,
-    forceShow?: boolean,
-    targetPaneId?: string,
-  ): Promise<void>;
   executeRawTmuxCommand(subcommand: string, args?: string[]): Promise<string>;
   zoomTmuxPane(): Promise<void>;
   getSelectedTmuxSessionId(): string | undefined;
@@ -219,13 +213,6 @@ export class MessageRouter {
       case "paneSwitchBackend":
         void this.provider.switchPaneBackend(message.paneId, message.backend);
         break;
-      case "requestAiToolSelector": {
-        const sessionId =
-          this.provider.getSelectedTmuxSessionId() ??
-          this.provider.getActiveInstanceId();
-        void this.provider.showAiToolSelector(sessionId, sessionId, true);
-        break;
-      }
       case "executeTmuxCommand":
         await this.handleExecuteTmuxCommand(message.commandId);
         break;
