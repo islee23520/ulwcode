@@ -13,6 +13,7 @@ import { InstanceRegistry } from "../services/InstanceRegistry";
 import { ThreadHistoryStore } from "../services/ThreadHistoryStore";
 import { InstanceQuickPick } from "../services/InstanceQuickPick";
 import { InstanceController } from "../services/InstanceController";
+import { CodexIdeContextService } from "../services/CodexIdeContextService";
 import { SessionWindowHandoffService } from "../services/SessionWindowHandoffService";
 import { NativeTerminalManager } from "../services/NativeTerminalManager";
 import { PortManager } from "../services/PortManager";
@@ -48,6 +49,7 @@ export class ExtensionLifecycle {
   private threadHistoryStore: ThreadHistoryStore | undefined;
   private instanceQuickPick: InstanceQuickPick | undefined;
   private instanceController: InstanceController | undefined;
+  private codexIdeContextService: CodexIdeContextService | undefined;
   private portManager: PortManager | undefined;
   private tmuxSessionManager: TmuxSessionManager | undefined;
   private zellijSessionManager: ZellijSessionManager | undefined;
@@ -121,6 +123,15 @@ export class ExtensionLifecycle {
       this.outputChannelService = logger;
       this.contextManager = new ContextManager(this.outputChannelService);
       this.instanceDiscoveryService = new InstanceDiscoveryService();
+      this.codexIdeContextService = new CodexIdeContextService(logger);
+      try {
+        await this.codexIdeContextService.start();
+        context.subscriptions.push(this.codexIdeContextService);
+      } catch (error) {
+        logger.warn(
+          `[ExtensionLifecycle] Codex IDE context provider unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
 
       this.instanceStore = new InstanceStore();
       this.threadHistoryStore = new ThreadHistoryStore(context.globalState);

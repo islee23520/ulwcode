@@ -1644,7 +1644,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       );
     });
 
-    it("withLaunchEnvironment forwards IDE context vars into created tmux sessions", () => {
+    it("withLaunchEnvironment forwards IDE context vars for every tmux-launched tool", () => {
       const runtime = sessionRuntime as unknown as {
         withLaunchEnvironment: (
           command: string,
@@ -1664,6 +1664,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
         expect(runtime.withLaunchEnvironment("codex", undefined)).toBe(
           "TERM_PROGRAM=vscode VSCODE_IPC_HOOK_CLI='/tmp/vscode hook.sock' CODEX_IDE_CONTEXT_SOCKET=/tmp/codex-ipc/context.sock codex",
+        );
+        expect(runtime.withLaunchEnvironment("claude", undefined)).toBe(
+          "TERM_PROGRAM=vscode VSCODE_IPC_HOOK_CLI='/tmp/vscode hook.sock' CODEX_IDE_CONTEXT_SOCKET=/tmp/codex-ipc/context.sock claude",
         );
       } finally {
         if (originalTermProgram === undefined) {
