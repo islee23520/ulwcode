@@ -33,6 +33,14 @@ interface StartupWorkspaceResolution {
   isWorkspaceScoped: boolean;
 }
 
+interface TmuxPaneSessionPlan {
+  baseSessionId: string;
+  attachSessionId: string;
+  ownedSessionId?: string;
+  windowId?: string;
+  paneId?: string;
+}
+
 interface SessionRuntimeCallbacks {
   postMessage: (message: unknown) => void;
   onActiveInstanceChanged: (instanceId: InstanceId) => void;
@@ -46,6 +54,10 @@ export interface SessionState {
   port?: number;
   backendState?: BackendSessionState;
   tmuxSessionId?: string;
+  tmuxAttachSessionId?: string;
+  ownedTmuxSessionId?: string;
+  tmuxWindowId?: string;
+  tmuxPaneId?: string;
   zellijSessionId?: string;
   backend: TerminalBackendType;
 }
@@ -257,13 +269,17 @@ export class SessionRuntime {
     const instanceId = this.createPaneInstanceId(normalizedPaneId);
 
     if (backend === "tmux") {
-      const tmuxSessionId = config.backendConfig?.tmux?.sessionId;
-      if (!this.tmuxSessionManager || !tmuxSessionId) {
-        throw new Error(`tmux backend requires tmuxSessionManager and sessionId`);
+      if (!this.tmuxSessionManager) {
+        throw new Error(`tmux backend requires tmuxSessionManager`);
       }
+      const tmuxSessionPlan = await this.createTmuxPaneSessionPlan(
+        normalizedPaneId,
+        workspacePath,
+        config.backendConfig?.tmux?.sessionId,
+      );
       this.terminalManager.createTerminal(
         normalizedPaneId,
-        `tmux attach -t ${tmuxSessionId}`,
+        this.buildTmuxAttachCommand(tmuxSessionPlan.attachSessionId),
         {},
         undefined,
         this.lastKnownCols || undefined,
@@ -276,15 +292,24 @@ export class SessionRuntime {
         instanceId,
         terminalKey: normalizedPaneId,
         backend,
-        tmuxSessionId,
+        tmuxSessionId: tmuxSessionPlan.baseSessionId,
+        tmuxAttachSessionId: tmuxSessionPlan.attachSessionId,
+        ownedTmuxSessionId: tmuxSessionPlan.ownedSessionId,
+        tmuxWindowId: tmuxSessionPlan.windowId,
+        tmuxPaneId: tmuxSessionPlan.paneId,
       });
     }
 
     if (backend === "zellij") {
-      const zellijSessionId = config.backendConfig?.zellij?.sessionId;
-      if (!this.zellijSessionManager || !zellijSessionId) {
-        throw new Error(`zellij backend requires zellijSessionManager and sessionId`);
+      if (!this.zellijSessionManager) {
+        throw new Error(`zellij backend requires zellijSessionManager`);
       }
+      const zellijSessionId =
+        config.backendConfig?.zellij?.sessionId ??
+        (await this.createIsolatedZellijSession(
+          normalizedPaneId,
+          workspacePath,
+        ));
       this.terminalManager.createTerminal(
         normalizedPaneId,
         `zellij attach ${zellijSessionId}`,
@@ -413,6 +438,7 @@ export class SessionRuntime {
     }
 
     this.terminalManager.killTerminal(existingSession.terminalKey);
+    this.cleanupOwnedTmuxSession(existingSession);
     this.sessions.delete(normalizedPaneId);
 
     return this.startPaneSession(paneId, newBackend);
@@ -427,6 +453,7 @@ export class SessionRuntime {
 
     this.terminalManager.killByInstance(session.instanceId);
     this.terminalManager.killTerminal(session.terminalKey);
+    this.cleanupOwnedTmuxSession(session);
     this.removeSessionState(session, true);
 
     if (normalizedPaneId === SessionRuntime.DEFAULT_PANE_ID) {
@@ -2155,6 +2182,160 @@ export class SessionRuntime {
       return this.activeInstanceId;
     }
     return `${this.activeInstanceId}::${paneId}`;
+  }
+
+  private async createIsolatedTmuxSession(
+    paneId: string,
+    workspacePath: string,
+  ): Promise<string> {
+    if (!this.tmuxSessionManager) {
+      throw new Error(`tmux backend requires tmuxSessionManager`);
+    }
+
+    const sessions = await this.tmuxSessionManager.discoverSessions();
+    const existingIds = new Set(sessions.map((session) => session.id));
+    const sessionId = this.createUniquePaneSessionId(
+      workspacePath,
+      paneId,
+      existingIds,
+    );
+    await this.tmuxSessionManager.createSession(sessionId, workspacePath);
+    return sessionId;
+  }
+
+  private async createTmuxPaneSessionPlan(
+    paneId: string,
+    workspacePath: string,
+    baseSessionId: string | undefined,
+  ): Promise<TmuxPaneSessionPlan> {
+    if (!baseSessionId) {
+      const sessionId = await this.createIsolatedTmuxSession(
+        paneId,
+        workspacePath,
+      );
+      return {
+        baseSessionId: sessionId,
+        attachSessionId: sessionId,
+      };
+    }
+
+    if (
+      paneId === SessionRuntime.DEFAULT_PANE_ID ||
+      !this.isEditorPaneId(paneId)
+    ) {
+      return {
+        baseSessionId,
+        attachSessionId: baseSessionId,
+      };
+    }
+
+    const ownedSessionId = await this.createGroupedTmuxPaneSession(
+      baseSessionId,
+      paneId,
+      workspacePath,
+    );
+    const window = await this.tmuxSessionManager!.createWindow(
+      ownedSessionId,
+      workspacePath,
+    );
+    return {
+      baseSessionId,
+      attachSessionId: ownedSessionId,
+      ownedSessionId,
+      windowId: window.windowId,
+      paneId: window.paneId,
+    };
+  }
+
+  private async createGroupedTmuxPaneSession(
+    baseSessionId: string,
+    paneId: string,
+    workspacePath: string,
+  ): Promise<string> {
+    if (!this.tmuxSessionManager) {
+      throw new Error(`tmux backend requires tmuxSessionManager`);
+    }
+
+    const sessions = await this.tmuxSessionManager.discoverSessions();
+    const existingIds = new Set(sessions.map((session) => session.id));
+    const groupedSessionId = this.createUniqueSessionId(
+      `${baseSessionId}-${paneId}`,
+      existingIds,
+    );
+    await this.tmuxSessionManager.createGroupedSession(
+      baseSessionId,
+      groupedSessionId,
+      workspacePath,
+    );
+    return groupedSessionId;
+  }
+
+  private async createIsolatedZellijSession(
+    paneId: string,
+    workspacePath: string,
+  ): Promise<string> {
+    if (!this.zellijSessionManager) {
+      throw new Error(`zellij backend requires zellijSessionManager`);
+    }
+
+    const sessions = await this.zellijSessionManager.discoverSessions();
+    const existingIds = new Set(sessions.map((session) => session.id));
+    const sessionId = this.createUniquePaneSessionId(
+      workspacePath,
+      paneId,
+      existingIds,
+    );
+    await this.zellijSessionManager.createSession(sessionId, workspacePath);
+    return sessionId;
+  }
+
+  private createUniquePaneSessionId(
+    workspacePath: string,
+    paneId: string,
+    existingIds: ReadonlySet<string>,
+  ): string {
+    const workspaceName = path.basename(workspacePath) || "ulw";
+    return this.createUniqueSessionId(`${workspaceName}-${paneId}`, existingIds);
+  }
+
+  private createUniqueSessionId(
+    baseName: string,
+    existingIds: ReadonlySet<string>,
+  ): string {
+    const sanitizedBaseName = this.sanitizeSessionId(baseName);
+    let candidate = sanitizedBaseName;
+    let suffix = 2;
+    while (existingIds.has(candidate)) {
+      candidate = `${sanitizedBaseName}-${suffix}`;
+      suffix += 1;
+    }
+    return candidate;
+  }
+
+  private buildTmuxAttachCommand(sessionId: string): string {
+    return `tmux attach-session -t ${sessionId} \\; set-option -u status off`;
+  }
+
+  private isEditorPaneId(paneId: string): boolean {
+    return paneId.startsWith("ulw-editor-");
+  }
+
+  private cleanupOwnedTmuxSession(session: SessionState): void {
+    if (!session.ownedTmuxSessionId || !this.tmuxSessionManager) {
+      return;
+    }
+    void Promise.resolve(
+      this.tmuxSessionManager.killSession(session.ownedTmuxSessionId),
+    ).catch((error: unknown) => {
+        this.logger.warn(
+          `[SessionRuntime] Failed to kill owned tmux session '${session.ownedTmuxSessionId}': ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+  }
+
+  private sanitizeSessionId(value: string): string {
+    const sanitized = value.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+    return sanitized || "ulw";
   }
 
   private registerSession(session: SessionState): SessionState {

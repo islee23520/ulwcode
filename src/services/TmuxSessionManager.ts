@@ -277,6 +277,32 @@ export class TmuxSessionManager {
     }
   }
 
+  public async createGroupedSession(
+    sourceSessionId: string,
+    groupedSessionId: string,
+    workspacePath: string,
+  ): Promise<void> {
+    try {
+      await this.runTmux([
+        "new-session",
+        "-d",
+        "-t",
+        sourceSessionId,
+        "-s",
+        groupedSessionId,
+        "-c",
+        workspacePath,
+      ]);
+      await this.configureMouseAndClipboard(groupedSessionId);
+    } catch (error) {
+      if (this.isTmuxUnavailable(error)) {
+        throw new TmuxUnavailableError();
+      }
+
+      throw error;
+    }
+  }
+
   public async executeRawCommand(
     sessionId: string,
     tmuxSubcommand: string,

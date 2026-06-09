@@ -2053,7 +2053,7 @@ describe("TerminalProvider", () => {
     );
   });
 
-  it("creates independent tmux-backed pane sessions for separate editor terminal panels", async () => {
+  it("creates same-session tmux editor panels through runtime isolation", async () => {
     mockConfiguration();
     provider = createProvider();
     resolveProvider(provider);
@@ -2101,7 +2101,7 @@ describe("TerminalProvider", () => {
     });
   });
 
-  it("replays the active session state to the editor panel so the toolbar stays visible", async () => {
+  it("does not replay the sidebar tmux session state to a new editor panel", async () => {
     mockConfiguration();
     provider = createProvider();
     const runtime = (provider as any).sessionRuntime;
@@ -2119,10 +2119,69 @@ describe("TerminalProvider", () => {
       ?.value as any;
     expect(panel.webview.postMessage).toHaveBeenCalledWith({
       type: "activeSession",
-      sessionName: "tmux-selected",
-      sessionId: "tmux-selected",
+      backend: "native",
+      paneId: "ulw-editor-1",
+    });
+    expect(panel.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "activeSession",
+        sessionId: "tmux-selected",
+      }),
+    );
+  });
+
+  it("routes pane-scoped terminal output only to the owning surface", async () => {
+    mockConfiguration();
+    provider = createProvider();
+    const { view } = resolveProvider(provider);
+
+    await provider.openInEditorTab();
+    await provider.openInEditorTab();
+    const firstPanel = vi.mocked(vscode.window.createWebviewPanel).mock
+      .results[0]?.value as any;
+    const secondPanel = vi.mocked(vscode.window.createWebviewPanel).mock
+      .results[1]?.value as any;
+    vi.mocked(view.webview.postMessage).mockClear();
+    vi.mocked(firstPanel.webview.postMessage).mockClear();
+    vi.mocked(secondPanel.webview.postMessage).mockClear();
+
+    provider["postWebviewMessageNow"]({
+      type: "terminalOutput",
+      data: "sidebar",
+      paneId: "default",
+    });
+    provider["postWebviewMessageNow"]({
+      type: "terminalOutput",
+      data: "editor-one",
+      paneId: "ulw-editor-1",
+    });
+    provider["postWebviewMessageNow"]({
+      type: "activeSession",
+      sessionName: "sidebar-session",
+      sessionId: "sidebar-session",
       backend: "tmux",
     });
+
+    expect(view.webview.postMessage).toHaveBeenCalledWith({
+      type: "terminalOutput",
+      data: "sidebar",
+      paneId: "default",
+    });
+    expect(view.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: "editor-one" }),
+    );
+    expect(firstPanel.webview.postMessage).toHaveBeenCalledWith({
+      type: "terminalOutput",
+      data: "editor-one",
+      paneId: "ulw-editor-1",
+    });
+    expect(firstPanel.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: "sidebar" }),
+    );
+    expect(firstPanel.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "sidebar-session" }),
+    );
+    expect(secondPanel.webview.postMessage).not.toHaveBeenCalled();
   });
 
   it("executes the dashboard command when toggling the dashboard", () => {
@@ -2447,7 +2506,7 @@ describe("TerminalProvider", () => {
     });
   });
 
-  it("posts zellij and native active session states to newly initialized editor panels", async () => {
+  it("posts isolated native active session state to newly initialized editor panels", async () => {
     mockConfiguration();
     provider = createProvider();
     const runtime = provider["sessionRuntime"];
@@ -2465,10 +2524,15 @@ describe("TerminalProvider", () => {
       ?.value;
     expect(panel.webview.postMessage).toHaveBeenCalledWith({
       type: "activeSession",
-      sessionName: "zellij-active",
-      sessionId: "zellij-active",
-      backend: "zellij",
+      backend: "native",
+      paneId: "ulw-editor-1",
     });
+    expect(panel.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "activeSession",
+        sessionId: "zellij-active",
+      }),
+    );
 
     const disposeListener = vi.mocked(panel.onDidDispose).mock.calls[0]?.[0] as
       | (() => void)
@@ -2483,6 +2547,7 @@ describe("TerminalProvider", () => {
     expect(panel.webview.postMessage).toHaveBeenCalledWith({
       type: "activeSession",
       backend: "native",
+      paneId: "ulw-editor-2",
     });
   });
 

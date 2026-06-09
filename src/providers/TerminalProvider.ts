@@ -24,7 +24,7 @@ import {
 import type { TmuxRawSubcommand } from "../types";
 import { AiToolOperatorRegistry } from "../services/aiTools/AiToolOperatorRegistry";
 import { MessageRouter, MessageRouterProviderBridge } from "./MessageRouter";
-import { SessionRuntime } from "./SessionRuntime";
+import { SessionRuntime, type SessionState } from "./SessionRuntime";
 import { renderTerminalHtml } from "../webview/terminal/html";
 import { ZellijSessionManager } from "../services/ZellijSessionManager";
 import { NativeTerminalManager } from "../services/NativeTerminalManager";
@@ -822,7 +822,7 @@ export class TerminalProvider
 
     try {
       const activeBackend = this.sessionRuntime.getActiveBackend();
-      const backendConfig = this.resolveBackendConfig(activeBackend);
+      const backendConfig = this.resolveBackendConfig(activeBackend, paneId);
       await this.sessionRuntime.createSession(paneId, {
         paneId,
         backend: activeBackend,
@@ -894,16 +894,20 @@ export class TerminalProvider
     }
     this.setFocusedPane(paneId);
 
-    if (!this.sessionRuntime.getSession(paneId)) {
+    let sessionState = this.sessionRuntime.getSession(paneId);
+    if (!sessionState) {
       const activeBackend = this.sessionRuntime.getActiveBackend();
-      await this.sessionRuntime.createSession(paneId, {
+      sessionState = await this.sessionRuntime.createSession(paneId, {
         paneId,
         backend: activeBackend,
-        backendConfig: this.resolveBackendConfig(activeBackend),
+        backendConfig: this.resolveBackendConfig(activeBackend, paneId),
       });
     }
 
     this.messageRouter.handleTerminalResize(message.cols, message.rows, paneId);
+    if (sessionState) {
+      this.postWebviewMessageNow(this.buildActiveSessionMessage(sessionState));
+    }
     this.postPlatformInfo();
   }
 
@@ -984,7 +988,7 @@ export class TerminalProvider
   }
 
   private postWebviewMessageNow(message: unknown): void {
-    const webviews = this.getTargetWebviews();
+    const webviews = this.getTargetWebviews(message);
     if (webviews.length > 0) {
       let deliveredSynchronously = false;
       let pendingAsyncDelivery = false;
@@ -1040,7 +1044,12 @@ export class TerminalProvider
     );
   }
 
-  private getTargetWebviews(): vscode.Webview[] {
+  private getTargetWebviews(message: unknown): vscode.Webview[] {
+    const targetPaneId = this.getTargetPaneId(message);
+    if (targetPaneId) {
+      return this.getTargetWebviewsForPane(targetPaneId);
+    }
+
     const webviews: vscode.Webview[] = [];
     if (this._view?.webview) {
       webviews.push(this._view.webview);
@@ -1049,6 +1058,33 @@ export class TerminalProvider
       webviews.push(panel.webview);
     }
     return webviews;
+  }
+
+  private getTargetWebviewsForPane(paneId: string): vscode.Webview[] {
+    if (paneId === TerminalProvider.DEFAULT_PANE_ID) {
+      return this._view?.webview ? [this._view.webview] : [];
+    }
+
+    const webviews: vscode.Webview[] = [];
+    for (const panel of this.editorPanels) {
+      if (this.editorPanelPaneIds.get(panel) === paneId) {
+        webviews.push(panel.webview);
+      }
+    }
+    return webviews;
+  }
+
+  private getTargetPaneId(message: unknown): string | undefined {
+    if (this.isTerminalOutputHostMessage(message)) {
+      return this.normalizePaneId(message.paneId);
+    }
+    if (this.isActiveSessionHostMessage(message)) {
+      return this.normalizePaneId(message.paneId);
+    }
+    if (this.isPaneScopedHostMessage(message)) {
+      return this.normalizePaneId(message.paneId);
+    }
+    return undefined;
   }
 
   private isThenablePostResult(
@@ -1221,7 +1257,25 @@ export class TerminalProvider
     }
   }
 
-  private postCurrentSessionState(webview: vscode.Webview): void {
+  private postCurrentSessionState(
+    webview: vscode.Webview,
+    paneId: string = TerminalProvider.DEFAULT_PANE_ID,
+  ): void {
+    const normalizedPaneId = this.normalizePaneId(paneId);
+    if (normalizedPaneId !== TerminalProvider.DEFAULT_PANE_ID) {
+      const session = this.sessionRuntime.getSession(normalizedPaneId);
+      webview.postMessage(
+        session
+          ? this.buildActiveSessionMessage(session)
+          : {
+              type: "activeSession",
+              backend: "native",
+              paneId: normalizedPaneId,
+            },
+      );
+      return;
+    }
+
     const selectedSessionId = this.sessionRuntime.getSelectedTmuxSessionId();
     const resolvedSessionId =
       this.sessionRuntime.resolveTmuxSessionIdForInstance(
@@ -1258,6 +1312,32 @@ export class TerminalProvider
     webview.postMessage(message);
   }
 
+  private buildActiveSessionMessage(session: SessionState): HostMessage {
+    if (session.tmuxSessionId) {
+      return {
+        type: "activeSession",
+        sessionName: session.tmuxSessionId,
+        sessionId: session.tmuxSessionId,
+        backend: "tmux",
+        paneId: session.paneId,
+      };
+    }
+    if (session.zellijSessionId) {
+      return {
+        type: "activeSession",
+        sessionName: session.zellijSessionId,
+        sessionId: session.zellijSessionId,
+        backend: "zellij",
+        paneId: session.paneId,
+      };
+    }
+    return {
+      type: "activeSession",
+      backend: session.backend,
+      paneId: session.paneId,
+    };
+  }
+
   private getEditorPanelOptions(): vscode.WebviewOptions &
     vscode.WebviewPanelOptions {
     return {
@@ -1289,7 +1369,7 @@ export class TerminalProvider
     }
 
     this.postTerminalConfig();
-    this.postCurrentSessionState(panel.webview);
+    this.postCurrentSessionState(panel.webview, paneId);
     this.flushPendingWebviewMessages(panel.webview);
 
     panel.onDidDispose(() => {
@@ -1511,7 +1591,13 @@ export class TerminalProvider
     return TerminalProvider.DEFAULT_PANE_ID;
   }
 
-  private resolveBackendConfig(backend: TerminalBackendType): BackendPaneConfig | undefined {
+  private resolveBackendConfig(
+    backend: TerminalBackendType,
+    paneId: string = TerminalProvider.DEFAULT_PANE_ID,
+  ): BackendPaneConfig | undefined {
+    if (this.isEditorPaneId(paneId) && backend !== "tmux") {
+      return undefined;
+    }
     if (backend === "tmux") {
       const tmuxSessionId = this.sessionRuntime.getSession(TerminalProvider.DEFAULT_PANE_ID)?.tmuxSessionId;
       return tmuxSessionId ? { tmux: { sessionId: tmuxSessionId } } : undefined;
@@ -1521,6 +1607,10 @@ export class TerminalProvider
       return zellijSessionId ? { zellij: { sessionId: zellijSessionId } } : undefined;
     }
     return undefined;
+  }
+
+  private isEditorPaneId(paneId: string): boolean {
+    return paneId.startsWith(`${TerminalProvider.EDITOR_PANE_PREFIX}-`);
   }
 
   private isMultiPaneSupportedBackend(): boolean {

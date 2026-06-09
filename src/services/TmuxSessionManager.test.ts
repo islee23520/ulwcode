@@ -961,6 +961,34 @@ describe("TmuxSessionManager", () => {
       ]);
     });
 
+    it("creates a grouped session from an existing session", async () => {
+      mockExecSequence([
+        { stdout: "" },
+        { stdout: "" },
+        { stdout: "" },
+        { stdout: "" },
+      ]);
+
+      await expect(
+        manager.createGroupedSession(
+          "base-session",
+          "base-session-editor-1",
+          "/workspaces/repo-a",
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(vi.mocked(execFile).mock.calls[0]?.[1]).toEqual([
+        "new-session",
+        "-d",
+        "-t",
+        "base-session",
+        "-s",
+        "base-session-editor-1",
+        "-c",
+        "/workspaces/repo-a",
+      ]);
+    });
+
     it("throws when createWindow output does not include both IDs", async () => {
       mockExecSequence([{ stdout: "@1" }]);
 

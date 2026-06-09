@@ -477,12 +477,13 @@ export type HostMessage =
       type: "activeSession";
       sessionName: string;
       sessionId: string;
+      paneId?: string;
       windowIndex?: number;
       windowName?: string;
       canKillPane?: boolean;
       backend?: TerminalBackendType;
     }
-  | { type: "activeSession"; backend?: TerminalBackendType }
+  | { type: "activeSession"; backend?: TerminalBackendType; paneId?: string }
   | {
       type: "updateDashboard";
       sessions: TmuxDashboardSessionDto[];

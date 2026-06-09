@@ -94,6 +94,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       listWindows: vi.fn(),
       discoverSessions: vi.fn(),
       createWindow: vi.fn(),
+      createGroupedSession: vi.fn(),
       createSession: vi.fn(),
       selectWindow: vi.fn(),
       splitPane: vi.fn(),
@@ -4333,7 +4334,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       expect(session?.tmuxSessionId).toBe("session-1");
       expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
         "pane-1",
-        "tmux attach -t session-1",
+        "tmux attach-session -t session-1 \\; set-option -u status off",
         {},
         undefined,
         undefined,
@@ -4371,6 +4372,103 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
           backendConfig: { tmux: { sessionId: "session-1" } },
         }),
       ).resolves.toBeDefined();
+    });
+
+    it("createSession with tmux backend creates a fresh session when no session id is provided", async () => {
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockResolvedValue([
+        { id: "project-a-ulw-editor-1", name: "project-a-ulw-editor-1" },
+      ] as unknown as Awaited<ReturnType<TmuxSessionManager["discoverSessions"]>>);
+
+      const session = await sessionRuntime.createSession("ulw-editor-1", {
+        paneId: "ulw-editor-1",
+        backend: "tmux",
+      });
+
+      expect(mockTmuxSessionManager.createSession).toHaveBeenCalledWith(
+        "project-a-ulw-editor-1-2",
+        "/workspace/project-a",
+      );
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "ulw-editor-1",
+        "tmux attach-session -t project-a-ulw-editor-1-2 \\; set-option -u status off",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default::ulw-editor-1",
+        "/workspace/project-a",
+      );
+      expect(session?.tmuxSessionId).toBe("project-a-ulw-editor-1-2");
+    });
+
+    it("createSession with tmux backend creates a grouped editor session and new window when session id is provided", async () => {
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockResolvedValue([
+        { id: "shared-session", name: "shared-session" },
+      ] as unknown as Awaited<ReturnType<TmuxSessionManager["discoverSessions"]>>);
+      vi.mocked(mockTmuxSessionManager.createWindow).mockResolvedValue({
+        windowId: "@12",
+        paneId: "%34",
+      });
+
+      const session = await sessionRuntime.createSession("ulw-editor-1", {
+        paneId: "ulw-editor-1",
+        backend: "tmux",
+        backendConfig: { tmux: { sessionId: "shared-session" } },
+      });
+
+      expect(mockTmuxSessionManager.createGroupedSession).toHaveBeenCalledWith(
+        "shared-session",
+        "shared-session-ulw-editor-1",
+        "/workspace/project-a",
+      );
+      expect(mockTmuxSessionManager.createWindow).toHaveBeenCalledWith(
+        "shared-session-ulw-editor-1",
+        "/workspace/project-a",
+      );
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
+        "ulw-editor-1",
+        "tmux attach-session -t shared-session-ulw-editor-1 \\; set-option -u status off",
+        {},
+        undefined,
+        undefined,
+        undefined,
+        "default::ulw-editor-1",
+        "/workspace/project-a",
+      );
+      expect(session).toEqual(
+        expect.objectContaining({
+          tmuxSessionId: "shared-session",
+          tmuxAttachSessionId: "shared-session-ulw-editor-1",
+          ownedTmuxSessionId: "shared-session-ulw-editor-1",
+          tmuxWindowId: "@12",
+          tmuxPaneId: "%34",
+        }),
+      );
+    });
+
+    it("destroySession kills owned grouped tmux editor sessions without killing the base session", async () => {
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockResolvedValue([
+        { id: "shared-session", name: "shared-session" },
+      ] as unknown as Awaited<ReturnType<TmuxSessionManager["discoverSessions"]>>);
+      vi.mocked(mockTmuxSessionManager.createWindow).mockResolvedValue({
+        windowId: "@12",
+        paneId: "%34",
+      });
+
+      await sessionRuntime.createSession("ulw-editor-1", {
+        paneId: "ulw-editor-1",
+        backend: "tmux",
+        backendConfig: { tmux: { sessionId: "shared-session" } },
+      });
+      sessionRuntime.destroySession("ulw-editor-1");
+      await Promise.resolve();
+
+      expect(mockTmuxSessionManager.killSession).toHaveBeenCalledWith(
+        "shared-session-ulw-editor-1",
+      );
+      expect(mockTmuxSessionManager.killSession).not.toHaveBeenCalledWith(
+        "shared-session",
+      );
     });
   });
 });
