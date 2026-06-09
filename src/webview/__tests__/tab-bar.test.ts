@@ -86,6 +86,17 @@ describe("TabBar", () => {
     expect(tabEl!.querySelector(".tab-close")).not.toBeNull();
   });
 
+  it("hides chrome for a single tab and restores it for multiple tabs", () => {
+    const bar = new TabBar(paneManager);
+    bar.addTab("tab-1", "First Tab");
+
+    expect(bar.getElement().classList.contains("tab-bar--single")).toBe(true);
+
+    bar.addTab("tab-2", "Second Tab");
+
+    expect(bar.getElement().classList.contains("tab-bar--single")).toBe(false);
+  });
+
   it("setTabBackend updates the icon for an existing tab", () => {
     const bar = new TabBar(paneManager);
     bar.addTab("tab-1", "Tab 1");

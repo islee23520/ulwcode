@@ -471,6 +471,7 @@ export type HostMessage =
       scrollback: number;
       sendKeybindingsToShell?: boolean;
       showTmuxWindowControls?: boolean;
+      renderer?: "webgl" | "canvas" | "auto";
     }
   | {
       type: "activeSession";

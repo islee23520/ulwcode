@@ -6,6 +6,7 @@ interface CommandContribution {
   readonly command: string;
   readonly title: string;
   readonly category?: string;
+  readonly icon?: string | { readonly light: string; readonly dark: string };
 }
 
 interface PackageManifest {
@@ -73,8 +74,8 @@ describe("package manifest branding", () => {
 
     expect(manifest.name).toBe("opencode-sidebar-tui");
     expect(manifest.publisher).toBe("islee23520");
-    expect(manifest.version).toBe("1.11.1");
-    expect(manifest.displayName).toBe("ulwcode");
+    expect(manifest.version).toBe("1.11.2");
+    expect(manifest.displayName).toBe("ulwcode-sidebar-terminal");
     expect(manifest.description).toBe(
       "sidebar terminal Extension for VS Code with tmux, zellij, and native terminal support",
     );
@@ -109,6 +110,19 @@ describe("package manifest branding", () => {
         .filter(({ category }) => category === "ULW")
         .every(({ title }) => !title.startsWith("ULW:")),
     ).toBe(true);
+  });
+
+  it("uses distinct title-bar icons for horizontal and vertical split actions", () => {
+    const commands = readManifest().contributes.commands;
+
+    expect(findCommand(commands, "ulw.tmuxSplitPaneH")).toMatchObject({
+      title: "Split Pane Side by Side",
+      icon: "$(layout-sidebar-left)",
+    });
+    expect(findCommand(commands, "ulw.tmuxSplitPaneV")).toMatchObject({
+      title: "Split Pane Top/Bottom",
+      icon: "$(layout-panel)",
+    });
   });
 
   it("keeps OpenCode as the default AI tool label and operator", () => {

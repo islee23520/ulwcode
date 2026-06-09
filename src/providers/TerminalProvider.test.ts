@@ -70,6 +70,7 @@ describe("TerminalProvider", () => {
     aiTools?: readonly unknown[];
     collapseSecondaryBarOnEditorOpen?: boolean;
     terminalDefaultLocation?: string;
+    paneRenderer?: "webgl" | "canvas" | "auto";
   }) {
     const {
       autoStartOnOpen = false,
@@ -78,6 +79,7 @@ describe("TerminalProvider", () => {
       aiTools = DEFAULT_AI_TOOLS,
       collapseSecondaryBarOnEditorOpen = false,
       terminalDefaultLocation = "editor",
+      paneRenderer = "auto",
     } = options ?? {};
 
     const configuration = {
@@ -105,6 +107,9 @@ describe("TerminalProvider", () => {
         }
         if (key === "terminal.defaultLocation") {
           return terminalDefaultLocation;
+        }
+        if (key === "pane.renderer") {
+          return paneRenderer;
         }
         return defaultValue;
       }),
@@ -491,7 +496,7 @@ describe("TerminalProvider", () => {
   });
 
   it("opens the terminal renderer in an editor tab", async () => {
-    mockConfiguration();
+    mockConfiguration({ paneRenderer: "canvas" });
     provider = createProvider();
     resolveProvider(provider);
 
@@ -517,6 +522,7 @@ describe("TerminalProvider", () => {
         localResourceRoots: expect.any(Array),
       }),
     );
+    expect(panel.webview.html).toContain('data-renderer="canvas"');
     provider.focus();
     expect(panel.webview.postMessage).toHaveBeenCalledWith({
       paneId: "ulw-editor-1",
@@ -2138,6 +2144,9 @@ describe("TerminalProvider", () => {
       "tmux-selected",
     );
     const { view } = resolveProvider(provider);
+
+    expect(view.title).toBe("ULW");
+    expect(view.description).toBe("T:tmux-selected");
 
     provider.toggleTmuxCommandToolbar();
 

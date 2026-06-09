@@ -124,6 +124,7 @@ export class TabBar {
 
     // Update close button visibility (only show when > 1 tab)
     this.updateCloseButtonVisibility();
+    this.updateChromeVisibility();
 
     // First tab → auto-activate
     if (this.activeTabId === null) {
@@ -148,6 +149,7 @@ export class TabBar {
     this.tabPanes.delete(tabId);
 
     this.updateCloseButtonVisibility();
+    this.updateChromeVisibility();
 
     if (wasActive) {
       // Switch to another tab (prefer the first remaining)
@@ -277,5 +279,9 @@ export class TabBar {
     for (const rec of this.tabs.values()) {
       rec.closeBtn.style.display = isSingleTab ? "none" : "";
     }
+  }
+
+  private updateChromeVisibility(): void {
+    this.element.classList.toggle("tab-bar--single", this.tabs.size <= 1);
   }
 }

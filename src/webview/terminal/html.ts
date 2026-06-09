@@ -23,6 +23,7 @@ export function renderTerminalHtml({
   cursorStyle,
   scrollback,
   sendKeybindingsToShell,
+  renderer,
   showTmuxWindowControls,
 }: TerminalHtmlParams): string {
   return `<!doctype html>
@@ -46,6 +47,7 @@ export function renderTerminalHtml({
       cursorStyle,
       scrollback,
       sendKeybindingsToShell,
+      renderer,
     })}
     ${renderTmuxPrompt()}
     <script nonce="${nonce}" src="${scriptUri}"></script>

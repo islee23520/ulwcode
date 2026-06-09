@@ -296,6 +296,31 @@ describe("MessageRouter", () => {
     );
   });
 
+  it("ignores duplicate terminal resize messages for the same pane", async () => {
+    await router.handleMessage({ type: "terminalResize", cols: 100, rows: 30 });
+    await router.handleMessage({ type: "terminalResize", cols: 100, rows: 30 });
+    await router.handleMessage({
+      type: "terminalResize",
+      cols: 100,
+      rows: 30,
+      paneId: "pane-2",
+    });
+
+    expect(terminalManager.resizeTerminal).toHaveBeenCalledTimes(2);
+    expect(terminalManager.resizeTerminal).toHaveBeenNthCalledWith(
+      1,
+      "terminal-1",
+      100,
+      30,
+    );
+    expect(terminalManager.resizeTerminal).toHaveBeenNthCalledWith(
+      2,
+      "pane-2",
+      100,
+      30,
+    );
+  });
+
   it("forwards Ctrl+C control bytes unchanged to the active terminal", async () => {
     await router.handleMessage({ type: "terminalInput", data: "\x03" });
 

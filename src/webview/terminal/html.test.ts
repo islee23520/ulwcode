@@ -13,13 +13,15 @@ describe("renderTerminalHtml", () => {
       cursorBlink: "true",
       cursorStyle: "block",
       scrollback: "10000",
+      renderer: "auto",
       showTmuxWindowControls: "true",
     });
 
-    expect(html).toContain('id="tmux-toolbar"');
-    expect(html).toContain('id="btn-toggle-backend"');
-    expect(html).toContain('id="btn-tmux-new-window"');
-    expect(html).toContain('id="btn-toggle-editor-attachment"');
+    expect(html).toContain('id="tmux-command-surface"');
+    expect(html).toContain('id="tmux-command-dropdown"');
+    expect(html).not.toContain('id="btn-toggle-backend"');
+    expect(html).not.toContain('id="btn-tmux-new-window"');
+    expect(html).not.toContain('id="btn-toggle-editor-attachment"');
     expect(html).toContain('id="terminal-container"');
     expect(html).toContain('id="tmux-prompt"');
   });
@@ -35,6 +37,7 @@ describe("renderTerminalHtml", () => {
       cursorBlink: "true",
       cursorStyle: "block",
       scrollback: "10000",
+      renderer: "auto",
       showTmuxWindowControls: "true",
     });
 
@@ -52,6 +55,7 @@ describe("renderTerminalHtml", () => {
       cursorBlink: "false",
       cursorStyle: "underline",
       scrollback: "5000",
+      renderer: "canvas",
       showTmuxWindowControls: "false",
     });
 
@@ -66,7 +70,8 @@ describe("renderTerminalHtml", () => {
     expect(html).toContain('data-cursor-blink="false"');
     expect(html).toContain('data-cursor-style="underline"');
     expect(html).toContain('data-scrollback="5000"');
-    expect(html).toContain('class="tmux-window-controls hidden"');
+    expect(html).toContain('data-renderer="canvas"');
+    expect(html).not.toContain("tmux-window-controls");
     expect(html).not.toContain("{{");
   });
 });

@@ -9,6 +9,8 @@ export function setupResizeHandling(
   container: HTMLElement,
 ): () => void {
   let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+  let lastCols = terminal.cols;
+  let lastRows = terminal.rows;
 
   const handleResize = () => {
     if (resizeTimeout) {
@@ -17,7 +19,13 @@ export function setupResizeHandling(
     resizeTimeout = setTimeout(() => {
       if (fitAddon && terminal) {
         fitAddon.fit();
-        scheduleRefresh(() => terminal.refresh(0, terminal.rows - 1));
+        const colsChanged = terminal.cols !== lastCols;
+        const rowsChanged = terminal.rows !== lastRows;
+        if (colsChanged || rowsChanged) {
+          lastCols = terminal.cols;
+          lastRows = terminal.rows;
+          scheduleRefresh(() => terminal.refresh(0, terminal.rows - 1));
+        }
       }
     }, 50);
   };

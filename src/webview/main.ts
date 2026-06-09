@@ -24,6 +24,7 @@ import {
   setupBackendToggleButton,
   updateBackendToggleButtonState,
 } from "./toolbar";
+import { setupTmuxEvents } from "./tmux-events";
 
 let currentSessionId: string | null = null;
 let activeBackend: TerminalBackendType = "native";
@@ -73,37 +74,12 @@ function updateBackendOnlyElements(): void {
 
 const callbacks: MessageHandlerCallbacks = {
   onActiveSession(message) {
-    const toolbar = document.getElementById("tmux-toolbar");
-    const label = document.getElementById("tmux-session-label");
-    const toolbarControls = document.querySelector(".toolbar-controls");
-
-    if (toolbar) toolbar.classList.remove("hidden");
-
     if ("sessionName" in message && message.sessionName) {
       currentSessionId = message.sessionId;
       activeBackend = message.backend ?? "tmux";
-      if (label) {
-        const windowSuffix =
-          message.windowIndex !== undefined
-            ? ` [${message.windowIndex}]${message.windowName ? ` ${message.windowName}` : ""}`
-            : "";
-        const backendPrefix = activeBackend === "zellij" ? "Zellij: " : "";
-        label.textContent = backendPrefix + message.sessionName + windowSuffix;
-      }
-      if (toolbarControls) {
-        if (activeBackend === "tmux" || activeBackend === "zellij") {
-          toolbarControls.classList.remove("hidden");
-        } else {
-          toolbarControls.classList.add("hidden");
-        }
-      }
     } else {
       currentSessionId = null;
       activeBackend = "native";
-      if (label) label.textContent = "Native Shell";
-      if (toolbarControls) {
-        toolbarControls.classList.add("hidden");
-      }
     }
 
     updateBackendToggleButtonState(activeBackend, backendAvailability);
@@ -251,71 +227,11 @@ function initApp(): void {
     messageHandler.handleEvent(event as MessageEvent<HostMessage>);
   });
 
-  setupAiToolSelectorEvents();
-}
-const tmuxPromptCallbacks = {
-  postMessage: (msg: unknown) => {
-    const m = msg as Record<string, unknown>;
-    if (m && m.type === "sendTmuxPromptChoice") {
-      postMessage({
-        type: "sendTmuxPromptChoice",
-        choice: String(m.choice) as "tmux" | "shell" | "zellij",
-      });
-    }
-  },
-};
-
-function setupAiToolSelectorEvents(): void {
-  document.addEventListener("keydown", (event) => {
-    // Cmd/Ctrl+Alt+M → toggle tmux command dropdown
-    // VS Code keybindings don't fire when xterm has focus,
-    // so we handle this directly in the webview.
-    const isToggleTmuxCmd =
-      event.altKey && (event.metaKey || event.ctrlKey) && event.code === "KeyM";
-    if (isToggleTmuxCmd) {
-      if (currentSessionId) {
-        event.preventDefault();
-        if (TmuxCmd.isVisible()) {
-          TmuxCmd.hide();
-        } else {
-          TmuxCmd.show(currentSessionId, activeBackend);
-        }
-      }
-      return;
-    }
-
-    if (TmuxCmd.isVisible()) {
-      if (TmuxCmd.handleKeydown(event)) {
-        return;
-      }
-    }
-  });
-
-  document.addEventListener("click", (event) => {
-    const target = event
-      .composedPath()
-      .find((el): el is Element => el instanceof Element);
-    if (!target) return;
-    if (TmuxPrompt.isVisible()) {
-      TmuxPrompt.handleClick(target, tmuxPromptCallbacks);
-    }
-
-    if (TmuxCmd.isVisible()) {
-      if (
-        target.closest(".tmux-cmd-item") &&
-        !target.closest(".tmux-cmd-item.disabled")
-      ) {
-        TmuxCmd.handleClick(target);
-      } else if (
-        !target.closest("#tmux-command-dropdown") &&
-        !target.closest("#btn-tmux-commands")
-      ) {
-        TmuxCmd.hide();
-      }
-    }
+  setupTmuxEvents({
+    getCurrentSessionId: () => currentSessionId,
+    getActiveBackend: () => activeBackend,
   });
 }
-
 const boot = () => {
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => initApp());
@@ -325,7 +241,7 @@ const boot = () => {
 };
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", boot);
+    document.addEventListener("DOMContentLoaded", boot);
 } else {
   boot();
 }

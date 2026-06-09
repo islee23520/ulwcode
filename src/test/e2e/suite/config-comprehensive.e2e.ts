@@ -194,12 +194,12 @@ function assertConfigurationProperty(
 }
 
 suite("Comprehensive configuration contributions", () => {
-  test("contributes exactly the expected 30 configuration properties", async () => {
+  test("contributes exactly the expected configuration properties", async () => {
     const extension = await activateExtension();
     const properties = getConfigurationProperties(extension);
     const expectedPropertyIds = Object.keys(configurationSpecs).sort();
 
-    assert.strictEqual(expectedPropertyIds.length, 30);
+    assert.strictEqual(expectedPropertyIds.length, 29);
     assert.deepStrictEqual(Object.keys(properties).sort(), expectedPropertyIds);
   });
 

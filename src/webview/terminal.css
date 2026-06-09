@@ -67,7 +67,8 @@ body {
   flex: 0 0 auto;
   align-items: center;
   gap: 2px;
-  padding: 2px 6px;
+  min-height: 22px;
+  padding: 1px 4px;
   position: relative;
   z-index: 600;
   background: var(--vscode-editorGroupHeader-tabsBackground, #252526);
@@ -113,7 +114,9 @@ body {
   border: none;
   color: var(--vscode-foreground, #cccccc);
   font-size: 12px;
-  padding: 1px 5px;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 4px;
   border-radius: 3px;
   cursor: pointer;
   line-height: 1;
@@ -141,14 +144,15 @@ body {
 }
 
 .tmux-session-label {
-  flex: 1;
-  text-align: center;
-  font-size: 11px;
+  flex: 1 1 auto;
+  text-align: left;
+  font-size: 10px;
   color: var(--vscode-descriptionForeground, #999);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  line-height: 1;
 }
 
 .pane-controls {
@@ -169,7 +173,9 @@ body {
   background: none;
   border: none;
   color: var(--vscode-foreground, #cccccc);
-  padding: 3px 4px;
+  width: 20px;
+  height: 18px;
+  padding: 0;
   border-radius: 3px;
   cursor: pointer;
   display: flex;
@@ -253,7 +259,7 @@ body {
 
 .tmux-cmd-dropdown {
   position: fixed;
-  top: 36px;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1001;

@@ -5,6 +5,18 @@ export interface TerminalConfig {
   cursorStyle: "block" | "underline" | "bar";
   scrollback: number;
   sendKeybindingsToShell: boolean;
+  renderer: "webgl" | "canvas" | "auto";
+}
+
+function parseRenderer(value: string | undefined): TerminalConfig["renderer"] {
+  switch (value) {
+    case "webgl":
+    case "canvas":
+    case "auto":
+      return value;
+    default:
+      return "auto";
+  }
 }
 
 export function readTerminalConfig(element: HTMLElement): TerminalConfig {
@@ -21,5 +33,6 @@ export function readTerminalConfig(element: HTMLElement): TerminalConfig {
     scrollback: parseInt(element.dataset.scrollback || "10000", 10),
     sendKeybindingsToShell:
       element.dataset.sendKeybindingsToShell === "true",
+    renderer: parseRenderer(element.dataset.renderer),
   };
 }

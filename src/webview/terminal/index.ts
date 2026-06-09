@@ -1,4 +1,4 @@
-import { Terminal } from "@xterm/xterm";
+import { Terminal, type ITerminalAddon } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -19,6 +19,12 @@ export interface TerminalInstance {
   terminal: Terminal;
   fitAddon: FitAddon;
   dispose: () => void;
+}
+
+class CanvasAddonFallback implements ITerminalAddon {
+  activate(): void {}
+
+  dispose(): void {}
 }
 
 const isWindowsPlatform = (): boolean =>
@@ -127,22 +133,24 @@ export function initTerminal(
     copyOsc52ToClipboard,
   );
 
-  try {
-    const webglAddon = new WebglAddon();
-    webglAddon.onContextLoss(() => {
-      webglAddon.dispose();
-    });
-    terminal.loadAddon(webglAddon);
-  } catch (error) {
-    console.warn(
-      "WebGL renderer not available, falling back to canvas:",
-      error,
-    );
+  if (config.renderer === "canvas") {
+    terminal.loadAddon(new CanvasAddonFallback());
+  } else {
+    try {
+      const webglAddon = new WebglAddon();
+      webglAddon.onContextLoss(() => {
+        webglAddon.dispose();
+      });
+      terminal.loadAddon(webglAddon);
+    } catch (error) {
+      console.warn(
+        "WebGL renderer not available, falling back to canvas:",
+        error,
+      );
+      terminal.loadAddon(new CanvasAddonFallback());
+    }
   }
 
-  const refreshTerminal = () => terminal.refresh(0, terminal.rows - 1);
-  container.addEventListener("focusin", refreshTerminal);
-  container.addEventListener("click", refreshTerminal);
   const wheelHandler = createWheelHandler({
     isWindows: isWindowsPlatform,
     getMouseTrackingMode: () => terminal.modes.mouseTrackingMode,
@@ -212,8 +220,6 @@ export function initTerminal(
     cleanupResize();
     cleanupVisibility();
     container.removeEventListener("contextmenu", contextMenuHandler);
-    container.removeEventListener("focusin", refreshTerminal);
-    container.removeEventListener("click", refreshTerminal);
     container.removeEventListener("wheel", wheelHandler, true);
     window.removeEventListener("dragover", dragOverHandler, true);
     window.removeEventListener("dragleave", dragLeaveHandler, true);

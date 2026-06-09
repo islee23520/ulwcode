@@ -70,10 +70,10 @@ suite("Package contribution metadata", () => {
     assert.ok(container, "ulwContainer should be contributed");
     assert.strictEqual(packageJSON.name, "opencode-sidebar-tui");
     assert.strictEqual(packageJSON.publisher, "islee23520");
-    assert.strictEqual(packageJSON.displayName, "ULW");
+    assert.strictEqual(packageJSON.displayName, "ulwcode-sidebar-terminal");
     assert.strictEqual(
       packageJSON.description,
-      "Open TUI terminal MUX for VS Code with tmux, zellij, and native terminal support",
+      "sidebar terminal Extension for VS Code with tmux, zellij, and native terminal support",
     );
     assert.strictEqual(container.title, "ULW");
     assert.strictEqual(packageJSON.contributes?.configuration?.title, "ULW");
@@ -118,8 +118,26 @@ suite("Package contribution metadata", () => {
   test("contributes editor and explorer context menus", async () => {
     const packageJSON = await getPackageJSON();
     const menus = packageJSON.contributes?.menus;
+    const viewTitle = menus?.["view/title"] ?? [];
     const editorContext = menus?.["editor/context"] ?? [];
     const explorerContext = menus?.["explorer/context"] ?? [];
+    const titleCommands = viewTitle.map(({ command }) => command);
+
+    assert.deepStrictEqual(titleCommands, [
+      "ulw.openNewSessionTerminalInEditor",
+      "ulw.tmuxSplitPaneH",
+      "ulw.tmuxSplitPaneV",
+      "ulw.tmuxPrevWindow",
+      "ulw.tmuxCreateWindow",
+      "ulw.tmuxNextWindow",
+      "ulw.toggleTmuxCommandToolbar",
+      "ulw.toggleDashboard",
+      "ulw.tmuxRefresh",
+    ]);
+    assert.ok(
+      viewTitle.every(({ when }) => when === "view == ulw"),
+      "view/title actions should stay scoped to the ULW sidebar view",
+    );
 
     assert.ok(
       editorContext.some(

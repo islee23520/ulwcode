@@ -29,6 +29,7 @@ import { renderTerminalHtml } from "../webview/terminal/html";
 import { ZellijSessionManager } from "../services/ZellijSessionManager";
 import { NativeTerminalManager } from "../services/NativeTerminalManager";
 import { TerminalBackendRegistry } from "../services/terminalBackends";
+import { formatActiveSessionLabel } from "../utils/activeSessionLabel";
 
 type TerminalDefaultLocation = "editor" | "sidebar";
 
@@ -923,6 +924,8 @@ export class TerminalProvider
   }
 
   private postWebviewMessage(message: unknown): void {
+    this.updateViewTitle(message);
+
     if (this.isTerminalOutputHostMessage(message)) {
       this.dataThrottleService.push(
         this.normalizePaneId(message.paneId),
@@ -946,6 +949,18 @@ export class TerminalProvider
     }
 
     this.postWebviewMessageNow(message);
+  }
+
+  private updateViewTitle(message: unknown): void {
+    if (!this._view || !this.isActiveSessionHostMessage(message)) {
+      return;
+    }
+
+    const activeBackend = "backend" in message && message.backend
+      ? message.backend
+      : this.sessionRuntime.getActiveBackend();
+    this._view.title = "ULW";
+    this._view.description = formatActiveSessionLabel(message, activeBackend);
   }
 
   private postPlatformInfo(): void {
@@ -1052,6 +1067,17 @@ export class TerminalProvider
       message.type === "terminalOutput" &&
       "data" in message &&
       typeof message.data === "string"
+    );
+  }
+
+  private isActiveSessionHostMessage(
+    message: unknown,
+  ): message is Extract<HostMessage, { type: "activeSession" }> {
+    return (
+      typeof message === "object" &&
+      message !== null &&
+      "type" in message &&
+      message.type === "activeSession"
     );
   }
 
@@ -1216,16 +1242,20 @@ export class TerminalProvider
         : "native";
 
     if (sessionId) {
-      webview.postMessage({
+      const message: HostMessage = {
         type: "activeSession",
         sessionName: sessionId,
         sessionId,
         backend: sessionBackend,
-      });
+      };
+      this.updateViewTitle(message);
+      webview.postMessage(message);
       return;
     }
 
-    webview.postMessage({ type: "activeSession", backend: "native" });
+    const message: HostMessage = { type: "activeSession", backend: "native" };
+    this.updateViewTitle(message);
+    webview.postMessage(message);
   }
 
   private getEditorPanelOptions(): vscode.WebviewOptions &
@@ -1321,6 +1351,10 @@ export class TerminalProvider
         "sendKeybindingsToShell",
         true,
       ),
+      renderer: config.get<"webgl" | "canvas" | "auto">(
+        "pane.renderer",
+        "auto",
+      ),
       showTmuxWindowControls: config.get<boolean>(
         "showTmuxWindowControls",
         true,
@@ -1401,6 +1435,7 @@ export class TerminalProvider
       cursorStyle: terminalConfig.cursorStyle,
       scrollback: String(terminalConfig.scrollback),
       sendKeybindingsToShell: String(terminalConfig.sendKeybindingsToShell),
+      renderer: terminalConfig.renderer,
       showTmuxWindowControls: String(terminalConfig.showTmuxWindowControls),
     });
 

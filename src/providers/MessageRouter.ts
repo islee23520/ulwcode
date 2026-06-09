@@ -86,6 +86,11 @@ function formatDroppedPathsForTerminal(filePaths: string[]): string {
 export class MessageRouter {
   private static readonly DEFAULT_PANE_ID = "default";
 
+  private readonly lastResizeByPane = new Map<
+    string,
+    { readonly cols: number; readonly rows: number }
+  >();
+
   public constructor(
     private readonly provider: MessageRouterProviderBridge,
     private readonly context: vscode.ExtensionContext,
@@ -319,6 +324,12 @@ export class MessageRouter {
     if (typeof cols !== "number" || typeof rows !== "number") {
       return;
     }
+
+    const previousSize = this.lastResizeByPane.get(paneId);
+    if (previousSize?.cols === cols && previousSize.rows === rows) {
+      return;
+    }
+    this.lastResizeByPane.set(paneId, { cols, rows });
 
     this.provider.setLastKnownTerminalSize(cols, rows);
     this.terminalManager.resizeTerminal(
