@@ -177,7 +177,11 @@ export function initTerminal(
     if (data) {
       const target = detectKoreanKeyboardInputSource?.(data);
       if (target) {
-        postMessage({ type: "switchKeyboardInputSource", target });
+        postMessage({
+          type: "switchKeyboardInputSource",
+          target,
+          paneId: container.dataset.paneId,
+        });
       }
       options.onData(data);
     }

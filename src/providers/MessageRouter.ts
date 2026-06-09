@@ -121,7 +121,7 @@ export class MessageRouter {
         this.handleTerminalResize(message.cols, message.rows, paneId);
         break;
       case "switchKeyboardInputSource":
-        await this.handleSwitchKeyboardInputSource(message.target);
+        await this.handleSwitchKeyboardInputSource(message.target, paneId);
         break;
       case "ready":
         this.handleReady(message.cols, message.rows, paneId);
@@ -264,8 +264,13 @@ export class MessageRouter {
 
   public async handleSwitchKeyboardInputSource(
     target: KeyboardInputSourceTarget,
+    paneId: string = MessageRouter.DEFAULT_PANE_ID,
   ): Promise<void> {
     await this.inputSourceSwitcher.switchTo(target);
+    this.provider.postWebviewMessage({
+      type: "focusTerminal",
+      paneId,
+    });
   }
 
   private async handleExecuteTmuxCommand(commandId: unknown): Promise<void> {

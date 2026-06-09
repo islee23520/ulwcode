@@ -327,9 +327,14 @@ describe("MessageRouter", () => {
     await routerWithSwitcher.handleMessage({
       type: "switchKeyboardInputSource",
       target: "korean",
+      paneId: "pane-2",
     });
 
     expect(switchTo).toHaveBeenCalledWith("korean");
+    expect(provider.postWebviewMessage).toHaveBeenCalledWith({
+      type: "focusTerminal",
+      paneId: "pane-2",
+    });
   });
 
   it("ignores duplicate terminal resize messages for the same pane", async () => {
