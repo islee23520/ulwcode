@@ -119,7 +119,6 @@ export function registerTerminalCommands(
         `[DIAG:sendAtMention] terminalId="${terminalId}" fileRef="${fileRef}"`,
       );
       void deps.sendPrompt(fileRef + " ");
-      focusTerminalIfConfigured(deps.provider);
     },
   );
 

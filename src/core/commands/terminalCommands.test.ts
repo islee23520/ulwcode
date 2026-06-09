@@ -299,9 +299,13 @@ describe("registerTerminalCommands", () => {
     );
     expect(successDeps.sendPrompt).toHaveBeenCalledWith("@src/file.ts#L1 ");
 
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "ulw.focus",
+    );
+
     vi.advanceTimersByTime(100);
 
-    expect(successDeps.provider?.focus).toHaveBeenCalledTimes(1);
+    expect(successDeps.provider?.focus).not.toHaveBeenCalled();
 
     vi.clearAllMocks();
     mockAutoFocusOnSend(true);
