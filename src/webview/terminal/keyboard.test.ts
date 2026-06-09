@@ -252,6 +252,39 @@ describe("createKeyboardHandler", () => {
   });
 
   describe("platform agnostic", () => {
+    it("sends readline word-movement sequences for Alt+Left and Alt+Right", () => {
+      const sendInput = vi.fn();
+      const keyboard = createKeyboardHandler({ isMac: true, sendInput });
+
+      const leftEvent = createKeyboardEvent({
+        altKey: true,
+        key: "ArrowLeft",
+        code: "ArrowLeft",
+      });
+      const rightEvent = createKeyboardEvent({
+        altKey: true,
+        key: "ArrowRight",
+        code: "ArrowRight",
+      });
+
+      expect(keyboard.handler(leftEvent)).toBe(false);
+      expect(leftEvent.defaultPrevented).toBe(true);
+      expect(keyboard.handler(rightEvent)).toBe(false);
+      expect(rightEvent.defaultPrevented).toBe(true);
+      expect(sendInput).toHaveBeenNthCalledWith(1, "\x1bb");
+      expect(sendInput).toHaveBeenNthCalledWith(2, "\x1bf");
+    });
+
+    it("does not intercept Alt+Arrow word movement when sendInput is missing", () => {
+      const keyboard = createKeyboardHandler({ isMac: true });
+
+      expectKeyboardHandling(keyboard, {
+        altKey: true,
+        key: "ArrowLeft",
+        code: "ArrowLeft",
+      }, true, false);
+    });
+
     it("does not intercept plain letter keys", () => {
       const keyboard = createKeyboardHandler({ isMac: true });
       expectKeyboardHandling(keyboard, {

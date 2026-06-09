@@ -5,6 +5,11 @@ const detectMacPlatform = (): boolean =>
 const isLetterOrDigitCode = (code: string): boolean =>
   /^Key[A-Z]$/.test(code) || /^Digit[0-9]$/.test(code);
 
+const ALT_ARROW_WORD_SEQUENCES: Readonly<Record<string, string>> = {
+  ArrowLeft: "\x1bb",
+  ArrowRight: "\x1bf",
+} as const;
+
 export interface KeyboardHandlerOptions {
   /** Whether the platform is macOS (auto-detected if omitted). */
   isMac?: boolean;
@@ -69,7 +74,28 @@ export function createKeyboardHandler(options: KeyboardHandlerOptions = {}) {
     !event.metaKey &&
     !event.altKey;
 
+  const getAltArrowWordSequence = (event: KeyboardEvent): string | undefined => {
+    if (
+      event.type !== "keydown" ||
+      !event.altKey ||
+      event.ctrlKey ||
+      event.metaKey
+    ) {
+      return undefined;
+    }
+
+    return ALT_ARROW_WORD_SEQUENCES[event.key];
+  };
+
   const handler = (event: KeyboardEvent): boolean => {
+    const altArrowWordSequence = getAltArrowWordSequence(event);
+    if (altArrowWordSequence !== undefined && options.sendInput) {
+      event.preventDefault();
+      event.stopPropagation();
+      options.sendInput(altArrowWordSequence);
+      return false;
+    }
+
     if (isShiftEnter(event) && event.type === "keydown" && options.sendInput) {
       event.preventDefault();
       event.stopPropagation();
