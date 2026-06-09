@@ -185,15 +185,15 @@
       },
       {
         "command": "ulw.tmuxSplitPaneH",
-        "title": "Split Pane Horizontal",
+        "title": "Split Pane Side by Side",
         "category": "ULW",
-        "icon": "$(split-horizontal)"
+        "icon": "$(layout-sidebar-left)"
       },
       {
         "command": "ulw.tmuxSplitPaneV",
-        "title": "Split Pane Vertical",
+        "title": "Split Pane Top/Bottom",
         "category": "ULW",
-        "icon": "$(split-vertical)"
+        "icon": "$(layout-panel)"
       },
       {
         "command": "ulw.tmuxSplitPaneWithCommand",
@@ -273,7 +273,53 @@
       }
     ],
     "menus": {
-      "view/title": [],
+      "view/title": [
+        {
+          "command": "ulw.openNewSessionTerminalInEditor",
+          "group": "navigation@1",
+          "when": "view == ulw"
+        },
+        {
+          "command": "ulw.tmuxSplitPaneH",
+          "group": "navigation@2",
+          "when": "view == ulw"
+        },
+        {
+          "command": "ulw.tmuxSplitPaneV",
+          "group": "navigation@3",
+          "when": "view == ulw"
+        },
+        {
+          "command": "ulw.tmuxPrevWindow",
+          "group": "navigation@4",
+          "when": "view == ulw"
+        },
+        {
+          "command": "ulw.tmuxCreateWindow",
+          "group": "navigation@5",
+          "when": "view == ulw"
+        },
+        {
+          "command": "ulw.tmuxNextWindow",
+          "group": "navigation@6",
+          "when": "view == ulw"
+        },
+        {
+          "command": "ulw.toggleTmuxCommandToolbar",
+          "group": "navigation@7",
+          "when": "view == ulw"
+        },
+        {
+          "command": "ulw.toggleDashboard",
+          "group": "navigation@8",
+          "when": "view == ulw"
+        },
+        {
+          "command": "ulw.tmuxRefresh",
+          "group": "navigation@9",
+          "when": "view == ulw"
+        }
+      ],
       "editor/title": [
         {
           "command": "ulw.openTerminalManager",
