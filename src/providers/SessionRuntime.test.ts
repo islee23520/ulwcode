@@ -1643,6 +1643,51 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         "opencode",
       );
     });
+
+    it("withLaunchEnvironment forwards IDE context vars into created tmux sessions", () => {
+      const runtime = sessionRuntime as unknown as {
+        withLaunchEnvironment: (
+          command: string,
+          port: number | undefined,
+        ) => string;
+      };
+      const originalTermProgram = process.env.TERM_PROGRAM;
+      const originalTermProgramVersion = process.env.TERM_PROGRAM_VERSION;
+      const originalIpcHook = process.env.VSCODE_IPC_HOOK_CLI;
+      const originalCodexSocket = process.env.CODEX_IDE_CONTEXT_SOCKET;
+
+      try {
+        process.env.TERM_PROGRAM = "vscode";
+        delete process.env.TERM_PROGRAM_VERSION;
+        process.env.VSCODE_IPC_HOOK_CLI = "/tmp/vscode hook.sock";
+        process.env.CODEX_IDE_CONTEXT_SOCKET = "/tmp/codex-ipc/context.sock";
+
+        expect(runtime.withLaunchEnvironment("codex", undefined)).toBe(
+          "TERM_PROGRAM=vscode VSCODE_IPC_HOOK_CLI='/tmp/vscode hook.sock' CODEX_IDE_CONTEXT_SOCKET=/tmp/codex-ipc/context.sock codex",
+        );
+      } finally {
+        if (originalTermProgram === undefined) {
+          delete process.env.TERM_PROGRAM;
+        } else {
+          process.env.TERM_PROGRAM = originalTermProgram;
+        }
+        if (originalTermProgramVersion === undefined) {
+          delete process.env.TERM_PROGRAM_VERSION;
+        } else {
+          process.env.TERM_PROGRAM_VERSION = originalTermProgramVersion;
+        }
+        if (originalIpcHook === undefined) {
+          delete process.env.VSCODE_IPC_HOOK_CLI;
+        } else {
+          process.env.VSCODE_IPC_HOOK_CLI = originalIpcHook;
+        }
+        if (originalCodexSocket === undefined) {
+          delete process.env.CODEX_IDE_CONTEXT_SOCKET;
+        } else {
+          process.env.CODEX_IDE_CONTEXT_SOCKET = originalCodexSocket;
+        }
+      }
+    });
   });
 
   describe("HTTP readiness and auto-context", () => {

@@ -47,6 +47,20 @@ interface SessionRuntimeCallbacks {
   requestStartOpenCode: () => Promise<void>;
 }
 
+const IDE_CONTEXT_ENV_ALLOWLIST = [
+  "VSCODE_CWD",
+  "VSCODE_HANDLES_UNCAUGHT_ERRORS",
+  "VSCODE_IPC_HOOK_CLI",
+  "VSCODE_NLS_CONFIG",
+  "VSCODE_PID",
+  "CODEX_IDE_CONTEXT",
+  "CODEX_IDE_CONTEXT_SOCKET",
+  "CODEX_IDE_SOCKET",
+  "CODEX_IPC_SOCKET",
+  "CURSOR_AGENT",
+  "CURSOR_TRACE_ID",
+] as const;
+
 export interface SessionState {
   paneId: string;
   instanceId: InstanceId;
@@ -1171,10 +1185,79 @@ export class SessionRuntime {
   }
 
   private withLaunchEnvironment(command: string, port: number | undefined): string {
-    if (!port) {
+    const envPrefix = this.buildLaunchEnvironmentPrefix(port);
+    if (!envPrefix) {
       return command;
     }
-    return `_EXTENSION_OPENCODE_PORT=${port} OPENCODE_CALLER=vscode ${command}`;
+    return `${envPrefix} ${command}`;
+  }
+
+  private buildLaunchEnvironmentPrefix(port: number | undefined): string {
+    const entries: string[] = [];
+    if (port) {
+      entries.push(
+        `_EXTENSION_OPENCODE_PORT=${this.shellQuoteForEnv(String(port))}`,
+        "OPENCODE_CALLER=vscode",
+      );
+    }
+
+    this.appendTerminalProgramEnvironment(entries);
+
+    const usedKeys = new Set<string>();
+    for (const key of IDE_CONTEXT_ENV_ALLOWLIST) {
+      usedKeys.add(key);
+      const value = process.env[key];
+      if (value) {
+        entries.push(`${key}=${this.shellQuoteForEnv(value)}`);
+      }
+    }
+
+    const dynamicKeys = Object.keys(process.env)
+      .filter((key) => !usedKeys.has(key) && this.isIdeContextEnvKey(key))
+      .sort((a, b) => a.localeCompare(b));
+    for (const key of dynamicKeys) {
+      const value = process.env[key];
+      if (value) {
+        entries.push(`${key}=${this.shellQuoteForEnv(value)}`);
+      }
+    }
+
+    return entries.join(" ");
+  }
+
+  private appendTerminalProgramEnvironment(entries: string[]): void {
+    const terminalProgram = process.env.TERM_PROGRAM;
+    if (!terminalProgram || !this.isIdeTerminalProgram(terminalProgram)) {
+      return;
+    }
+
+    entries.push(`TERM_PROGRAM=${this.shellQuoteForEnv(terminalProgram)}`);
+    const terminalProgramVersion = process.env.TERM_PROGRAM_VERSION;
+    if (terminalProgramVersion) {
+      entries.push(
+        `TERM_PROGRAM_VERSION=${this.shellQuoteForEnv(terminalProgramVersion)}`,
+      );
+    }
+  }
+
+  private isIdeTerminalProgram(value: string): boolean {
+    const normalized = value.toLowerCase();
+    return normalized.includes("vscode") || normalized.includes("cursor");
+  }
+
+  private isIdeContextEnvKey(key: string): boolean {
+    return (
+      key.startsWith("VSCODE_") ||
+      key.startsWith("CURSOR_") ||
+      key.startsWith("CODEX_IDE_")
+    );
+  }
+
+  private shellQuoteForEnv(value: string): string {
+    if (/^[A-Za-z0-9_./:=@%+-]+$/.test(value)) {
+      return value;
+    }
+    return `'${value.replace(/'/g, "'\\''")}'`;
   }
 
   public resolveConfiguredBackend(
@@ -1382,7 +1465,7 @@ export class SessionRuntime {
   public async switchToTmuxSessionWithTool(
     sessionId: string,
     preferredToolName?: string,
-    options: {
+    _options: {
       forceToolPrompt?: boolean;
       respectPromptAiToolOnSession?: boolean;
     } = {},
