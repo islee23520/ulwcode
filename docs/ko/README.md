@@ -135,19 +135,20 @@ ULW는 OpenCode와 더 안정적으로 통신하기 위해 HTTP API를 사용합
 
 ### 터미널 및 시작 동작
 
-| 설정                          | 설명                                 |
-| ----------------------------- | ------------------------------------ |
-| `ulw.autoStart`       | 뷰가 활성화되면 OpenCode 자동 시작   |
-| `ulw.autoStartOnOpen` | 사이드바가 열리면 OpenCode 자동 시작 |
-| `ulw.fontSize`        | 터미널 글꼴 크기                     |
-| `ulw.fontFamily`      | 터미널 글꼴 패밀리                   |
-| `ulw.terminal.defaultLocation` | 기본 터미널 위치: `editor` 또는 `sidebar` |
-| `ulw.autoFocusOnSend` | 파일 참조 전송 후 ULW 포커스         |
+| 설정                           | 설명                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| `ulw.autoStart`                | 뷰가 활성화되면 OpenCode 자동 시작                                             |
+| `ulw.autoStartOnOpen`          | 사이드바가 열리면 OpenCode 자동 시작                                           |
+| `ulw.fontSize`                 | 터미널 글꼴 크기                                                               |
+| `ulw.fontFamily`               | 터미널 글꼴 패밀리                                                             |
+| `ulw.autoSwitchKoreanKeyboard` | 한/영 자판 오입력이 감지되면 macOS 시스템 입력 소스를 자동 전환. 기본값은 꺼짐 |
+| `ulw.terminal.defaultLocation` | 기본 터미널 위치: `editor` 또는 `sidebar`                                      |
+| `ulw.autoFocusOnSend`          | 파일 참조 전송 후 ULW 포커스                                                   |
 
 ### HTTP API 및 컨텍스트 공유
 
-| 설정                            | 설명                            |
-| ------------------------------- | ------------------------------- |
+| 설정                    | 설명                            |
+| ----------------------- | ------------------------------- |
 | `ulw.enableHttpApi`     | HTTP API 통신 사용              |
 | `ulw.httpTimeout`       | 요청 타임아웃(ms)               |
 | `ulw.autoShareContext`  | 에디터 컨텍스트 자동 공유       |
@@ -155,8 +156,8 @@ ULW는 OpenCode와 더 안정적으로 통신하기 위해 HTTP API를 사용합
 
 ### AI 툴 및 tmux 동작
 
-| 설정                             | 설명                        |
-| -------------------------------- | --------------------------- |
+| 설정                     | 설명                        |
+| ------------------------ | --------------------------- |
 | `ulw.aiTools`            | 사용 가능한 AI 툴 구성      |
 | `ulw.defaultAiTool`      | 새 `tmux` 세션의 기본 툴    |
 | `ulw.enableAutoSpawn`    | OpenCode가 없으면 자동 실행 |

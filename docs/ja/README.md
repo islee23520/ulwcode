@@ -135,19 +135,20 @@ ULW は、OpenCode とより安定して通信するために HTTP API を使用
 
 ### ターミナルと起動動作
 
-| 設定                          | 説明                                         |
-| ----------------------------- | -------------------------------------------- |
-| `ulw.autoStart`       | ビュー有効化時に OpenCode を自動起動         |
-| `ulw.autoStartOnOpen` | サイドバーを開いたときに OpenCode を自動起動 |
-| `ulw.fontSize`        | ターミナルのフォントサイズ                   |
-| `ulw.fontFamily`      | ターミナルのフォントファミリー               |
-| `ulw.terminal.defaultLocation` | 既定のターミナル位置: `editor` または `sidebar` |
-| `ulw.autoFocusOnSend` | ファイル参照送信後に ULW へフォーカス        |
+| 設定                           | 説明                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------- |
+| `ulw.autoStart`                | ビュー有効化時に OpenCode を自動起動                                                        |
+| `ulw.autoStartOnOpen`          | サイドバーを開いたときに OpenCode を自動起動                                                |
+| `ulw.fontSize`                 | ターミナルのフォントサイズ                                                                  |
+| `ulw.fontFamily`               | ターミナルのフォントファミリー                                                              |
+| `ulw.autoSwitchKoreanKeyboard` | 韓英キーボード配列の入力ミスを検出したら macOS のシステム入力ソースを自動切替。既定では無効 |
+| `ulw.terminal.defaultLocation` | 既定のターミナル位置: `editor` または `sidebar`                                             |
+| `ulw.autoFocusOnSend`          | ファイル参照送信後に ULW へフォーカス                                                       |
 
 ### HTTP API とコンテキスト共有
 
-| 設定                            | 説明                             |
-| ------------------------------- | -------------------------------- |
+| 設定                    | 説明                             |
+| ----------------------- | -------------------------------- |
 | `ulw.enableHttpApi`     | HTTP API 通信を有効化            |
 | `ulw.httpTimeout`       | リクエストのタイムアウト (ms)    |
 | `ulw.autoShareContext`  | エディタのコンテキストを自動共有 |
@@ -155,8 +156,8 @@ ULW は、OpenCode とより安定して通信するために HTTP API を使用
 
 ### AI ツールと tmux 動作
 
-| 設定                             | 説明                               |
-| -------------------------------- | ---------------------------------- |
+| 設定                     | 説明                               |
+| ------------------------ | ---------------------------------- |
 | `ulw.aiTools`            | 利用可能な AI ツールの設定         |
 | `ulw.defaultAiTool`      | 新しい `tmux` session の既定ツール |
 | `ulw.enableAutoSpawn`    | OpenCode が未起動なら自動起動      |

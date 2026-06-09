@@ -85,6 +85,10 @@ const configurationSpecs: Record<string, ConfigurationSpec> = {
     type: "boolean",
     defaultValue: true,
   },
+  "ulw.autoSwitchKoreanKeyboard": {
+    type: "boolean",
+    defaultValue: false,
+  },
   "ulw.showTmuxWindowControls": {
     type: "boolean",
     defaultValue: true,
@@ -166,7 +170,11 @@ function assertConfigurationProperty(
   spec: ConfigurationSpec,
 ): void {
   assert.ok(property, `${id} should be contributed`);
-  assert.strictEqual(property.type, spec.type, `${id} should have expected type`);
+  assert.strictEqual(
+    property.type,
+    spec.type,
+    `${id} should have expected type`,
+  );
 
   if (id !== "ulw.aiTools") {
     assert.deepStrictEqual(
@@ -199,7 +207,7 @@ suite("Comprehensive configuration contributions", () => {
     const properties = getConfigurationProperties(extension);
     const expectedPropertyIds = Object.keys(configurationSpecs).sort();
 
-    assert.strictEqual(expectedPropertyIds.length, 29);
+    assert.strictEqual(expectedPropertyIds.length, 30);
     assert.deepStrictEqual(Object.keys(properties).sort(), expectedPropertyIds);
   });
 
@@ -288,6 +296,7 @@ suite("Runtime configuration defaults", () => {
     ]);
     assert.strictEqual(defaultValue("terminalBackend"), "tmux");
     assert.strictEqual(defaultValue("autoStartOnOpen"), true);
+    assert.strictEqual(defaultValue("autoSwitchKoreanKeyboard"), false);
     assert.strictEqual(defaultValue("enableHttpApi"), true);
     assert.strictEqual(defaultValue("fontSize"), 14);
   });

@@ -78,6 +78,11 @@ export interface TerminalBackendAvailability {
 export type WebviewMessage =
   | { type: "terminalInput"; data: string; paneId?: string }
   | { type: "terminalResize"; cols: number; rows: number; paneId?: string }
+  | {
+      type: "switchKeyboardInputSource";
+      target: "english" | "korean";
+      paneId?: string;
+    }
   | { type: "listTerminals"; paneId?: string }
   | {
       type: "openFile";
@@ -142,7 +147,11 @@ export type WebviewMessage =
       paneId?: string;
     }
   | { type: "requestRestart"; paneId?: string }
-  | { type: "paneCreate"; direction?: "horizontal" | "vertical"; paneId?: string }
+  | {
+      type: "paneCreate";
+      direction?: "horizontal" | "vertical";
+      paneId?: string;
+    }
   | { type: "paneDelete"; paneId?: string };
 
 export type AiTool = string;
@@ -401,21 +410,20 @@ export type TmuxDashboardWindowDto = {
   panes: TmuxDashboardPaneDto[];
 };
 
-export type TmuxDashboardHostMessage =
-  | {
-      type: "updateTmuxSessions";
-      sessions: TmuxDashboardSessionDto[];
-      nativeShells?: NativeShellDto[];
-      threadHistory?: ThreadHistoryDashboardDto;
-      showingThreadHistory?: boolean;
-      workspace: string;
-      workspaceUri?: string;
-      windows?: Record<string, TmuxDashboardWindowDto[]>;
-      panes?: Record<string, TmuxDashboardPaneDto[]>;
-      showingAll?: boolean;
-      tools?: AiToolConfig[];
-      tmuxAvailable?: boolean;
-    };
+export type TmuxDashboardHostMessage = {
+  type: "updateTmuxSessions";
+  sessions: TmuxDashboardSessionDto[];
+  nativeShells?: NativeShellDto[];
+  threadHistory?: ThreadHistoryDashboardDto;
+  showingThreadHistory?: boolean;
+  workspace: string;
+  workspaceUri?: string;
+  windows?: Record<string, TmuxDashboardWindowDto[]>;
+  panes?: Record<string, TmuxDashboardPaneDto[]>;
+  showingAll?: boolean;
+  tools?: AiToolConfig[];
+  tmuxAvailable?: boolean;
+};
 
 export const ALLOWED_IMAGE_TYPES = [
   "image/png",
@@ -470,6 +478,7 @@ export type HostMessage =
       cursorStyle: "block" | "underline" | "bar";
       scrollback: number;
       sendKeybindingsToShell?: boolean;
+      autoSwitchKoreanKeyboard?: boolean;
       showTmuxWindowControls?: boolean;
       renderer?: "webgl" | "canvas" | "auto";
     }
@@ -499,7 +508,11 @@ export type HostMessage =
       zellijAvailable?: boolean;
       activeBackend?: TerminalBackendType;
     }
-  | { type: "paneCreate"; direction?: "horizontal" | "vertical"; paneId?: string }
+  | {
+      type: "paneCreate";
+      direction?: "horizontal" | "vertical";
+      paneId?: string;
+    }
   | {
       type: "paneBackendChanged";
       paneId: string;
@@ -533,8 +546,8 @@ export interface ExtensionConfig {
   collapseSecondaryBarOnEditorOpen: boolean;
   terminalBackend: TerminalBackendType;
   showTmuxWindowControls: boolean;
-  'pane.defaultSplitDirection': "horizontal" | "vertical";
-  'pane.focusOnClick': boolean;
-  'pane.showPaneActions': boolean;
-  'pane.renderer': "webgl" | "canvas" | "auto";
+  "pane.defaultSplitDirection": "horizontal" | "vertical";
+  "pane.focusOnClick": boolean;
+  "pane.showPaneActions": boolean;
+  "pane.renderer": "webgl" | "canvas" | "auto";
 }

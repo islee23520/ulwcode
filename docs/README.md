@@ -135,18 +135,19 @@ The most important settings stay in English because they must match the real VS 
 
 ### Terminal and Startup
 
-| Setting                       | Description                                             |
-| ----------------------------- | ------------------------------------------------------- |
-| `ulw.autoStart`       | Start the configured AI tool automatically when the view is activated |
-| `ulw.autoStartOnOpen` | Start the configured AI tool when the sidebar opens                   |
-| `ulw.fontSize`        | Terminal font size                                      |
-| `ulw.fontFamily`      | Terminal font family                                    |
-| `ulw.autoFocusOnSend` | Focus the sidebar after sending file references         |
+| Setting                        | Description                                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `ulw.autoStart`                | Start the configured AI tool automatically when the view is activated                                                  |
+| `ulw.autoStartOnOpen`          | Start the configured AI tool when the sidebar opens                                                                    |
+| `ulw.fontSize`                 | Terminal font size                                                                                                     |
+| `ulw.fontFamily`               | Terminal font family                                                                                                   |
+| `ulw.autoSwitchKoreanKeyboard` | Auto-switch the macOS system input source when likely Korean/English layout mistakes are detected. Disabled by default |
+| `ulw.autoFocusOnSend`          | Focus the sidebar after sending file references                                                                        |
 
 ### HTTP API and Context Sharing
 
-| Setting                         | Description                        |
-| ------------------------------- | ---------------------------------- |
+| Setting                 | Description                        |
+| ----------------------- | ---------------------------------- |
 | `ulw.enableHttpApi`     | Enable HTTP API communication      |
 | `ulw.httpTimeout`       | Request timeout in milliseconds    |
 | `ulw.autoShareContext`  | Share editor context automatically |
@@ -154,8 +155,8 @@ The most important settings stay in English because they must match the real VS 
 
 ### AI Tool and tmux Behavior
 
-| Setting                          | Description                                       |
-| -------------------------------- | ------------------------------------------------- |
+| Setting                  | Description                                       |
+| ------------------------ | ------------------------------------------------- |
 | `ulw.aiTools`            | Configure available AI tools                      |
 | `ulw.defaultAiTool`      | Default tool for new `tmux` sessions              |
 | `ulw.enableAutoSpawn`    | Auto-spawn OpenCode if it is not already running  |

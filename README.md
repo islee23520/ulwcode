@@ -231,26 +231,27 @@ Available settings in VS Code settings (`Cmd+,` / `Ctrl+,`):
 
 ### Terminal Settings
 
-| Setting                       | Type    | Default           | Description                                             |
-| ----------------------------- | ------- | ----------------- | ------------------------------------------------------- |
-| `ulw.autoStart`       | boolean | `true`            | Automatically start OpenCode when the view is activated |
-| `ulw.autoStartOnOpen` | boolean | `true`            | Automatically start OpenCode when sidebar is opened     |
-| `ulw.fontSize`        | number  | `14`              | Terminal font size in pixels (6-25)                     |
-| `ulw.fontFamily`      | string  | Nerd Font stack\* | Terminal font family                                    |
-| `ulw.cursorBlink`     | boolean | `true`            | Enable cursor blinking                                  |
-| `ulw.cursorStyle`     | string  | `"block"`         | Cursor style: `block`, `underline`, or `bar`            |
-| `ulw.scrollback`      | number  | `10000`           | Maximum lines in scrollback buffer (0-100000)           |
-| `ulw.terminal.defaultLocation` | string | `"editor"` | Default terminal location: `editor` or `sidebar`        |
-| `ulw.autoFocusOnSend` | boolean | `true`            | Auto-focus ULW after sending file references            |
-| `ulw.shellPath`       | string  | `""`              | Custom shell path (empty = VS Code default)             |
-| `ulw.shellArgs`       | array   | `[]`              | Custom shell arguments                                  |
+| Setting                        | Type    | Default           | Description                                                                                       |
+| ------------------------------ | ------- | ----------------- | ------------------------------------------------------------------------------------------------- |
+| `ulw.autoStart`                | boolean | `true`            | Automatically start OpenCode when the view is activated                                           |
+| `ulw.autoStartOnOpen`          | boolean | `true`            | Automatically start OpenCode when sidebar is opened                                               |
+| `ulw.fontSize`                 | number  | `14`              | Terminal font size in pixels (6-25)                                                               |
+| `ulw.fontFamily`               | string  | Nerd Font stack\* | Terminal font family                                                                              |
+| `ulw.cursorBlink`              | boolean | `true`            | Enable cursor blinking                                                                            |
+| `ulw.cursorStyle`              | string  | `"block"`         | Cursor style: `block`, `underline`, or `bar`                                                      |
+| `ulw.scrollback`               | number  | `10000`           | Maximum lines in scrollback buffer (0-100000)                                                     |
+| `ulw.autoSwitchKoreanKeyboard` | boolean | `false`           | Auto-switch the macOS system input source when likely Korean/English layout mistakes are detected |
+| `ulw.terminal.defaultLocation` | string  | `"editor"`        | Default terminal location: `editor` or `sidebar`                                                  |
+| `ulw.autoFocusOnSend`          | boolean | `true`            | Auto-focus ULW after sending file references                                                      |
+| `ulw.shellPath`                | string  | `""`              | Custom shell path (empty = VS Code default)                                                       |
+| `ulw.shellArgs`                | array   | `[]`              | Custom shell arguments                                                                            |
 
 \* Default: `'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', 'CascadiaCode NF', Menlo, monospace`
 
 ### HTTP API Settings
 
-| Setting                         | Type    | Default | Description                                      |
-| ------------------------------- | ------- | ------- | ------------------------------------------------ |
+| Setting                 | Type    | Default | Description                                      |
+| ----------------------- | ------- | ------- | ------------------------------------------------ |
 | `ulw.enableHttpApi`     | boolean | `true`  | Enable HTTP API for OpenCode communication       |
 | `ulw.httpTimeout`       | number  | `5000`  | HTTP API request timeout in ms (1000-30000)      |
 | `ulw.autoShareContext`  | boolean | `true`  | Auto-share editor context with OpenCode          |
@@ -258,24 +259,24 @@ Available settings in VS Code settings (`Cmd+,` / `Ctrl+,`):
 
 ### AI Tool Settings
 
-| Setting                       | Type    | Default                       | Description                                               |
-| ----------------------------- | ------- | ----------------------------- | --------------------------------------------------------- |
+| Setting               | Type    | Default                       | Description                                               |
+| --------------------- | ------- | ----------------------------- | --------------------------------------------------------- |
 | `ulw.aiTools`         | array   | `[{opencode, claude, codex}]` | Configure AI coding tools with custom paths and arguments |
 | `ulw.defaultAiTool`   | string  | `"opencode"`                  | Default AI tool for new tmux sessions                     |
 | `ulw.enableAutoSpawn` | boolean | `true`                        | Auto-spawn OpenCode if not running                        |
 
 ### Tmux Settings
 
-| Setting                          | Type   | Default | Description                                                              |
-| -------------------------------- | ------ | ------- | ------------------------------------------------------------------------ |
-| `ulw.nativeShellDefault` | string | `""`    | Default behavior for native shell switch (`""`, `"opencode"`, `"shell"`) |
-| `ulw.tmuxSessionDefault` | string | `""`    | Default behavior for new tmux sessions (`""`, `"opencode"`, `"shell"`)   |
-| `ulw.showTmuxWindowControls` | boolean | `true` | Show direct tmux session/window controls in the terminal toolbar          |
+| Setting                      | Type    | Default | Description                                                              |
+| ---------------------------- | ------- | ------- | ------------------------------------------------------------------------ |
+| `ulw.nativeShellDefault`     | string  | `""`    | Default behavior for native shell switch (`""`, `"opencode"`, `"shell"`) |
+| `ulw.tmuxSessionDefault`     | string  | `""`    | Default behavior for new tmux sessions (`""`, `"opencode"`, `"shell"`)   |
+| `ulw.showTmuxWindowControls` | boolean | `true`  | Show direct tmux session/window controls in the terminal toolbar         |
 
 ### Advanced Settings
 
-| Setting                            | Type   | Default                | Description                                      |
-| ---------------------------------- | ------ | ---------------------- | ------------------------------------------------ |
+| Setting                    | Type   | Default                | Description                                      |
+| -------------------------- | ------ | ---------------------- | ------------------------------------------------ |
 | `ulw.logLevel`             | string | `"info"`               | Log level: `debug`, `info`, `warn`, `error`      |
 | `ulw.maxDiagnosticLength`  | number | `500`                  | Maximum length of diagnostic messages (100-2000) |
 | `ulw.codeActionSeverities` | array  | `["error", "warning"]` | Diagnostic severities that trigger code actions  |

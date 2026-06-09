@@ -5,6 +5,10 @@ import { randomUUID } from "crypto";
 import * as vscode from "vscode";
 import { ContextSharingService } from "../services/ContextSharingService";
 import { InstanceId, InstanceStore } from "../services/InstanceStore";
+import {
+  InputSourceSwitcher,
+  type KeyboardInputSourceTarget,
+} from "../services/InputSourceSwitcher";
 import { OpenCodeApiClient } from "../services/OpenCodeApiClient";
 import { OutputCaptureManager } from "../services/OutputCaptureManager";
 import { OutputChannelService } from "../services/OutputChannelService";
@@ -22,11 +26,7 @@ import type {
   TmuxRawSubcommand,
   TmuxWebviewCommandId,
 } from "../types";
-import {
-  createSelection,
-  fuzzyMatchFile,
-  openFileInEditor,
-} from "./openFile";
+import { createSelection, fuzzyMatchFile, openFileInEditor } from "./openFile";
 
 export interface MessageRouterProviderBridge {
   startOpenCode(): Promise<void>;
@@ -72,7 +72,10 @@ export interface MessageRouterProviderBridge {
     tmux: boolean;
     zellij: boolean;
   };
-  switchPaneBackend(paneId: string, backend: TerminalBackendType): Promise<void>;
+  switchPaneBackend(
+    paneId: string,
+    backend: TerminalBackendType,
+  ): Promise<void>;
 }
 
 function quoteShellPath(filePath: string): string {
@@ -100,6 +103,7 @@ export class MessageRouter {
     _contextSharingService: ContextSharingService,
     private readonly logger: OutputChannelService,
     _instanceStore: InstanceStore | undefined,
+    private readonly inputSourceSwitcher = new InputSourceSwitcher({ logger }),
   ) {}
 
   public async handleMessage(rawMessage: unknown): Promise<void> {
@@ -115,6 +119,9 @@ export class MessageRouter {
         break;
       case "terminalResize":
         this.handleTerminalResize(message.cols, message.rows, paneId);
+        break;
+      case "switchKeyboardInputSource":
+        await this.handleSwitchKeyboardInputSource(message.target);
         break;
       case "ready":
         this.handleReady(message.cols, message.rows, paneId);
@@ -249,7 +256,16 @@ export class MessageRouter {
       return;
     }
 
-    this.terminalManager.writeToTerminal(this.resolveTerminalTarget(paneId), data);
+    this.terminalManager.writeToTerminal(
+      this.resolveTerminalTarget(paneId),
+      data,
+    );
+  }
+
+  public async handleSwitchKeyboardInputSource(
+    target: KeyboardInputSourceTarget,
+  ): Promise<void> {
+    await this.inputSourceSwitcher.switchTo(target);
   }
 
   private async handleExecuteTmuxCommand(commandId: unknown): Promise<void> {
@@ -405,7 +421,8 @@ export class MessageRouter {
     ];
 
     if (dedupedFiles.length === 0 && blobFiles && blobFiles.length > 0) {
-      const resolvedBlobPaths = await this.resolveDroppedBlobFilePaths(blobFiles);
+      const resolvedBlobPaths =
+        await this.resolveDroppedBlobFilePaths(blobFiles);
       const materializedBlobPaths =
         resolvedBlobPaths.length > 0
           ? resolvedBlobPaths

@@ -5,6 +5,7 @@ export interface TerminalContainerParams {
   cursorStyle: string;
   scrollback: string;
   sendKeybindingsToShell?: string;
+  autoSwitchKoreanKeyboard?: string;
   showTmuxWindowControls?: string;
   renderer?: string;
 }
@@ -16,6 +17,7 @@ export function renderTerminalContainer({
   cursorStyle,
   scrollback,
   sendKeybindingsToShell = "false",
+  autoSwitchKoreanKeyboard = "false",
   renderer = "auto",
 }: TerminalContainerParams): string {
   return `<div
@@ -26,6 +28,7 @@ export function renderTerminalContainer({
       data-cursor-style="${cursorStyle}"
       data-scrollback="${scrollback}"
       data-send-keybindings-to-shell="${sendKeybindingsToShell}"
+      data-auto-switch-korean-keyboard="${autoSwitchKoreanKeyboard}"
       data-renderer="${renderer}"
     ></div>`;
 }

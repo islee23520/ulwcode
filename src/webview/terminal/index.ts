@@ -4,6 +4,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { readTerminalConfig } from "./config";
 import { createKeyboardHandler } from "./keyboard";
+import { createKoreanKeyboardInputSourceDetector } from "./korean-keyboard-auto-switch";
 import { copyOsc52ToClipboard, copySelectionToClipboard } from "../clipboard";
 import {
   setupResizeHandling,
@@ -112,6 +113,9 @@ export function initTerminal(
     sendKeybindingsToShell: config.sendKeybindingsToShell,
   });
   terminal.attachCustomKeyEventHandler(keyboardHandler.handler);
+  const detectKoreanKeyboardInputSource = config.autoSwitchKoreanKeyboard
+    ? createKoreanKeyboardInputSourceDetector()
+    : undefined;
 
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
@@ -171,6 +175,10 @@ export function initTerminal(
 
   terminal.onData((data) => {
     if (data) {
+      const target = detectKoreanKeyboardInputSource?.(data);
+      if (target) {
+        postMessage({ type: "switchKeyboardInputSource", target });
+      }
       options.onData(data);
     }
   });

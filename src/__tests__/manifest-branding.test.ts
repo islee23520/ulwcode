@@ -74,7 +74,7 @@ describe("package manifest branding", () => {
 
     expect(manifest.name).toBe("opencode-sidebar-tui");
     expect(manifest.publisher).toBe("islee23520");
-    expect(manifest.version).toBe("1.11.5");
+    expect(manifest.version).toBe("1.11.6");
     expect(manifest.displayName).toBe("ulwcode-sidebar-terminal");
     expect(manifest.description).toBe(
       "sidebar terminal Extension for VS Code with tmux, zellij, and native terminal support",

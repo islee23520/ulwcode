@@ -2,7 +2,7 @@
   "name": "opencode-sidebar-tui",
   "displayName": "ulwcode-sidebar-terminal",
   "description": "sidebar terminal Extension for VS Code with tmux, zellij, and native terminal support",
-  "version": "1.11.5",
+  "version": "1.11.6",
   "publisher": "islee23520",
   "icon": "icon.png",
   "engines": {
@@ -457,6 +457,11 @@
           "type": "boolean",
           "default": true,
           "description": "Send Ctrl/Cmd + letter shortcuts (including Ctrl+P) directly to the sidebar terminal instead of letting VS Code intercept them. This extension's main purpose is running opencode (a TUI with its own keybindings), so the default is ON. You can turn it off if you prefer normal IDE shortcuts even when the sidebar terminal is focused. Control keys like Ctrl+C are always sent to the terminal."
+        },
+        "ulw.autoSwitchKoreanKeyboard": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically switch the macOS system input source between English and Korean when the sidebar terminal detects likely Korean/English keyboard layout mistakes. Disabled by default."
         },
         "ulw.showTmuxWindowControls": {
           "type": "boolean",

@@ -65,11 +65,21 @@ export class TerminalProvider
     private readonly instanceStore?: InstanceStore,
     private readonly tmuxSessionManager?: TmuxSessionManager,
     private readonly zellijSessionManager?: ZellijSessionManager,
-    private readonly backendRegistry: TerminalBackendRegistry = new TerminalBackendRegistry([
-      { type: "native", label: "Native", isAvailable: () => true },
-      { type: "tmux", label: "Tmux", isAvailable: () => !!tmuxSessionManager },
-      { type: "zellij", label: "Zellij", isAvailable: () => !!zellijSessionManager },
-    ]),
+    private readonly backendRegistry: TerminalBackendRegistry = new TerminalBackendRegistry(
+      [
+        { type: "native", label: "Native", isAvailable: () => true },
+        {
+          type: "tmux",
+          label: "Tmux",
+          isAvailable: () => !!tmuxSessionManager,
+        },
+        {
+          type: "zellij",
+          label: "Zellij",
+          isAvailable: () => !!zellijSessionManager,
+        },
+      ],
+    ),
     private readonly nativeTerminalManager?: NativeTerminalManager,
     private readonly tmuxPaneSyncService?: TmuxPaneSyncService,
     // zellijPaneSyncService: reserved for Phase 3 zellij pane sync operations
@@ -112,7 +122,8 @@ export class TerminalProvider
     const routerBridge: MessageRouterProviderBridge = {
       startOpenCode: () => this.startOpenCode(),
       switchToTmuxSession: (sessionId) => this.switchToTmuxSession(sessionId),
-      switchToZellijSession: (sessionId) => this.switchToZellijSession(sessionId),
+      switchToZellijSession: (sessionId) =>
+        this.switchToZellijSession(sessionId),
       killTmuxSession: (sessionId) => this.killTmuxSession(sessionId),
       createTmuxSession: () => this.createTmuxSession(),
       toggleDashboard: () => this.toggleDashboard(),
@@ -146,7 +157,8 @@ export class TerminalProvider
       isTmuxAvailable: () => !!this.tmuxSessionManager,
       isZellijAvailable: () => !!this.zellijSessionManager,
       getActiveBackend: () => this.sessionRuntime.getActiveBackend(),
-      getBackendAvailability: () => this.sessionRuntime.getBackendAvailability(),
+      getBackendAvailability: () =>
+        this.sessionRuntime.getBackendAvailability(),
       switchPaneBackend: (paneId, backend) =>
         this.switchPaneBackend(paneId, backend),
     };
@@ -563,7 +575,9 @@ export class TerminalProvider
           this.sessionRuntime.resolveZellijSessionIdForInstance(instanceId) ??
           sessionId;
         if (typeof this.zellijSessionManager.switchSession === "function") {
-          await this.zellijSessionManager.switchSession(effectiveZellijSessionId);
+          await this.zellijSessionManager.switchSession(
+            effectiveZellijSessionId,
+          );
         }
         if (targetPaneId) {
           await this.zellijSessionManager.selectPane(targetPaneId);
@@ -613,7 +627,9 @@ export class TerminalProvider
   private handleMessage(message: unknown, surfacePaneId?: string): void {
     const scopedMessage = this.withSurfacePaneId(message, surfacePaneId);
     if (this.isPaneScopedWebviewMessage(scopedMessage)) {
-      this.dataThrottleService.setFocusedPane(this.normalizePaneId(scopedMessage.paneId));
+      this.dataThrottleService.setFocusedPane(
+        this.normalizePaneId(scopedMessage.paneId),
+      );
     }
 
     if (this.isPaneCreateWebviewMessage(scopedMessage)) {
@@ -706,7 +722,11 @@ export class TerminalProvider
     );
 
     const runningTool = this.tmuxSessionManager
-      ? await this.detectRunningTmuxAiTool(effectiveSessionId, targetPaneId, tools)
+      ? await this.detectRunningTmuxAiTool(
+          effectiveSessionId,
+          targetPaneId,
+          tools,
+        )
       : undefined;
     if (runningTool) {
       this.sessionRuntime.rememberSelectedTool(runningTool, instanceId);
@@ -830,13 +850,19 @@ export class TerminalProvider
       });
 
       if (activeBackend === "tmux" && this.tmuxPaneSyncService) {
-        const tmuxSessionId = this.sessionRuntime.getSelectedTmuxSessionId?.() ?? this.sessionRuntime.getSession(TerminalProvider.DEFAULT_PANE_ID)?.tmuxSessionId;
+        const tmuxSessionId =
+          this.sessionRuntime.getSelectedTmuxSessionId?.() ??
+          this.sessionRuntime.getSession(TerminalProvider.DEFAULT_PANE_ID)
+            ?.tmuxSessionId;
         if (tmuxSessionId) {
           try {
             const direction = message.direction ?? "horizontal";
             await this.tmuxPaneSyncService.splitPane(tmuxSessionId, direction);
           } catch (error) {
-            console.warn('[TerminalProvider] tmux split-pane sync failed', error);
+            console.warn(
+              "[TerminalProvider] tmux split-pane sync failed",
+              error,
+            );
           }
         }
       }
@@ -940,7 +966,10 @@ export class TerminalProvider
 
     if (this.isPaneScopedHostMessage(message)) {
       const paneId = this.normalizePaneId(message.paneId);
-      if (message.type === "focusTerminal" || message.type === "webviewVisible") {
+      if (
+        message.type === "focusTerminal" ||
+        message.type === "webviewVisible"
+      ) {
         this.dataThrottleService.setFocusedPane(paneId);
         this.dataThrottleService.flush();
       }
@@ -960,9 +989,10 @@ export class TerminalProvider
       return;
     }
 
-    const activeBackend = "backend" in message && message.backend
-      ? message.backend
-      : this.sessionRuntime.getActiveBackend();
+    const activeBackend =
+      "backend" in message && message.backend
+        ? message.backend
+        : this.sessionRuntime.getActiveBackend();
     this._view.title = "ULW";
     this._view.description = formatActiveSessionLabel(message, activeBackend);
   }
@@ -1117,9 +1147,7 @@ export class TerminalProvider
     );
   }
 
-  private isPaneScopedHostMessage(
-    message: unknown,
-  ): message is Extract<
+  private isPaneScopedHostMessage(message: unknown): message is Extract<
     HostMessage,
     {
       type:
@@ -1183,7 +1211,11 @@ export class TerminalProvider
 
   private isPaneCreateWebviewMessage(
     message: unknown,
-  ): message is { type: "paneCreate"; paneId?: string; direction?: "horizontal" | "vertical" } {
+  ): message is {
+    type: "paneCreate";
+    paneId?: string;
+    direction?: "horizontal" | "vertical";
+  } {
     return (
       typeof message === "object" &&
       message !== null &&
@@ -1282,13 +1314,14 @@ export class TerminalProvider
         this.getActiveInstanceId(),
       );
     const activeBackend = this.sessionRuntime.getActiveBackend();
-    const zellijSessionId = this.sessionRuntime.resolveZellijSessionIdForInstance(
-      this.getActiveInstanceId(),
-    );
+    const zellijSessionId =
+      this.sessionRuntime.resolveZellijSessionIdForInstance(
+        this.getActiveInstanceId(),
+      );
     const sessionId =
       activeBackend === "zellij"
         ? zellijSessionId
-        : selectedSessionId ?? resolvedSessionId;
+        : (selectedSessionId ?? resolvedSessionId);
     const sessionBackend: TerminalBackendType = zellijSessionId
       ? "zellij"
       : sessionId
@@ -1431,6 +1464,10 @@ export class TerminalProvider
         "sendKeybindingsToShell",
         true,
       ),
+      autoSwitchKoreanKeyboard: config.get<boolean>(
+        "autoSwitchKoreanKeyboard",
+        false,
+      ),
       renderer: config.get<"webgl" | "canvas" | "auto">(
         "pane.renderer",
         "auto",
@@ -1515,6 +1552,7 @@ export class TerminalProvider
       cursorStyle: terminalConfig.cursorStyle,
       scrollback: String(terminalConfig.scrollback),
       sendKeybindingsToShell: String(terminalConfig.sendKeybindingsToShell),
+      autoSwitchKoreanKeyboard: String(terminalConfig.autoSwitchKoreanKeyboard),
       renderer: terminalConfig.renderer,
       showTmuxWindowControls: String(terminalConfig.showTmuxWindowControls),
     });
@@ -1562,7 +1600,9 @@ export class TerminalProvider
   }
 
   private getFocusedPaneId(): string {
-    return this.paneStore.getActivePane()?.paneId ?? TerminalProvider.DEFAULT_PANE_ID;
+    return (
+      this.paneStore.getActivePane()?.paneId ?? TerminalProvider.DEFAULT_PANE_ID
+    );
   }
 
   private setFocusedPane(paneId: string): void {
@@ -1579,9 +1619,8 @@ export class TerminalProvider
       return nextPaneId;
     }
 
-    const firstRemainingPaneId = this.paneStore.getAllPanes().keys().next().value as
-      | string
-      | undefined;
+    const firstRemainingPaneId = this.paneStore.getAllPanes().keys().next()
+      .value as string | undefined;
     if (firstRemainingPaneId) {
       this.paneStore.setActivePane(firstRemainingPaneId);
       return firstRemainingPaneId;
@@ -1599,12 +1638,18 @@ export class TerminalProvider
       return undefined;
     }
     if (backend === "tmux") {
-      const tmuxSessionId = this.sessionRuntime.getSession(TerminalProvider.DEFAULT_PANE_ID)?.tmuxSessionId;
+      const tmuxSessionId = this.sessionRuntime.getSession(
+        TerminalProvider.DEFAULT_PANE_ID,
+      )?.tmuxSessionId;
       return tmuxSessionId ? { tmux: { sessionId: tmuxSessionId } } : undefined;
     }
     if (backend === "zellij") {
-      const zellijSessionId = this.sessionRuntime.getSession(TerminalProvider.DEFAULT_PANE_ID)?.zellijSessionId;
-      return zellijSessionId ? { zellij: { sessionId: zellijSessionId } } : undefined;
+      const zellijSessionId = this.sessionRuntime.getSession(
+        TerminalProvider.DEFAULT_PANE_ID,
+      )?.zellijSessionId;
+      return zellijSessionId
+        ? { zellij: { sessionId: zellijSessionId } }
+        : undefined;
     }
     return undefined;
   }

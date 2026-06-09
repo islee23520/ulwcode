@@ -1644,7 +1644,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       );
     });
 
-    it("withLaunchEnvironment forwards IDE context vars for every tmux-launched tool", () => {
+    it("withLaunchEnvironment forwards only the narrow IDE context vars for every tmux-launched tool", () => {
       const runtime = sessionRuntime as unknown as {
         withLaunchEnvironment: (
           command: string,
@@ -1654,19 +1654,23 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       const originalTermProgram = process.env.TERM_PROGRAM;
       const originalTermProgramVersion = process.env.TERM_PROGRAM_VERSION;
       const originalIpcHook = process.env.VSCODE_IPC_HOOK_CLI;
+      const originalVscodeCwd = process.env.VSCODE_CWD;
+      const originalVscodeGitIpc = process.env.VSCODE_GIT_IPC_HANDLE;
       const originalCodexSocket = process.env.CODEX_IDE_CONTEXT_SOCKET;
 
       try {
         process.env.TERM_PROGRAM = "vscode";
-        delete process.env.TERM_PROGRAM_VERSION;
+        process.env.TERM_PROGRAM_VERSION = "1.123.0";
+        process.env.VSCODE_CWD = "/Users/example";
+        process.env.VSCODE_GIT_IPC_HANDLE = "/tmp/vscode-git.sock";
         process.env.VSCODE_IPC_HOOK_CLI = "/tmp/vscode hook.sock";
         process.env.CODEX_IDE_CONTEXT_SOCKET = "/tmp/codex-ipc/context.sock";
 
         expect(runtime.withLaunchEnvironment("codex", undefined)).toBe(
-          "TERM_PROGRAM=vscode VSCODE_IPC_HOOK_CLI='/tmp/vscode hook.sock' CODEX_IDE_CONTEXT_SOCKET=/tmp/codex-ipc/context.sock codex",
+          "VSCODE_IPC_HOOK_CLI='/tmp/vscode hook.sock' CODEX_IDE_CONTEXT_SOCKET=/tmp/codex-ipc/context.sock codex",
         );
         expect(runtime.withLaunchEnvironment("claude", undefined)).toBe(
-          "TERM_PROGRAM=vscode VSCODE_IPC_HOOK_CLI='/tmp/vscode hook.sock' CODEX_IDE_CONTEXT_SOCKET=/tmp/codex-ipc/context.sock claude",
+          "VSCODE_IPC_HOOK_CLI='/tmp/vscode hook.sock' CODEX_IDE_CONTEXT_SOCKET=/tmp/codex-ipc/context.sock claude",
         );
       } finally {
         if (originalTermProgram === undefined) {
@@ -1678,6 +1682,16 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
           delete process.env.TERM_PROGRAM_VERSION;
         } else {
           process.env.TERM_PROGRAM_VERSION = originalTermProgramVersion;
+        }
+        if (originalVscodeCwd === undefined) {
+          delete process.env.VSCODE_CWD;
+        } else {
+          process.env.VSCODE_CWD = originalVscodeCwd;
+        }
+        if (originalVscodeGitIpc === undefined) {
+          delete process.env.VSCODE_GIT_IPC_HANDLE;
+        } else {
+          process.env.VSCODE_GIT_IPC_HANDLE = originalVscodeGitIpc;
         }
         if (originalIpcHook === undefined) {
           delete process.env.VSCODE_IPC_HOOK_CLI;

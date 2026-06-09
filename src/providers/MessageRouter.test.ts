@@ -3,24 +3,27 @@ import type * as vscodeApi from "vscode";
 import type * as vscodeTypes from "../test/mocks/vscode";
 import type { MessageRouterProviderBridge } from "./MessageRouter";
 import { MessageRouter } from "./MessageRouter";
+import { InputSourceSwitcher } from "../services/InputSourceSwitcher";
 import { OutputChannelService } from "../services/OutputChannelService";
 import type { TerminalManager } from "../terminals/TerminalManager";
 import type { OutputCaptureManager } from "../services/OutputCaptureManager";
 import type { TerminalBackendType } from "../types";
 
 const mockWriteFile = vi.hoisted(() =>
-  vi.fn(async (file: string | Buffer | URL, data: unknown, options?: unknown) => {
-    if (String(file).includes("/tmp/opencode-tests/")) {
+  vi.fn(
+    async (file: string | Buffer | URL, data: unknown, options?: unknown) => {
+      if (String(file).includes("/tmp/opencode-tests/")) {
+        return undefined;
+      }
+      const fs = await import("node:fs");
+      await fs.promises.writeFile(
+        file,
+        data as Parameters<typeof fs.promises.writeFile>[1],
+        options as Parameters<typeof fs.promises.writeFile>[2],
+      );
       return undefined;
-    }
-    const fs = await import("node:fs");
-    await fs.promises.writeFile(
-      file,
-      data as Parameters<typeof fs.promises.writeFile>[1],
-      options as Parameters<typeof fs.promises.writeFile>[2],
-    );
-    return undefined;
-  }),
+    },
+  ),
 );
 const mockUnlink = vi.hoisted(() =>
   vi.fn(async (file: string | Buffer | URL) => {
@@ -145,28 +148,36 @@ describe("MessageRouter", () => {
     OutputChannelService.resetInstance();
     vi.useRealTimers();
 
-    mockWriteFile.mockReset().mockImplementation(
-      async (file: string | Buffer | URL, data: unknown, options?: unknown) => {
+    mockWriteFile
+      .mockReset()
+      .mockImplementation(
+        async (
+          file: string | Buffer | URL,
+          data: unknown,
+          options?: unknown,
+        ) => {
+          if (String(file).includes("/tmp/opencode-tests/")) {
+            return undefined;
+          }
+          const fs = await import("node:fs");
+          await fs.promises.writeFile(
+            file,
+            data as Parameters<typeof fs.promises.writeFile>[1],
+            options as Parameters<typeof fs.promises.writeFile>[2],
+          );
+          return undefined;
+        },
+      );
+    mockUnlink
+      .mockReset()
+      .mockImplementation(async (file: string | Buffer | URL) => {
         if (String(file).includes("/tmp/opencode-tests/")) {
           return undefined;
         }
         const fs = await import("node:fs");
-        await fs.promises.writeFile(
-          file,
-          data as Parameters<typeof fs.promises.writeFile>[1],
-          options as Parameters<typeof fs.promises.writeFile>[2],
-        );
+        await fs.promises.unlink(file);
         return undefined;
-      },
-    );
-    mockUnlink.mockReset().mockImplementation(async (file: string | Buffer | URL) => {
-      if (String(file).includes("/tmp/opencode-tests/")) {
-        return undefined;
-      }
-      const fs = await import("node:fs");
-      await fs.promises.unlink(file);
-      return undefined;
-    });
+      });
     mockNormalize
       .mockReset()
       .mockImplementation((value: string) => value.replace(/\\/g, "/"));
@@ -296,6 +307,31 @@ describe("MessageRouter", () => {
     );
   });
 
+  it("routes keyboard input source switch requests to the system switcher", async () => {
+    const inputSourceSwitcher = new InputSourceSwitcher({ platform: "linux" });
+    const switchTo = vi
+      .spyOn(inputSourceSwitcher, "switchTo")
+      .mockResolvedValue(undefined);
+    const routerWithSwitcher = new MessageRouter(
+      provider,
+      context,
+      terminalManager as TerminalManager,
+      captureManager as OutputCaptureManager,
+      undefined,
+      {} as never,
+      logger,
+      undefined,
+      inputSourceSwitcher,
+    );
+
+    await routerWithSwitcher.handleMessage({
+      type: "switchKeyboardInputSource",
+      target: "korean",
+    });
+
+    expect(switchTo).toHaveBeenCalledWith("korean");
+  });
+
   it("ignores duplicate terminal resize messages for the same pane", async () => {
     await router.handleMessage({ type: "terminalResize", cols: 100, rows: 30 });
     await router.handleMessage({ type: "terminalResize", cols: 100, rows: 30 });
@@ -407,16 +443,23 @@ describe("MessageRouter", () => {
   });
 
   it("routes switchSession through zellij when zellij backend is active", async () => {
-    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(() => "zellij");
+    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(
+      () => "zellij",
+    );
 
-    await router.handleMessage({ type: "switchSession", sessionId: "zellij-a" });
+    await router.handleMessage({
+      type: "switchSession",
+      sessionId: "zellij-a",
+    });
 
     expect(provider.switchToZellijSession).toHaveBeenCalledWith("zellij-a");
     expect(provider.switchToTmuxSession).not.toHaveBeenCalled();
   });
 
   it("routes killSession through the backend-aware session runtime bridge for zellij", async () => {
-    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(() => "zellij");
+    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(
+      () => "zellij",
+    );
 
     await router.handleMessage({ type: "killSession", sessionId: "zellij-b" });
 
@@ -424,7 +467,9 @@ describe("MessageRouter", () => {
   });
 
   it("routes zoomTmuxPane through the backend-aware session runtime bridge for zellij", async () => {
-    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(() => "zellij");
+    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(
+      () => "zellij",
+    );
 
     await router.handleMessage({ type: "zoomTmuxPane" });
 
@@ -502,7 +547,10 @@ describe("MessageRouter", () => {
       (value: string) => value,
     );
 
-    await router.handleFilesDropped(["/workspace/has space/owner's note.md"], false);
+    await router.handleFilesDropped(
+      ["/workspace/has space/owner's note.md"],
+      false,
+    );
 
     expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
       "terminal-1",
@@ -1010,7 +1058,10 @@ describe("MessageRouter", () => {
     await router.handleMessage({ type: "openFile", path: 123 });
     await router.handleMessage({ type: "setClipboard", text: 123 });
     await router.handleMessage({ type: "imagePasted", data: 123 });
-    await router.handleMessage({ type: "selectTerminalBackend", backend: "native" });
+    await router.handleMessage({
+      type: "selectTerminalBackend",
+      backend: "native",
+    });
     await router.handleMessage({ type: "requestRestart" });
     await router.handleMessage({ type: "unknownMessage" });
 
@@ -1020,17 +1071,24 @@ describe("MessageRouter", () => {
   });
 
   it("keeps create-session and raw-command behavior backend aware for zellij", async () => {
-    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(() => "zellij");
+    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(
+      () => "zellij",
+    );
     const warnSpy = vi.spyOn(logger, "warn");
 
     await router.handleMessage({ type: "createTmuxSession" });
-    await router.handleMessage({ type: "executeTmuxRawCommand", subcommand: "choose-tree" });
+    await router.handleMessage({
+      type: "executeTmuxRawCommand",
+      subcommand: "choose-tree",
+    });
 
     expect(provider.selectTerminalBackend).toHaveBeenCalledWith("zellij");
     expect(provider.createTmuxSession).not.toHaveBeenCalled();
     expect(provider.executeRawTmuxCommand).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("executeTmuxRawCommand ignored for zellij backend"),
+      expect.stringContaining(
+        "executeTmuxRawCommand ignored for zellij backend",
+      ),
     );
   });
 
@@ -1050,7 +1108,12 @@ describe("MessageRouter", () => {
       "Invalid file path: Only file URIs can be opened",
     );
 
-    await router.handleOpenFile("file:///workspace/absolute.ts", 1, undefined, 1);
+    await router.handleOpenFile(
+      "file:///workspace/absolute.ts",
+      1,
+      undefined,
+      1,
+    );
     await router.handleOpenFile("C:\\workspace\\absolute.ts");
 
     expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
@@ -1111,29 +1174,39 @@ describe("MessageRouter", () => {
     const exact = vscode.Uri.file("/workspace/src/providers/MessageRouter.ts");
     vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([first, exact]);
 
-    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
-      exact,
-    );
+    expect(
+      await router.fuzzyMatchFile("src/providers/MessageRouter.ts"),
+    ).toEqual(exact);
 
-    const wrongDir = vscode.Uri.file("/workspace/other/providers/MessageRouter.tsx");
+    const wrongDir = vscode.Uri.file(
+      "/workspace/other/providers/MessageRouter.tsx",
+    );
     const matchingDir = vscode.Uri.file("src/providers/MessageRouter.tsx");
     vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([
       wrongDir,
       matchingDir,
     ]);
 
-    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.tsx")).toEqual(
-      matchingDir,
-    );
+    expect(
+      await router.fuzzyMatchFile("src/providers/MessageRouter.tsx"),
+    ).toEqual(matchingDir);
   });
 
   it("routes zellij session switches and ignores malformed session messages", async () => {
-    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(() => "zellij");
+    provider.getActiveBackend = vi.fn<() => TerminalBackendType>(
+      () => "zellij",
+    );
 
-    await router.handleMessage({ type: "switchSession", sessionId: "zellij-a" });
+    await router.handleMessage({
+      type: "switchSession",
+      sessionId: "zellij-a",
+    });
     await router.handleMessage({ type: "switchSession", sessionId: 42 });
     await router.handleMessage({ type: "killSession", sessionId: 42 });
-    await router.handleMessage({ type: "sendTmuxPromptChoice", choice: "ignored" });
+    await router.handleMessage({
+      type: "sendTmuxPromptChoice",
+      choice: "ignored",
+    });
 
     expect(provider.switchToZellijSession).toHaveBeenCalledWith("zellij-a");
     expect(provider.switchToTmuxSession).not.toHaveBeenCalled();
@@ -1143,7 +1216,9 @@ describe("MessageRouter", () => {
   });
 
   it("logs non-Error command failures with stringified messages", async () => {
-    vi.mocked(vscode.commands.executeCommand).mockRejectedValueOnce("command down");
+    vi.mocked(vscode.commands.executeCommand).mockRejectedValueOnce(
+      "command down",
+    );
     provider.executeRawTmuxCommand = vi.fn().mockRejectedValueOnce("raw down");
     const errorSpy = vi.spyOn(logger, "error");
 
@@ -1197,7 +1272,9 @@ describe("MessageRouter", () => {
       expect.objectContaining({ preview: true }),
     );
     expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
-      expect.objectContaining({ fsPath: "/workspace/relative/no-workspace.ts" }),
+      expect.objectContaining({
+        fsPath: "/workspace/relative/no-workspace.ts",
+      }),
       expect.objectContaining({ preview: true }),
     );
     expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
@@ -1219,7 +1296,9 @@ describe("MessageRouter", () => {
     await router.handleImagePasted("data:image/png;base64,aGVsbG8=");
     expect(provider.pasteText).not.toHaveBeenCalled();
 
-    mockRandomUUID.mockReturnValueOnce("drop-empty").mockReturnValueOnce("drop-bad");
+    mockRandomUUID
+      .mockReturnValueOnce("drop-empty")
+      .mockReturnValueOnce("drop-bad");
     await router.handleFilesDropped([], false, undefined, [
       { name: "   ", data: "data:image/png;base64,aGVsbG8=" },
       { name: "folder/???.png", data: "data:image/png;base64,aGVsbG8=" },
@@ -1255,16 +1334,16 @@ describe("MessageRouter", () => {
       exactFirst,
       exactSecond,
     ]);
-    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
-      exactSecond,
-    );
+    expect(
+      await router.fuzzyMatchFile("src/providers/MessageRouter.ts"),
+    ).toEqual(exactSecond);
     vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([
       exactSecond,
       exactFirst,
     ]);
-    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
-      exactSecond,
-    );
+    expect(
+      await router.fuzzyMatchFile("src/providers/MessageRouter.ts"),
+    ).toEqual(exactSecond);
 
     const firstDirMatch = vscode.Uri.file("src/other/MessageRouter.ts");
     const secondDirMatch = vscode.Uri.file("other/src/MessageRouter.ts");
@@ -1274,20 +1353,22 @@ describe("MessageRouter", () => {
       firstDirMatch,
       neutral,
     ]);
-    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
-      firstDirMatch,
-    );
+    expect(
+      await router.fuzzyMatchFile("src/providers/MessageRouter.ts"),
+    ).toEqual(firstDirMatch);
     vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([
       firstDirMatch,
       secondDirMatch,
       neutral,
     ]);
-    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toEqual(
-      firstDirMatch,
-    );
+    expect(
+      await router.fuzzyMatchFile("src/providers/MessageRouter.ts"),
+    ).toEqual(firstDirMatch);
 
     vi.mocked(vscode.workspace.findFiles).mockRejectedValueOnce("find failed");
-    expect(await router.fuzzyMatchFile("src/providers/MessageRouter.ts")).toBeNull();
+    expect(
+      await router.fuzzyMatchFile("src/providers/MessageRouter.ts"),
+    ).toBeNull();
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining("Fuzzy match failed: find failed"),
     );
@@ -1301,9 +1382,13 @@ describe("MessageRouter", () => {
     provider.zoomTmuxPane = vi.fn().mockRejectedValueOnce("zoom down");
     await router.handleMessage({ type: "zoomTmuxPane" });
 
-    vi.mocked(vscode.env.clipboard.readText).mockRejectedValueOnce("paste down");
+    vi.mocked(vscode.env.clipboard.readText).mockRejectedValueOnce(
+      "paste down",
+    );
     await router.handlePaste();
-    vi.mocked(vscode.env.clipboard.writeText).mockRejectedValueOnce("clip down");
+    vi.mocked(vscode.env.clipboard.writeText).mockRejectedValueOnce(
+      "clip down",
+    );
     await router.handleSetClipboard("text");
 
     mockWriteFile.mockRejectedValueOnce("image down");
@@ -1335,17 +1420,24 @@ describe("MessageRouter", () => {
         shellIntegration: { cwd: {} },
       } as unknown as vscodeApi.Terminal,
     ];
-    expect(await router.getTerminalEntries()).toEqual([{ name: "No Cwd", cwd: "" }]);
+    expect(await router.getTerminalEntries()).toEqual([
+      { name: "No Cwd", cwd: "" },
+    ]);
 
     expect(sanitized).toBe("dropped-file");
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("zoom down"));
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("paste down"));
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("paste down"),
+    );
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("clip down"));
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("image down"));
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("image down"),
+    );
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("blob down"));
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("unlink down"));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("unlink down"),
+    );
     errorSpy.mockRestore();
     warnSpy.mockRestore();
   });
-
 });

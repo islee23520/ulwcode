@@ -23,6 +23,7 @@ export function renderTerminalHtml({
   cursorStyle,
   scrollback,
   sendKeybindingsToShell,
+  autoSwitchKoreanKeyboard,
   renderer,
   showTmuxWindowControls,
 }: TerminalHtmlParams): string {
@@ -47,6 +48,7 @@ export function renderTerminalHtml({
       cursorStyle,
       scrollback,
       sendKeybindingsToShell,
+      autoSwitchKoreanKeyboard,
       renderer,
     })}
     ${renderTmuxPrompt()}
