@@ -277,7 +277,7 @@ describe("registerTerminalCommands", () => {
     expect(deps.provider?.focus).not.toHaveBeenCalled();
   });
 
-  it("sends editor references and falls back to cwd when @mention cannot be created", () => {
+  it("sends editor references, focuses the terminal, and falls back to cwd when @mention cannot be created", () => {
     const document = new vscode.TextDocument(
       vscode.Uri.file("/workspace/file.ts"),
       "content",
@@ -299,13 +299,13 @@ describe("registerTerminalCommands", () => {
     );
     expect(successDeps.sendPrompt).toHaveBeenCalledWith("@src/file.ts#L1 ");
 
-    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "ulw.focus",
     );
 
     vi.advanceTimersByTime(100);
 
-    expect(successDeps.provider?.focus).not.toHaveBeenCalled();
+    expect(successDeps.provider?.focus).toHaveBeenCalledTimes(1);
 
     vi.clearAllMocks();
     mockAutoFocusOnSend(true);
@@ -336,6 +336,35 @@ describe("registerTerminalCommands", () => {
     );
     expect(noEditorDeps.sendTerminalCwd).toHaveBeenCalledTimes(1);
     expect(noEditorDeps.sendPrompt).not.toHaveBeenCalled();
+  });
+
+  it("skips focus after sending an @mention when autoFocusOnSend is disabled", () => {
+    mockAutoFocusOnSend(false);
+    const deps = createDependencies();
+    const document = new vscode.TextDocument(
+      vscode.Uri.file("/workspace/file.ts"),
+      "content",
+    );
+    const selection = new vscode.Selection(0, 0, 0, 1);
+    vscode.window.activeTextEditor = new vscode.TextEditor(
+      document,
+      selection,
+    );
+    vi.mocked(deps.provider!.formatEditorReference).mockReturnValue(
+      "@src/file.ts#L1",
+    );
+
+    const commands = registerAndGetCommands(deps);
+    getCommand(commands, "ulw.sendAtMention")();
+
+    expect(deps.sendPrompt).toHaveBeenCalledWith("@src/file.ts#L1 ");
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "ulw.focus",
+    );
+
+    vi.runAllTimers();
+
+    expect(deps.provider?.focus).not.toHaveBeenCalled();
   });
 
   it("sends all open file references while filtering unsupported tabs", () => {
