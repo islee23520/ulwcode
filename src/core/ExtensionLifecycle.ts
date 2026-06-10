@@ -26,7 +26,6 @@ import {
   StaticTerminalBackend,
   TerminalBackendRegistry,
 } from "../services/terminalBackends";
-import { TerminalDashboardProvider } from "../providers/TerminalDashboardProvider";
 import {
   registerCommands as registerAllCommands,
   type RegisterCommandDependencies,
@@ -56,7 +55,6 @@ export class ExtensionLifecycle {
   private tmuxPaneSyncService: TmuxPaneSyncService | undefined;
   private zellijPaneSyncService: ZellijPaneSyncService | undefined;
   private backendRegistry: TerminalBackendRegistry | undefined;
-  private terminalDashboardProvider: TerminalDashboardProvider | undefined;
   private activated = false;
   private tuiProviderRegistration: vscode.Disposable | undefined;
   private context?: vscode.ExtensionContext;
@@ -251,27 +249,6 @@ export class ExtensionLifecycle {
         }
       }
 
-      if (this.tmuxSessionManager) {
-        this.terminalDashboardProvider = new TerminalDashboardProvider(
-          context,
-          this.tmuxSessionManager,
-          logger,
-          this.instanceStore,
-          this.tuiProvider,
-          this.zellijSessionManager,
-          this.threadHistoryStore,
-        );
-
-        context.subscriptions.push(
-          vscode.commands.registerCommand(
-            "ulw.openTerminalManager",
-            () => {
-              this.terminalDashboardProvider?.show();
-            },
-          ),
-        );
-      }
-
       this.registerCommands(context);
 
       // Consume pending session window handoff (from dashboard "open in new window")
@@ -295,7 +272,7 @@ export class ExtensionLifecycle {
       context.subscriptions.push(codeActionRegistration, explainAndFixCommand);
 
       // Expose that the extension is fully active so editor/title buttons
-      // (openTerminalInEditor, openTerminalManager, etc.) only appear after
+      // (openTerminalInEditor, etc.) only appear after
       // commands are registered. This prevents "command not found" errors.
       await vscode.commands.executeCommand("setContext", "ulw.active", true);
 
@@ -619,11 +596,6 @@ export class ExtensionLifecycle {
 
     if (this.instanceStore) {
       this.instanceStore = undefined;
-    }
-
-    if (this.terminalDashboardProvider) {
-      this.terminalDashboardProvider.dispose();
-      this.terminalDashboardProvider = undefined;
     }
 
     this.codeActionProvider = undefined;

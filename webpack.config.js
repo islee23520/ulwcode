@@ -51,7 +51,6 @@ const webviewConfig = {
   mode: "none",
   entry: {
     main: "./src/webview/main.ts",
-    dashboard: "./src/webview/dashboard-manager.tsx",
   },
   output: {
     path: path.resolve(__dirname, "dist"),

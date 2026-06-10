@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ExtensionLifecycle } from "./ExtensionLifecycle";
-import { TerminalDashboardProvider } from "../providers/TerminalDashboardProvider";
 import { OutputCaptureManager } from "../services/OutputCaptureManager";
 import { OutputChannelService } from "../services/OutputChannelService";
 import { InstanceRegistry } from "../services/InstanceRegistry";
@@ -75,10 +74,6 @@ describe("ExtensionLifecycle", () => {
         }),
       );
 
-      expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
-        "ulw.openTerminalManager",
-        expect.any(Function),
-      );
       expect(vscode.window.registerWebviewPanelSerializer).toHaveBeenCalledWith(
         "ulw.terminalEditor",
         expect.any(Object),
@@ -378,22 +373,6 @@ describe("ExtensionLifecycle", () => {
       );
     });
 
-    it("should open the terminal dashboard through the registered command", async () => {
-      const showSpy = vi
-        .spyOn(TerminalDashboardProvider.prototype, "show")
-        .mockImplementation(() => undefined);
-
-      await lifecycle.activate(mockContext);
-
-      const openTerminalManager = getRegisteredCommandHandler<() => void>(
-        "ulw.openTerminalManager",
-      );
-
-      openTerminalManager();
-
-      expect(showSpy).toHaveBeenCalledTimes(1);
-    });
-
     it("should handle activation errors", async () => {
       vi.mocked(vscode.window.registerWebviewViewProvider).mockImplementation(
         () => {
@@ -455,7 +434,6 @@ describe("ExtensionLifecycle", () => {
       const contextManager = { dispose: vi.fn() };
       const instanceDiscoveryService = { dispose: vi.fn() };
       const instanceRegistry = { dispose: vi.fn() };
-      const terminalDashboardProvider = { dispose: vi.fn() };
       const tuiProviderRegistration = { dispose: vi.fn() };
       const tmuxPaneSyncService = { dispose: vi.fn() };
       const zellijPaneSyncService = { dispose: vi.fn() };
@@ -471,11 +449,6 @@ describe("ExtensionLifecycle", () => {
       );
       Reflect.set(lifecycle, "instanceRegistry", instanceRegistry);
       Reflect.set(lifecycle, "instanceStore", new InstanceStore());
-      Reflect.set(
-        lifecycle,
-        "terminalDashboardProvider",
-        terminalDashboardProvider,
-      );
       Reflect.set(lifecycle, "tuiProviderRegistration", tuiProviderRegistration);
       Reflect.set(lifecycle, "tmuxPaneSyncService", tmuxPaneSyncService);
       Reflect.set(lifecycle, "zellijPaneSyncService", zellijPaneSyncService);
@@ -489,7 +462,6 @@ describe("ExtensionLifecycle", () => {
       expect(contextManager.dispose).toHaveBeenCalledTimes(1);
       expect(instanceDiscoveryService.dispose).toHaveBeenCalledTimes(1);
       expect(instanceRegistry.dispose).toHaveBeenCalledTimes(1);
-      expect(terminalDashboardProvider.dispose).toHaveBeenCalledTimes(1);
       expect(tuiProviderRegistration.dispose).toHaveBeenCalledTimes(1);
       expect(tmuxPaneSyncService.dispose).toHaveBeenCalledTimes(1);
       expect(zellijPaneSyncService.dispose).toHaveBeenCalledTimes(1);
@@ -502,7 +474,6 @@ describe("ExtensionLifecycle", () => {
       ).toBeUndefined();
       expect(Reflect.get(lifecycle, "instanceRegistry")).toBeUndefined();
       expect(Reflect.get(lifecycle, "instanceStore")).toBeUndefined();
-      expect(Reflect.get(lifecycle, "terminalDashboardProvider")).toBeUndefined();
       expect(Reflect.get(lifecycle, "tuiProviderRegistration")).toBeUndefined();
       expect(Reflect.get(lifecycle, "tmuxPaneSyncService")).toBeUndefined();
       expect(Reflect.get(lifecycle, "zellijPaneSyncService")).toBeUndefined();

@@ -17,14 +17,14 @@ import {
   type TmuxPaneCommandDependencies,
 } from "./tmuxPaneCommands";
 import {
-  registerDashboardCommands,
-  type DashboardCommandDependencies,
-} from "./dashboardCommands";
+  registerTmuxToolbarCommands,
+  type TmuxToolbarCommandDependencies,
+} from "./tmuxToolbarCommands";
 
 export type RegisterCommandDependencies = TerminalCommandDependencies &
   TmuxSessionCommandDependencies &
   TmuxPaneCommandDependencies &
-  DashboardCommandDependencies & {
+  TmuxToolbarCommandDependencies & {
   terminalManager: TerminalManager | undefined;
   contextSharingService: ContextSharingService | undefined;
   contextManager: ContextManager | undefined;
@@ -40,7 +40,7 @@ export function registerCommands(
     ...registerTerminalCommands(deps),
     ...registerTmuxSessionCommands(deps),
     ...registerTmuxPaneCommands(deps),
-    ...registerDashboardCommands(deps),
+    ...registerTmuxToolbarCommands(deps),
   ];
 
   context.subscriptions.push(...disposables);

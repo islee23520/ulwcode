@@ -261,7 +261,7 @@ Available settings in VS Code settings (`Cmd+,` / `Ctrl+,`):
 | Setting                 | Type    | Default  | Description                                                                 |
 | ----------------------- | ------- | -------- | --------------------------------------------------------------------------- |
 | `ulw.terminalBackend`   | string  | `"tmux"` | Terminal backend: `native`, `tmux`, or `zellij` (unavailable backends fall back to native) |
-| `ulw.enableAutoSpawn`   | boolean | `true`   | When process scan finds no OpenCode instance, try spawning OpenCode in the background (discovery only; does not change sidebar startup) |
+| `ulw.enableAutoSpawn`   | boolean | `false`  | When enabled, discovery may spawn OpenCode in the background if no instance is found (does not affect sidebar terminal startup) |
 | `ulw.showTmuxWindowControls` | boolean | `true` | Show tmux session/window controls in the terminal toolbar                   |
 
 ### Advanced Settings

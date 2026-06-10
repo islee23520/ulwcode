@@ -53,7 +53,9 @@ export function createMessageHandler(
 
         case "terminalExited":
           if (terminal) {
-            terminal.write("\r\n\x1b[31mOpenCode exited\x1b[0m\r\n");
+            terminal.write(
+              "\r\n\x1b[31mTerminal session ended. Reopen the sidebar or restart the session.\x1b[0m\r\n",
+            );
           }
           break;
 

@@ -31,8 +31,7 @@ async function executeCommandWithoutUserInput(commandId: string): Promise<void> 
 suite("Command behavior", () => {
   const safeCommands = [
     "ulw.start",
-    "ulw.toggleDashboard",
-    "ulw.openTerminalManager",
+    "ulw.toggleTmuxCommandToolbar",
     "ulw.browseTmuxSessions",
     "ulw.switchTmuxSession",
     "ulw.switchNativeShell",

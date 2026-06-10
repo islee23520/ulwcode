@@ -33,7 +33,7 @@ suite("Webview registration", () => {
 
     const commands = await vscode.commands.getCommands(true);
     assert.ok(
-      commands.includes("ulw.toggleDashboard"),
+      commands.includes("ulw.toggleTmuxCommandToolbar"),
       "Dashboard command should be registered",
     );
   });

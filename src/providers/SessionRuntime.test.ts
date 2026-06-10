@@ -465,7 +465,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       } as Awaited<ReturnType<TmuxSessionManager["findSessionForWorkspace"]>>);
 
       const switchSpy = vi
-        .spyOn(sessionRuntime, "switchToTmuxSessionWithTool")
+        .spyOn(sessionRuntime, "switchToTmuxSession")
         .mockResolvedValue();
       registerDefaultSession({
         tmuxSessionId: "workspace-session",
@@ -499,8 +499,13 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       });
       (sessionRuntime as unknown as { isStarted: boolean }).isStarted = true;
 
-      const nativeShellSpy = vi
-        .spyOn(sessionRuntime, "switchToNativeShell")
+      const restoreSpy = vi
+        .spyOn(
+          sessionRuntime as unknown as {
+            restoreDefaultPlainTerminal: () => Promise<void>;
+          },
+          "restoreDefaultPlainTerminal",
+        )
         .mockResolvedValue();
       registerDefaultSession({
         tmuxSessionId: "workspace-session",
@@ -514,7 +519,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
       await flushAsyncWork();
 
-      expect(nativeShellSpy).toHaveBeenCalled();
+      expect(restoreSpy).toHaveBeenCalled();
 
       expect(
         instanceStore.get("default")?.runtime.tmuxSessionId,
@@ -1671,7 +1676,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       vi.mocked(mockTmuxSessionManager.createSession).mockResolvedValue();
 
       const switchSpy = vi
-        .spyOn(sessionRuntime, "switchToTmuxSessionWithTool")
+        .spyOn(sessionRuntime, "switchToTmuxSession")
         .mockResolvedValue();
 
       await expect(sessionRuntime.createTmuxSession()).resolves.toBe(
@@ -1682,10 +1687,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         "project-a-3",
         "/workspace/project-a",
       );
-      expect(switchSpy).toHaveBeenCalledWith("project-a-3", undefined, {
-        forceToolPrompt: true,
-        respectPromptAiToolOnSession: true,
-      });
+      expect(switchSpy).toHaveBeenCalledWith("project-a-3");
     });
 
     it("zooms the active pane", async () => {
@@ -1746,7 +1748,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       } as Awaited<ReturnType<TmuxSessionManager["findSessionForWorkspace"]>>);
 
       const switchSpy = vi
-        .spyOn(sessionRuntime, "switchToTmuxSessionWithTool")
+        .spyOn(sessionRuntime, "switchToTmuxSession")
         .mockResolvedValue();
 
       await sessionRuntime.killTmuxSession("workspace-session");
@@ -1757,10 +1759,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       expect(
         instanceStore.get("default")?.runtime.tmuxSessionId,
       ).toBeUndefined();
-      expect(switchSpy).toHaveBeenCalledWith("replacement-session", undefined, {
-        forceToolPrompt: true,
-        respectPromptAiToolOnSession: true,
-      });
+      expect(switchSpy).toHaveBeenCalledWith("replacement-session");
       expect(mockPortManager.releaseTerminalPorts).toHaveBeenCalledWith(
         "default",
       );
@@ -2007,24 +2006,29 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       });
     });
 
-    it("posts terminal output only for the active instance and exits native terminals normally", () => {
+    it("posts terminal output only for the active instance and restores plain shell when native PTY exits", async () => {
       let dataHandler: ((event: { id: string; data: string }) => void) | undefined;
       vi.mocked(mockTerminalManager.onData).mockImplementation((handler) => {
         dataHandler = handler;
         return { dispose: vi.fn() };
       });
       registerDefaultSession();
+      setConfiguration({ terminalBackend: "native" satisfies TerminalBackendType });
+      vi.mocked(mockTmuxSessionManager.discoverSessions).mockResolvedValue([]);
 
       sessionRuntime.reconnectListeners();
       dataHandler?.({ id: "other", data: "ignored" });
       dataHandler?.({ id: "default", data: "hello" });
       exitHandler?.("default");
+      await flushAsyncWork();
 
       expect(postMessageMock).toHaveBeenCalledWith({
         type: "terminalOutput",
         data: "hello",
       });
-      expect(postMessageMock).toHaveBeenCalledWith({ type: "terminalExited" });
+      expect(postMessageMock).toHaveBeenCalledWith({ type: "clearTerminal" });
+      expect(mockTerminalManager.createTerminal).toHaveBeenCalled();
+      expect(postMessageMock).not.toHaveBeenCalledWith({ type: "terminalExited" });
     });
 
     it("restarts by killing the active terminal and requesting a fresh launch", () => {
@@ -2871,14 +2875,12 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         },
       });
       const switchSpy = vi
-        .spyOn(sessionRuntime, "switchToTmuxSessionWithTool")
+        .spyOn(sessionRuntime, "switchToTmuxSession")
         .mockResolvedValue();
 
       await sessionRuntime.selectTerminalBackend("tmux");
 
-      expect(switchSpy).toHaveBeenCalledWith("project-a", undefined, {
-        forceToolPrompt: true,
-      });
+      expect(switchSpy).toHaveBeenCalledWith("project-a");
       expect(
         (
           sessionRuntime as unknown as {
@@ -2975,9 +2977,12 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     it("posts terminalExited when attached tmux restoration fails", async () => {
       upsertInstance({ tmuxSessionId: "workspace-session" });
       (sessionRuntime as unknown as { isStarted: boolean }).isStarted = true;
-      vi.spyOn(sessionRuntime, "switchToNativeShell").mockRejectedValue(
-        new Error("native failed"),
-      );
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          restoreDefaultPlainTerminal: () => Promise<void>;
+        },
+        "restoreDefaultPlainTerminal",
+      ).mockRejectedValue(new Error("restore failed"));
       registerDefaultSession({
         tmuxSessionId: "workspace-session",
         backend: "tmux",
@@ -3986,12 +3991,20 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       expect(findReplacementSpy).not.toHaveBeenCalled();
       expect(nativeSpy).toHaveBeenCalled();
 
-      nativeSpy.mockRejectedValueOnce("restore string");
+      const restoreSpy = vi
+        .spyOn(
+          sessionRuntime as unknown as {
+            restoreDefaultPlainTerminal: () => Promise<void>;
+          },
+          "restoreDefaultPlainTerminal",
+        )
+        .mockRejectedValueOnce("restore string");
       await (
         sessionRuntime as unknown as {
           restoreAfterAttachedTmuxSessionExit: (sessionId: string) => Promise<void>;
         }
       ).restoreAfterAttachedTmuxSessionExit("restore-string");
+      expect(restoreSpy).toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining("restore string"),
       );

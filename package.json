@@ -133,28 +133,10 @@
         "title": "ULW: Kill Native Shell"
       },
       {
-        "command": "ulw.openTerminalManager",
-        "title": "Open Terminal Manager",
-        "category": "ULW",
-        "icon": "$(server)"
-      },
-      {
-        "command": "ulw.toggleDashboard",
-        "title": "Open ULW Terminal Manager",
-        "category": "ULW",
-        "icon": "$(dashboard)"
-      },
-      {
         "command": "ulw.toggleTmuxCommandToolbar",
         "title": "Toggle Tmux Command Toolbar",
         "category": "ULW",
-        "icon": "$(list-tree)"
-      },
-      {
-        "command": "ulw.openDashboardInEditor",
-        "title": "Open ULW Terminal Manager in Editor",
-        "category": "ULW",
-        "icon": "$(editor-layout)"
+        "icon": "$(terminal-tmux)"
       },
       {
         "command": "ulw.openTerminalInEditor",
@@ -169,7 +151,7 @@
         "command": "ulw.openNewSessionTerminalInEditor",
         "title": "Open New Session Terminal in Editor",
         "category": "ULW",
-        "icon": "$(terminal-new)"
+        "icon": "$(empty-window)"
       },
       {
         "command": "ulw.restoreTerminalToSidebar",
@@ -187,13 +169,13 @@
         "command": "ulw.tmuxSplitPaneH",
         "title": "Split Pane Side by Side",
         "category": "ULW",
-        "icon": "$(layout-sidebar-left)"
+        "icon": "$(split-horizontal)"
       },
       {
         "command": "ulw.tmuxSplitPaneV",
         "title": "Split Pane Top/Bottom",
         "category": "ULW",
-        "icon": "$(layout-panel)"
+        "icon": "$(split-vertical)"
       },
       {
         "command": "ulw.tmuxSplitPaneWithCommand",
@@ -267,7 +249,7 @@
       },
       {
         "command": "ulw.tmuxRefresh",
-        "title": "Refresh Terminal Manager",
+        "title": "Restart Terminal",
         "category": "ULW",
         "icon": "$(refresh)"
       }
@@ -275,57 +257,12 @@
     "menus": {
       "view/title": [
         {
-          "command": "ulw.openNewSessionTerminalInEditor",
-          "group": "navigation@1",
-          "when": "view == ulw"
-        },
-        {
-          "command": "ulw.tmuxSplitPaneH",
-          "group": "navigation@2",
-          "when": "view == ulw"
-        },
-        {
-          "command": "ulw.tmuxSplitPaneV",
-          "group": "navigation@3",
-          "when": "view == ulw"
-        },
-        {
-          "command": "ulw.tmuxPrevWindow",
-          "group": "navigation@4",
-          "when": "view == ulw"
-        },
-        {
-          "command": "ulw.tmuxCreateWindow",
-          "group": "navigation@5",
-          "when": "view == ulw"
-        },
-        {
-          "command": "ulw.tmuxNextWindow",
-          "group": "navigation@6",
-          "when": "view == ulw"
-        },
-        {
           "command": "ulw.toggleTmuxCommandToolbar",
-          "group": "navigation@7",
-          "when": "view == ulw"
-        },
-        {
-          "command": "ulw.toggleDashboard",
-          "group": "navigation@8",
-          "when": "view == ulw"
-        },
-        {
-          "command": "ulw.tmuxRefresh",
-          "group": "navigation@9",
+          "group": "navigation",
           "when": "view == ulw"
         }
       ],
       "editor/title": [
-        {
-          "command": "ulw.openTerminalManager",
-          "group": "navigation",
-          "when": "ulw.active"
-        },
         {
           "command": "ulw.openTerminalInEditor",
           "group": "navigation@1",
@@ -512,8 +449,8 @@
         },
         "ulw.enableAutoSpawn": {
           "type": "boolean",
-          "default": true,
-          "description": "Auto-spawn OpenCode if not running"
+          "default": false,
+          "description": "When enabled, discovery may spawn OpenCode in the background if no instance is found (does not affect sidebar terminal startup)"
         },
         "ulw.terminalBackend": {
           "type": "string",
@@ -567,11 +504,7 @@
           ],
           "description": "Diagnostic severities that trigger code actions"
         },
-        "ulw.projectList.openedOnly": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show only opened projects in the ULW Terminal Manager project list by default."
-        },
+
         "ulw.pane.defaultSplitDirection": {
           "type": "string",
           "default": "horizontal",

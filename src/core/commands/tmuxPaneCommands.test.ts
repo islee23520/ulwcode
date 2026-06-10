@@ -127,6 +127,7 @@ function createHarness(options?: {
   const provider = new vscodeMock.Disposable(
     () => {},
   ) as unknown as TerminalProvider;
+  (provider as Record<string, unknown>).restart = vi.fn();
   const resolveActiveTmuxSessionId = vi.fn<() => string | undefined>(() =>
     options && "sessionId" in options ? options.sessionId : "session-1",
   );
@@ -1235,13 +1236,13 @@ describe("registerTmuxPaneCommands", () => {
     expect(harness.nextTab).not.toHaveBeenCalled();
   });
 
-  it("refreshes the terminal manager", async () => {
+  it("restarts the terminal", async () => {
     const harness = createHarness();
 
     await getHandler(harness, "ulw.tmuxRefresh")();
 
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "ulw.openTerminalManager",
-    );
+    expect(
+      (harness.deps.provider as Record<string, unknown>).restart,
+    ).toHaveBeenCalled();
   });
 });

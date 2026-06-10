@@ -197,6 +197,8 @@ describe("InstanceDiscoveryService", () => {
       update: vi.fn(),
     } as any);
 
+    service = new InstanceDiscoveryService();
+
     vi.spyOn(service as any, "scanProcesses").mockResolvedValue([]);
     vi.spyOn(service as any, "spawnOpenCode").mockResolvedValue({
       pid: 300,

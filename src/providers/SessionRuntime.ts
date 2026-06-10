@@ -203,9 +203,7 @@ export class SessionRuntime {
     if (resolved === "tmux") {
       const sessionId = await this.ensureTmuxBackendSession();
       if (sessionId) {
-        await this.switchToTmuxSessionWithTool(sessionId, undefined, {
-          forceToolPrompt: true,
-        });
+        await this.switchToTmuxSession(sessionId);
         return;
       }
       void vscode.window.showWarningMessage(
@@ -339,15 +337,11 @@ export class SessionRuntime {
       });
     }
 
-    const resolvedTool = this.activeTool ?? this.resolveStoredTool();
+    const resolvedTool = config.command ? this.activeTool : undefined;
     const operator = resolvedTool
       ? this.aiToolRegistry.getForConfig(resolvedTool)
       : undefined;
-    const command =
-      config.command ??
-      (resolvedTool && operator
-        ? operator.getLaunchCommand(resolvedTool)
-        : undefined);
+    const command = config.command;
 
     let nativeLaunchPlan: BackendLaunchPlan | undefined;
     if (this.nativeTerminalManager && command) {
@@ -954,10 +948,7 @@ export class SessionRuntime {
           return;
         }
 
-        this.resetState();
-        this.callbacks.postMessage({
-          type: "terminalExited",
-        });
+        void this.restoreDefaultPlainTerminal();
         return;
       }
 
@@ -1003,14 +994,46 @@ export class SessionRuntime {
         : undefined;
 
       if (replacementSessionId) {
-        await this.switchToTmuxSessionWithTool(replacementSessionId);
+        await this.switchToTmuxSession(replacementSessionId);
         return;
       }
 
-      await this.switchToNativeShell();
+      await this.restoreDefaultPlainTerminal();
     } catch (error) {
       this.logger.error(
         `[TerminalProvider] Failed to restore after tmux exit: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      this.resetState();
+      this.callbacks.postMessage({
+        type: "terminalExited",
+      });
+    }
+  }
+
+  private async restoreDefaultPlainTerminal(): Promise<void> {
+    const configuredBackend = this.resolveConfiguredBackend(
+      vscode.workspace.getConfiguration("ulw"),
+    );
+    const backend = this.backendRegistry.resolveAvailable(configuredBackend);
+
+    this.pendingLaunchToolName = undefined;
+    this.activeTool = undefined;
+    this.forceNativeShellNextStart = backend === "native";
+    this.pendingBackendOverride = backend === "native" ? "native" : backend;
+    this.selectedTmuxSessionId = undefined;
+    this.selectedZellijSessionId = undefined;
+
+    this.disposeListeners();
+    this.destroySession(SessionRuntime.DEFAULT_PANE_ID);
+    this.resetState();
+
+    this.callbacks.postMessage({ type: "clearTerminal" });
+
+    try {
+      await this.startOpenCode();
+    } catch (error) {
+      this.logger.error(
+        `[SessionRuntime] Failed to restore plain terminal after exit: ${error instanceof Error ? error.message : String(error)}`,
       );
       this.resetState();
       this.callbacks.postMessage({
@@ -1404,10 +1427,7 @@ export class SessionRuntime {
   }
 
   public async switchToTmuxSession(sessionId: string): Promise<void> {
-    await this.switchToTmuxSessionWithTool(sessionId, undefined, {
-      forceToolPrompt: true,
-      respectPromptAiToolOnSession: true,
-    });
+    await this.switchToTmuxSessionWithTool(sessionId);
   }
 
   public async switchToTmuxSessionWithTool(
@@ -1542,10 +1562,7 @@ export class SessionRuntime {
       }
 
       await this.tmuxSessionManager.createSession(candidate, workspacePath);
-      await this.switchToTmuxSessionWithTool(candidate, undefined, {
-        forceToolPrompt: true,
-        respectPromptAiToolOnSession: true,
-      });
+      await this.switchToTmuxSession(candidate);
 
       return candidate;
     } catch (error) {

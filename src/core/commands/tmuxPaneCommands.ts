@@ -758,8 +758,8 @@ export function registerTmuxPaneCommands(
 
   const tmuxRefreshCommand = vscode.commands.registerCommand(
     "ulw.tmuxRefresh",
-    async () => {
-      await vscode.commands.executeCommand("ulw.openTerminalManager");
+    () => {
+      deps.provider?.restart();
     },
   );
 

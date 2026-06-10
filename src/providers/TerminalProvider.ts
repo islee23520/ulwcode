@@ -125,7 +125,6 @@ export class TerminalProvider
         this.switchToZellijSession(sessionId),
       killTmuxSession: (sessionId) => this.killTmuxSession(sessionId),
       createTmuxSession: () => this.createTmuxSession(),
-      toggleDashboard: () => this.toggleDashboard(),
       toggleEditorAttachment: () => this.toggleEditorAttachment(),
       restart: () => this.restart(),
       switchToNativeShell: () => this.switchToNativeShell(),
@@ -1503,10 +1502,6 @@ export class TerminalProvider
       text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
-  }
-
-  public toggleDashboard(): void {
-    void vscode.commands.executeCommand("ulw.openTerminalManager");
   }
 
   public toggleTmuxCommandToolbar(): void {

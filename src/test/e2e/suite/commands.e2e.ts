@@ -21,7 +21,7 @@ suite("Command registration", () => {
     assert.ok(commands.includes("ulw.focus"));
     assert.ok(commands.includes("ulw.openTerminalInEditor"));
     assert.ok(commands.includes("ulw.openNewSessionTerminalInEditor"));
-    assert.ok(commands.includes("ulw.toggleDashboard"));
+    assert.ok(commands.includes("ulw.toggleTmuxCommandToolbar"));
   });
 
   test("registers focus command without relying on internal workbench commands", async () => {

@@ -1732,17 +1732,6 @@ describe("TerminalProvider", () => {
     expect(secondPanel.webview.postMessage).not.toHaveBeenCalled();
   });
 
-  it("executes the dashboard command when toggling the dashboard", () => {
-    mockConfiguration();
-    provider = createProvider();
-
-    provider.toggleDashboard();
-
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "ulw.openTerminalManager",
-    );
-  });
-
   it("posts a webview message when toggling the tmux command toolbar", () => {
     mockConfiguration();
     provider = createProvider();
@@ -2192,11 +2181,9 @@ describe("TerminalProvider", () => {
     vi.spyOn(runtime, "routeDroppedTextToTmuxPane").mockResolvedValue(true);
     vi.spyOn(runtime, "formatPastedImage").mockReturnValue("@image.png");
     vi.spyOn(provider, "toggleEditorAttachment").mockResolvedValue(undefined);
-    const dashboardSpy = vi.spyOn(provider, "toggleDashboard");
     const restartSpy = vi.spyOn(runtime, "restart").mockImplementation(() => {});
 
     messageHandler({ type: "switchSession", sessionId: "zellij-route" });
-    messageHandler({ type: "toggleDashboard" });
     messageHandler({ type: "toggleEditorAttachment" });
     messageHandler({ type: "requestRestart" });
     messageHandler({ type: "sendTmuxPromptChoice", choice: "shell" });
@@ -2205,7 +2192,6 @@ describe("TerminalProvider", () => {
     await flushAsyncStartup();
 
     expect(runtime.switchToZellijSession).toHaveBeenCalledWith("zellij-route");
-    expect(dashboardSpy).toHaveBeenCalledTimes(1);
     expect(provider.toggleEditorAttachment).toHaveBeenCalledTimes(1);
     expect(restartSpy).toHaveBeenCalledTimes(1);
     expect(runtime.switchToNativeShell).toHaveBeenCalledTimes(1);

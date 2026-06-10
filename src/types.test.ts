@@ -63,7 +63,7 @@ describe("Types", () => {
         { type: "killSession", sessionId: "workspace-a", paneId: "pane-1" },
         { type: "createTmuxSession", paneId: "pane-1" },
         { type: "zoomTmuxPane", paneId: "pane-1" },
-        { type: "toggleDashboard", paneId: "pane-1" },
+
         { type: "toggleEditorAttachment", paneId: "pane-1" },
         {
           type: "sendTmuxPromptChoice",
@@ -95,11 +95,11 @@ describe("Types", () => {
         { type: "requestRestart", paneId: "pane-1" },
       ];
 
-      expect(messages).toHaveLength(23);
+      expect(messages).toHaveLength(22);
       expect(messages[0]).toEqual(
         expect.objectContaining({ paneId: "pane-1" }),
       );
-      expect(messages[21]?.type).toBe("executeTmuxRawCommand");
+      expect(messages[21]?.type).toBe("requestRestart");
     });
 
     it("should accept all variants without paneId for backward compatibility", () => {
@@ -122,7 +122,7 @@ describe("Types", () => {
         { type: "killSession", sessionId: "workspace-a" },
         { type: "createTmuxSession" },
         { type: "zoomTmuxPane" },
-        { type: "toggleDashboard" },
+
         { type: "toggleEditorAttachment" },
         { type: "sendTmuxPromptChoice", choice: "tmux" },
         { type: "selectTerminalBackend", backend: "zellij" },
@@ -139,9 +139,9 @@ describe("Types", () => {
         { type: "requestRestart" },
       ];
 
-      expect(messages).toHaveLength(22);
+      expect(messages).toHaveLength(21);
       expect(messages[0]?.paneId).toBeUndefined();
-      expect(messages[21]?.type).toBe("requestRestart");
+      expect(messages[20]?.type).toBe("requestRestart");
     });
 
     it("should accept terminalInput message", () => {

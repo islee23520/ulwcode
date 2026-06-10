@@ -67,7 +67,7 @@ describe("package manifest branding", () => {
 
     expect(manifest.name).toBe("opencode-sidebar-tui");
     expect(manifest.publisher).toBe("islee23520");
-    expect(manifest.version).toBe("1.11.6");
+    expect(manifest.version).toBe("1.12.0");
     expect(manifest.displayName).toBe("ulwcode-sidebar-terminal");
     expect(manifest.description).toBe(
       "sidebar terminal Extension for VS Code with tmux, zellij, and native terminal support",
@@ -110,11 +110,11 @@ describe("package manifest branding", () => {
 
     expect(findCommand(commands, "ulw.tmuxSplitPaneH")).toMatchObject({
       title: "Split Pane Side by Side",
-      icon: "$(layout-sidebar-left)",
+      icon: "$(split-horizontal)",
     });
     expect(findCommand(commands, "ulw.tmuxSplitPaneV")).toMatchObject({
       title: "Split Pane Top/Bottom",
-      icon: "$(layout-panel)",
+      icon: "$(split-vertical)",
     });
   });
 

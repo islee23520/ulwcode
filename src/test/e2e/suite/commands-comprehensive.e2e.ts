@@ -56,13 +56,7 @@ const commandCategories = {
     "ulw.tmuxKillWindow",
     "ulw.tmuxSelectWindow",
   ],
-  dashboard: [
-    "ulw.openTerminalManager",
-    "ulw.toggleDashboard",
-    "ulw.toggleTmuxCommandToolbar",
-    "ulw.openDashboardInEditor",
-    "ulw.tmuxRefresh",
-  ],
+  tmuxToolbar: ["ulw.toggleTmuxCommandToolbar"],
 } as const satisfies Record<string, readonly string[]>;
 
 function allExpectedCommands(): string[] {

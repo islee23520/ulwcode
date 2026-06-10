@@ -109,7 +109,6 @@ export type WebviewMessage =
   | { type: "killSession"; sessionId: string; paneId?: string }
   | { type: "createTmuxSession"; paneId?: string }
   | { type: "zoomTmuxPane"; paneId?: string }
-  | { type: "toggleDashboard"; paneId?: string }
   | { type: "toggleEditorAttachment"; paneId?: string }
   | {
       type: "sendTmuxPromptChoice";
@@ -478,7 +477,6 @@ export type HostMessage =
       workspace: string;
       showingAll?: boolean;
     }
-  | { type: "toggleDashboard"; visible: boolean }
   | { type: "toggleTmuxCommandToolbar" }
   | {
       type: "showTmuxPrompt";

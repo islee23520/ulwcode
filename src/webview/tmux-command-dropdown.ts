@@ -1,7 +1,7 @@
 import type { WebviewMessage } from "../types";
 import type { TerminalBackendType } from "../types";
 import { postMessage } from "./shared/vscode-api";
-import { escapeHtml } from "./dashboard/utils";
+import { escapeHtml } from "./shared/utils";
 
 type TmuxDropdownMessage = Extract<
   WebviewMessage,
@@ -201,7 +201,7 @@ const commands: TmuxCommand[] = [
   },
   {
     id: "refresh",
-    label: "Refresh ULW Terminal Manager",
+    label: "Restart Terminal",
     category: "Utility",
     requiresSession: false,
     buildMessage: () => ({

@@ -98,7 +98,6 @@ describe("MessageRouter", () => {
       switchToZellijSession: vi.fn(async () => undefined),
       killTmuxSession: vi.fn(async () => undefined),
       createTmuxSession: vi.fn(async () => "tmux-new"),
-      toggleDashboard: vi.fn(),
       toggleEditorAttachment: vi.fn(async () => undefined),
       restart: vi.fn(),
       switchToNativeShell: vi.fn(async () => undefined),
@@ -404,7 +403,6 @@ describe("MessageRouter", () => {
       type: "executeTmuxCommand",
       commandId: "ulw.tmuxCreateWindow",
     });
-    await router.handleMessage({ type: "toggleDashboard" });
     await router.handleMessage({ type: "toggleEditorAttachment" });
     await router.handleMessage({
       type: "openFile",
@@ -427,7 +425,6 @@ describe("MessageRouter", () => {
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "ulw.tmuxCreateWindow",
     );
-    expect(provider.toggleDashboard).toHaveBeenCalledTimes(1);
     expect(provider.toggleEditorAttachment).toHaveBeenCalledTimes(1);
     expect(vscode.window.showTextDocument).toHaveBeenCalledTimes(1);
   });

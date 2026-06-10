@@ -123,17 +123,7 @@ suite("Package contribution metadata", () => {
     const explorerContext = menus?.["explorer/context"] ?? [];
     const titleCommands = viewTitle.map(({ command }) => command);
 
-    assert.deepStrictEqual(titleCommands, [
-      "ulw.openNewSessionTerminalInEditor",
-      "ulw.tmuxSplitPaneH",
-      "ulw.tmuxSplitPaneV",
-      "ulw.tmuxPrevWindow",
-      "ulw.tmuxCreateWindow",
-      "ulw.tmuxNextWindow",
-      "ulw.toggleTmuxCommandToolbar",
-      "ulw.toggleDashboard",
-      "ulw.tmuxRefresh",
-    ]);
+    assert.deepStrictEqual(titleCommands, ["ulw.toggleTmuxCommandToolbar"]);
     assert.ok(
       viewTitle.every(({ when }) => when === "view == ulw"),
       "view/title actions should stay scoped to the ULW sidebar view",

@@ -118,7 +118,7 @@ const configurationSpecs: Record<string, ConfigurationSpec> = {
     minimum: 100,
     maximum: 2000,
   },
-  "ulw.enableAutoSpawn": { type: "boolean", defaultValue: true },
+  "ulw.enableAutoSpawn": { type: "boolean", defaultValue: false },
   "ulw.terminalBackend": {
     type: "string",
     defaultValue: "tmux",
@@ -155,10 +155,6 @@ const configurationSpecs: Record<string, ConfigurationSpec> = {
     type: "string",
     defaultValue: "auto",
     enumValues: ["webgl", "canvas", "auto"],
-  },
-  "ulw.projectList.openedOnly": {
-    type: "boolean",
-    defaultValue: true,
   },
 };
 

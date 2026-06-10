@@ -34,7 +34,7 @@ export class InstanceDiscoveryService {
 
   constructor(instanceStore?: InstanceStore) {
     const config = vscode.workspace.getConfiguration("ulw");
-    this.autoSpawn = config.get<boolean>("enableAutoSpawn", true);
+    this.autoSpawn = config.get<boolean>("enableAutoSpawn", false);
     this.enableProcessScan = config.get<boolean>("enableProcessScan", true);
     this.instanceStore = instanceStore;
   }

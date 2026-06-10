@@ -34,7 +34,7 @@ export interface MessageRouterProviderBridge {
   switchToZellijSession(sessionId: string): Promise<void>;
   killTmuxSession(sessionId: string): Promise<void>;
   createTmuxSession(): Promise<string | undefined>;
-  toggleDashboard(): void;
+
   toggleEditorAttachment(): Promise<void>;
   restart(): void;
   switchToNativeShell(): Promise<void>;
@@ -216,9 +216,7 @@ export class MessageRouter {
           message.args,
         );
         break;
-      case "toggleDashboard":
-        this.provider.toggleDashboard();
-        break;
+
       case "toggleEditorAttachment":
         await this.provider.toggleEditorAttachment();
         break;
