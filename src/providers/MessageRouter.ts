@@ -54,13 +54,6 @@ export interface MessageRouterProviderBridge {
   ): Promise<boolean>;
   formatDroppedFiles(paths: string[], useAtSyntax: boolean): string;
   formatPastedImage(tempPath: string): string | undefined;
-  launchAiTool(
-    sessionId: string,
-    toolName: string,
-    savePreference: boolean,
-    targetPaneId?: string,
-    backendHint?: TerminalBackendType,
-  ): Promise<void>;
   executeRawTmuxCommand(subcommand: string, args?: string[]): Promise<string>;
   zoomTmuxPane(): Promise<void>;
   getSelectedTmuxSessionId(): string | undefined;
@@ -187,17 +180,6 @@ export class MessageRouter {
           void this.provider.createTmuxSession();
         }
         break;
-      case "launchAiTool": {
-        const backendHint = this.provider.getActiveBackend();
-        void this.provider.launchAiTool(
-          message.sessionId,
-          message.tool,
-          message.savePreference,
-          message.targetPaneId,
-          backendHint,
-        );
-        break;
-      }
       case "zoomTmuxPane":
         try {
           await this.provider.zoomTmuxPane();

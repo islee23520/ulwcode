@@ -9,7 +9,7 @@ This guide explains how to install and use **ULW** as an Open TUI terminal MUX i
 
 ## Overview
 
-ULW embeds OpenCode, Claude, Codex, custom AI tools, or a native shell directly in the VS Code sidebar instead of the native terminal panel.
+ULW embeds a terminal MUX (`native`, `tmux`, or `zellij`) in the VS Code sidebar instead of the native terminal panel. AI CLIs such as OpenCode are optional — run them yourself in the terminal.
 
 It provides two main sidebar views:
 
@@ -18,9 +18,8 @@ It provides two main sidebar views:
 
 ## Key Features
 
-- Auto-launch **OpenCode** when the terminal view is activated.
+- Starts your chosen **backend** (plain shell, `tmux`, or `zellij`) when the view opens — no AI tool selector.
 - Full TUI rendering with `xterm.js` and WebGL.
-- Multi-AI tool support for OpenCode, Claude, Codex, or custom tools.
 - Integrated `tmux` session discovery and workspace-aware filtering.
 - Native shell switching inside the same terminal surface.
 - HTTP API communication with OpenCode for prompts and context sharing.
@@ -62,8 +61,8 @@ Then install the generated VSIX from the Extensions view with **Install from VSI
 
 1. Open **ULW Terminal Manager** when you need to manage `tmux` sessions.
 2. Open **ULW Terminal** in the secondary sidebar.
-3. Let ULW auto-start OpenCode, or start it manually.
-4. Work with OpenCode directly inside the sidebar.
+3. Let ULW auto-start your backend (`ulw.autoStartOnOpen`), or start manually.
+4. Use the shell or multiplexer; launch OpenCode or other tools when you need them.
 
 ### Common Shortcuts
 
@@ -137,8 +136,8 @@ The most important settings stay in English because they must match the real VS 
 
 | Setting                        | Description                                                                                                            |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `ulw.autoStart`                | Start the configured AI tool automatically when the view is activated                                                  |
-| `ulw.autoStartOnOpen`          | Start the configured AI tool when the sidebar opens                                                                    |
+| `ulw.autoStart`                | Start the terminal session when the view is activated                                                                  |
+| `ulw.autoStartOnOpen`          | Start the terminal when the sidebar opens (uses `ulw.terminalBackend`)                                                 |
 | `ulw.fontSize`                 | Terminal font size                                                                                                     |
 | `ulw.fontFamily`               | Terminal font family                                                                                                   |
 | `ulw.autoSwitchKoreanKeyboard` | Auto-switch the macOS system input source when likely Korean/English layout mistakes are detected. Disabled by default |
@@ -154,15 +153,12 @@ The most important settings stay in English because they must match the real VS 
 | `ulw.autoShareContext`  | Share editor context automatically |
 | `ulw.contextDebounceMs` | Debounce delay for context updates |
 
-### AI Tool and tmux Behavior
+### Backend and discovery
 
-| Setting                  | Description                                       |
-| ------------------------ | ------------------------------------------------- |
-| `ulw.aiTools`            | Configure available AI tools                      |
-| `ulw.defaultAiTool`      | Default tool for new `tmux` sessions              |
-| `ulw.enableAutoSpawn`    | Auto-spawn OpenCode if it is not already running  |
-| `ulw.nativeShellDefault` | Default behavior when switching to a native shell |
-| `ulw.tmuxSessionDefault` | Default behavior for new `tmux` sessions          |
+| Setting               | Description                                                                 |
+| --------------------- | --------------------------------------------------------------------------- |
+| `ulw.terminalBackend` | `native`, `tmux`, or `zellij` for sidebar startup                           |
+| `ulw.enableAutoSpawn` | Background OpenCode spawn when discovery finds no instance (not sidebar UI) |
 
 ## Requirements
 

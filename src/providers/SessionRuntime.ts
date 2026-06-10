@@ -684,13 +684,7 @@ export class SessionRuntime {
       let resolvedTool: AiToolConfig | undefined;
       let command: string | undefined;
 
-      if (
-        !forceNativeShell &&
-        (this.activeBackend === "native" ||
-          Boolean(tmuxSessionId) ||
-          Boolean(zellijSessionId) ||
-          Boolean(this.pendingLaunchToolName))
-      ) {
+      if (!forceNativeShell && this.pendingLaunchToolName) {
         resolvedTool = await this.resolveToolForStartup(config);
         if (!resolvedTool) {
           this.isStarting = false;
@@ -2495,33 +2489,24 @@ export class SessionRuntime {
     }
   }
 
-  private getConfiguredTools(
-    config = vscode.workspace.getConfiguration("ulw"),
-  ): AiToolConfig[] {
-    return resolveAiToolConfigs(config.get("aiTools", []));
+  private getConfiguredTools(): AiToolConfig[] {
+    return resolveAiToolConfigs([]);
   }
 
   private resolveStoredTool(
     instanceId = this.activeInstanceId,
   ): AiToolConfig | undefined {
-    const config = vscode.workspace.getConfiguration("ulw");
     const storedToolName =
       this.instanceStore?.get(instanceId)?.config.selectedAiTool;
-    return this.resolveToolConfig(
-      storedToolName ?? config.get<string>("defaultAiTool", ""),
-      config,
-    );
+    return this.resolveToolConfig(storedToolName);
   }
 
-  private resolveToolConfig(
-    toolName: string | undefined,
-    config = vscode.workspace.getConfiguration("ulw"),
-  ): AiToolConfig | undefined {
+  private resolveToolConfig(toolName: string | undefined): AiToolConfig | undefined {
     if (!toolName) {
       return undefined;
     }
 
-    return this.getConfiguredTools(config).find((tool) =>
+    return this.getConfiguredTools().find((tool) =>
       this.aiToolRegistry.matchesName(tool, toolName),
     );
   }
@@ -2549,14 +2534,14 @@ export class SessionRuntime {
   }
 
   private async resolveToolForStartup(
-    config: vscode.WorkspaceConfiguration,
+    _config: vscode.WorkspaceConfiguration,
   ): Promise<AiToolConfig | undefined> {
-    const preferredToolName =
-      this.pendingLaunchToolName ??
-      this.instanceStore?.get(this.activeInstanceId)?.config.selectedAiTool ??
-      config.get<string>("defaultAiTool", "");
+    const preferredToolName = this.pendingLaunchToolName;
+    if (!preferredToolName) {
+      return undefined;
+    }
 
-    const tool = this.resolveToolConfig(preferredToolName, config);
+    const tool = this.resolveToolConfig(preferredToolName);
     if (!tool) {
       return undefined;
     }

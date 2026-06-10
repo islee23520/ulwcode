@@ -138,8 +138,6 @@ const configurationSpecs: Record<string, ConfigurationSpec> = {
     defaultValue: ["error", "warning"],
     itemType: "string",
   },
-  "ulw.aiTools": { type: "array", defaultValue: undefined },
-  "ulw.defaultAiTool": { type: "string", defaultValue: "opencode" },
   "ulw.pane.defaultSplitDirection": {
     type: "string",
     defaultValue: "horizontal",
@@ -176,13 +174,11 @@ function assertConfigurationProperty(
     `${id} should have expected type`,
   );
 
-  if (id !== "ulw.aiTools") {
-    assert.deepStrictEqual(
-      property.default,
-      spec.defaultValue,
-      `${id} should have expected default`,
-    );
-  }
+  assert.deepStrictEqual(
+    property.default,
+    spec.defaultValue,
+    `${id} should have expected default`,
+  );
 
   if (spec.minimum !== undefined) {
     assert.strictEqual(property.minimum, spec.minimum);
@@ -207,7 +203,7 @@ suite("Comprehensive configuration contributions", () => {
     const properties = getConfigurationProperties(extension);
     const expectedPropertyIds = Object.keys(configurationSpecs).sort();
 
-    assert.strictEqual(expectedPropertyIds.length, 30);
+    assert.strictEqual(expectedPropertyIds.length, 28);
     assert.deepStrictEqual(Object.keys(properties).sort(), expectedPropertyIds);
   });
 
@@ -220,45 +216,6 @@ suite("Comprehensive configuration contributions", () => {
     });
   }
 
-  test("defines aiTools object schema and default tools", async () => {
-    const extension = await activateExtension();
-    const properties = getConfigurationProperties(extension);
-    const aiTools = properties["ulw.aiTools"];
-
-    assert.strictEqual(aiTools?.type, "array");
-    assert.strictEqual(aiTools?.items?.type, "object");
-    assert.deepStrictEqual(aiTools?.items?.required, ["name", "label"]);
-    assert.strictEqual(aiTools?.items?.properties?.name?.type, "string");
-    assert.strictEqual(aiTools?.items?.properties?.label?.type, "string");
-    assert.strictEqual(aiTools?.items?.properties?.path?.type, "string");
-    assert.strictEqual(aiTools?.items?.properties?.args?.type, "array");
-    assert.strictEqual(aiTools?.items?.properties?.aliases?.type, "array");
-    assert.strictEqual(aiTools?.items?.properties?.operator?.type, "string");
-    assert.deepStrictEqual(aiTools?.default, [
-      {
-        name: "opencode",
-        label: "OpenCode",
-        path: "",
-        args: [],
-        operator: "opencode",
-      },
-      {
-        name: "claude",
-        label: "Claude",
-        path: "",
-        args: [],
-        aliases: ["claude"],
-        operator: "claude",
-      },
-      {
-        name: "codex",
-        label: "Codex",
-        path: "",
-        args: [],
-        operator: "codex",
-      },
-    ]);
-  });
 });
 
 suite("Runtime configuration defaults", () => {
@@ -269,31 +226,6 @@ suite("Runtime configuration defaults", () => {
     const defaultValue = (key: string): unknown =>
       config.inspect(key)?.defaultValue;
 
-    assert.strictEqual(defaultValue("defaultAiTool"), "opencode");
-    assert.deepStrictEqual(defaultValue("aiTools"), [
-      {
-        name: "opencode",
-        label: "OpenCode",
-        path: "",
-        args: [],
-        operator: "opencode",
-      },
-      {
-        name: "claude",
-        label: "Claude",
-        path: "",
-        args: [],
-        aliases: ["claude"],
-        operator: "claude",
-      },
-      {
-        name: "codex",
-        label: "Codex",
-        path: "",
-        args: [],
-        operator: "codex",
-      },
-    ]);
     assert.strictEqual(defaultValue("terminalBackend"), "tmux");
     assert.strictEqual(defaultValue("autoStartOnOpen"), true);
     assert.strictEqual(defaultValue("autoSwitchKoreanKeyboard"), false);

@@ -35,13 +35,6 @@ interface PackageManifest {
     readonly configuration: {
       readonly title: string;
       readonly properties: {
-        readonly "ulw.aiTools": {
-          readonly default: readonly {
-            readonly name: string;
-            readonly label: string;
-            readonly operator: string;
-          }[];
-        };
         readonly "ulw.terminal.defaultLocation": {
           readonly default: string;
           readonly enum: readonly string[];
@@ -123,24 +116,6 @@ describe("package manifest branding", () => {
       title: "Split Pane Top/Bottom",
       icon: "$(layout-panel)",
     });
-  });
-
-  it("keeps OpenCode as the default AI tool label and operator", () => {
-    const tools =
-      readManifest().contributes.configuration.properties["ulw.aiTools"]
-        .default;
-
-    expect(tools).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "opencode",
-          label: "OpenCode",
-          operator: "opencode",
-        }),
-        expect.objectContaining({ name: "claude", label: "Claude" }),
-        expect.objectContaining({ name: "codex", label: "Codex" }),
-      ]),
-    );
   });
 
   it("keeps the sidebar terminal view contributed while defaulting start location to editor", () => {

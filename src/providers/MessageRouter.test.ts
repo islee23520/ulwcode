@@ -118,7 +118,6 @@ describe("MessageRouter", () => {
           `${useAtSyntax ? "@" : ""}${paths.join(" ")}`,
       ),
       formatPastedImage: vi.fn((tempPath: string) => `@img:${tempPath}`),
-      launchAiTool: vi.fn(async () => undefined),
       executeRawTmuxCommand: vi.fn(async () => ""),
       zoomTmuxPane: vi.fn(async () => undefined),
       getSelectedTmuxSessionId: vi.fn(() => "tmux-selected"),
@@ -384,13 +383,6 @@ describe("MessageRouter", () => {
     await router.handleMessage({ type: "killSession", sessionId: "tmux-b" });
     await router.handleMessage({ type: "createTmuxSession" });
     await router.handleMessage({
-      type: "launchAiTool",
-      sessionId: "tmux-c",
-      tool: "claude",
-      savePreference: true,
-      targetPaneId: "%1",
-    });
-    await router.handleMessage({
       type: "sendTmuxPromptChoice",
       choice: "tmux",
     });
@@ -432,13 +424,6 @@ describe("MessageRouter", () => {
     expect(provider.cycleTerminalBackend).toHaveBeenCalledTimes(1);
     expect(provider.switchToNativeShell).toHaveBeenCalledTimes(1);
     expect(provider.switchPaneBackend).toHaveBeenCalledWith("pane-1", "native");
-    expect(provider.launchAiTool).toHaveBeenCalledWith(
-      "tmux-c",
-      "claude",
-      true,
-      "%1",
-      "tmux",
-    );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "ulw.tmuxCreateWindow",
     );

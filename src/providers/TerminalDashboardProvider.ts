@@ -188,10 +188,7 @@ export class TerminalDashboardProvider
 
       const panesMap: Record<string, TmuxDashboardPaneDto[]> = {};
       const windowsMap: Record<string, TmuxDashboardWindowDto[]> = {};
-      const config = vscode.workspace.getConfiguration("ulw");
-      const tools: AiToolConfig[] = resolveAiToolConfigs(
-        config.get("aiTools", []),
-      );
+      const tools: AiToolConfig[] = resolveAiToolConfigs([]);
       for (const session of filtered) {
         try {
           if (session.backend === "zellij") {
@@ -512,42 +509,6 @@ export class TerminalDashboardProvider
         );
         await this.postSessionsToWebview();
         return;
-      case "launchDefaultAiTool": {
-        let targetPaneId: string | undefined;
-        let resolvedTool: string | undefined;
-        try {
-          const config = vscode.workspace.getConfiguration("ulw");
-          const tools: AiToolConfig[] = resolveAiToolConfigs(
-            config.get("aiTools", []),
-          );
-          if ((await this.getSessionBackend(message.sessionId)) === "zellij") {
-            await this.ensureZellijSession(message.sessionId);
-            const panes = await this.zellijSessionManager?.listPanes();
-            const activePane = panes?.find((pane) => pane.isFocused);
-            targetPaneId = activePane?.id;
-            resolvedTool = detectAiToolName(activePane?.title, tools);
-          } else {
-            const panes = await this.tmuxSessionManager.listPanes(
-              message.sessionId,
-              { activeWindowOnly: true },
-            );
-            const activePane = panes.find((pane) => pane.isActive);
-            if (activePane) {
-              targetPaneId = activePane.paneId;
-              resolvedTool = detectAiToolName(activePane.currentCommand, tools);
-            }
-          }
-        } catch (error) {
-          this.logger?.debug(
-            `[TerminalDashboard] Unable to resolve active pane for default AI tool launch: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-        if (resolvedTool) {
-          return;
-        }
-        await this.launchDefaultAiTool(message.sessionId, targetPaneId);
-        return;
-      }
       case "expandPanes":
         await this.postSessionsToWebview();
         return;
@@ -735,15 +696,6 @@ export class TerminalDashboardProvider
         );
         await this.postSessionsToWebview();
         return;
-      case "launchAiTool":
-        await this.handleLaunchAiTool(
-          message.sessionId,
-          message.tool,
-          message.savePreference,
-          message.targetPaneId,
-        );
-        await this.postSessionsToWebview();
-        return;
       case "killNativeShell": {
         await this.threadHistoryStore?.removeTerminal(message.instanceId);
         await vscode.commands.executeCommand(
@@ -832,46 +784,6 @@ export class TerminalDashboardProvider
         /\{\{HTML_VERSION\}\}/g,
         String(TerminalDashboardProvider.HTML_VERSION),
       );
-  }
-
-  public async launchDefaultAiTool(
-    sessionId: string,
-    targetPaneId?: string,
-  ): Promise<void> {
-    if (this.terminalProvider) {
-      await this.terminalProvider.launchDefaultAiTool(
-        sessionId,
-        targetPaneId,
-      );
-    }
-  }
-
-  private async handleLaunchAiTool(
-    sessionId: string,
-    toolName: string,
-    savePreference: boolean,
-    targetPaneId?: string,
-  ): Promise<void> {
-    if (!this.terminalProvider) {
-      return;
-    }
-
-    try {
-      const sessionBackend = await this.getSessionBackend(sessionId);
-      const backendHint: TerminalBackendType =
-        sessionBackend === "zellij" ? "zellij" : "tmux";
-      await this.terminalProvider.launchAiTool(
-        sessionId,
-        toolName,
-        savePreference,
-        targetPaneId,
-        backendHint,
-      );
-    } catch (error) {
-      this.logger?.error(
-        `[TerminalDashboardProvider] Failed to launch AI tool: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
   }
 
   private resolveCurrentWorkspaceUri(workspacePath?: string): string | undefined {

@@ -182,9 +182,6 @@ export const App: FunctionComponent<AppProps> = ({
         onActivate: (sessionId, workspaceUri): void => {
           handleAction({ action: "activate", sessionId, workspaceUri });
         },
-        onLaunchDefaultAiTool: (sessionId, sessionName): void => {
-          handleAction({ action: "launchDefaultAiTool", sessionId, sessionName });
-        },
         onKill: (sessionId): void => {
           handleAction({ action: "killSession", sessionId });
         },

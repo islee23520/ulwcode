@@ -62,13 +62,6 @@ describe("Types", () => {
         { type: "switchSession", sessionId: "workspace-a", paneId: "pane-1" },
         { type: "killSession", sessionId: "workspace-a", paneId: "pane-1" },
         { type: "createTmuxSession", paneId: "pane-1" },
-        {
-          type: "launchAiTool",
-          sessionId: "workspace-a",
-          tool: "opencode",
-          savePreference: true,
-          paneId: "pane-1",
-        },
         { type: "zoomTmuxPane", paneId: "pane-1" },
         { type: "toggleDashboard", paneId: "pane-1" },
         { type: "toggleEditorAttachment", paneId: "pane-1" },
@@ -102,11 +95,11 @@ describe("Types", () => {
         { type: "requestRestart", paneId: "pane-1" },
       ];
 
-      expect(messages).toHaveLength(24);
+      expect(messages).toHaveLength(23);
       expect(messages[0]).toEqual(
         expect.objectContaining({ paneId: "pane-1" }),
       );
-      expect(messages[22]?.type).toBe("executeTmuxRawCommand");
+      expect(messages[21]?.type).toBe("executeTmuxRawCommand");
     });
 
     it("should accept all variants without paneId for backward compatibility", () => {
@@ -128,12 +121,6 @@ describe("Types", () => {
         { type: "switchSession", sessionId: "workspace-a" },
         { type: "killSession", sessionId: "workspace-a" },
         { type: "createTmuxSession" },
-        {
-          type: "launchAiTool",
-          sessionId: "workspace-a",
-          tool: "opencode",
-          savePreference: true,
-        },
         { type: "zoomTmuxPane" },
         { type: "toggleDashboard" },
         { type: "toggleEditorAttachment" },
@@ -152,9 +139,9 @@ describe("Types", () => {
         { type: "requestRestart" },
       ];
 
-      expect(messages).toHaveLength(23);
+      expect(messages).toHaveLength(22);
       expect(messages[0]?.paneId).toBeUndefined();
-      expect(messages[22]?.type).toBe("requestRestart");
+      expect(messages[21]?.type).toBe("requestRestart");
     });
 
     it("should accept terminalInput message", () => {
@@ -369,12 +356,6 @@ describe("Types", () => {
       expect(activateMessage.action).toBe("activate");
       expect(activateMessage.sessionId).toBe("workspace-a-2");
 
-      const launchMessage: TmuxDashboardActionMessage = {
-        action: "launchAiTool",
-        sessionId: "workspace-a-2",
-        tool: "custom-tool",
-        savePreference: true,
-      };
       const toggleHistoryMessage: TmuxDashboardActionMessage = {
         action: "toggleThreadHistory",
       };
@@ -390,8 +371,6 @@ describe("Types", () => {
         action: "deleteThread",
         threadId: "thread-a",
       };
-      expect(launchMessage.action).toBe("launchAiTool");
-      expect(launchMessage.tool).toBe("custom-tool");
       expect(toggleHistoryMessage.action).toBe("toggleThreadHistory");
       expect(archiveMessage.threadId).toBe("thread-a");
       expect(restoreMessage.threadId).toBe("thread-a");

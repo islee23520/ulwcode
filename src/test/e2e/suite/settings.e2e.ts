@@ -35,7 +35,7 @@ function getConfigurationProperties(
   return properties;
 }
 
-suite("AI tool settings", () => {
+suite("ULW settings", () => {
   test("projectList.openedOnly defaults to true", async () => {
     const extension = await activateExtension();
     const properties = getConfigurationProperties(extension);
@@ -44,63 +44,5 @@ suite("AI tool settings", () => {
       properties["ulw.projectList.openedOnly"]?.default,
       true,
     );
-  });
-
-  test('defaultAiTool defaults to "opencode"', async () => {
-    const extension = await activateExtension();
-    const properties = getConfigurationProperties(extension);
-
-    assert.strictEqual(
-      properties["ulw.defaultAiTool"]?.default,
-      "opencode",
-    );
-  });
-
-  test("aiTools config structure is correct", async () => {
-    const extension = await activateExtension();
-    const properties = getConfigurationProperties(extension);
-    const aiTools = properties["ulw.aiTools"];
-
-    assert.ok(aiTools, "ulw.aiTools should be contributed");
-    assert.strictEqual(aiTools.type, "array");
-
-    const items = aiTools.items as ConfigurationProperty | undefined;
-    assert.ok(items, "ulw.aiTools should define array item schema");
-    assert.strictEqual(items.type, "object");
-    assert.deepStrictEqual(items.required, ["name", "label"]);
-
-    const itemProperties = items.properties;
-    assert.ok(itemProperties, "AI tool item schema should define properties");
-    assert.strictEqual(itemProperties.name?.type, "string");
-    assert.strictEqual(itemProperties.label?.type, "string");
-    assert.strictEqual(itemProperties.path?.type, "string");
-    assert.strictEqual(itemProperties.args?.type, "array");
-    assert.strictEqual(itemProperties.aliases?.type, "array");
-    assert.strictEqual(itemProperties.operator?.type, "string");
-
-    assert.deepStrictEqual(aiTools.default, [
-      {
-        name: "opencode",
-        label: "OpenCode",
-        path: "",
-        args: [],
-        operator: "opencode",
-      },
-      {
-        name: "claude",
-        label: "Claude",
-        path: "",
-        args: [],
-        aliases: ["claude"],
-        operator: "claude",
-      },
-      {
-        name: "codex",
-        label: "Codex",
-        path: "",
-        args: [],
-        operator: "codex",
-      },
-    ]);
   });
 });

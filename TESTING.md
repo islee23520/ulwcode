@@ -81,8 +81,8 @@ For rapid testing during development:
 
 **Terminal not starting?**
 
-- Check if your configured AI tool command is in PATH
-- Try configuring the tool path under `ulw.aiTools`
+- Check `ulw.terminalBackend` (`native`, `tmux`, or `zellij`) and that `tmux`/`zellij` is installed if you use those backends
+- For HTTP/OpenCode features only: ensure `opencode` is on PATH, or set `ulw.enableAutoSpawn` to `false` if you do not want background spawn
 
 **Rendering issues?**
 

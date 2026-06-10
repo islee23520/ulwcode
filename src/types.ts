@@ -108,14 +108,6 @@ export type WebviewMessage =
   | { type: "switchSession"; sessionId: string; paneId?: string }
   | { type: "killSession"; sessionId: string; paneId?: string }
   | { type: "createTmuxSession"; paneId?: string }
-  | {
-      type: "launchAiTool";
-      sessionId: string;
-      tool: string;
-      savePreference: boolean;
-      targetPaneId?: string;
-      paneId?: string;
-    }
   | { type: "zoomTmuxPane"; paneId?: string }
   | { type: "toggleDashboard"; paneId?: string }
   | { type: "toggleEditorAttachment"; paneId?: string }
@@ -322,12 +314,6 @@ export type TmuxDashboardActionMessage =
   | { action: "activateNativeShell"; instanceId: string; workspaceUri?: string }
   | { action: "killNativeShell"; instanceId: string }
   | { action: "activate"; sessionId: string; workspaceUri?: string }
-  | {
-      action: "launchDefaultAiTool";
-      sessionId: string;
-      sessionName: string;
-      targetPaneId?: string;
-    }
   | { action: "expandPanes"; sessionId: string }
   | { action: "createWindow"; sessionId: string }
   | { action: "nextWindow"; sessionId: string }
@@ -367,13 +353,6 @@ export type TmuxDashboardActionMessage =
       sessionId: string;
       sourcePaneId: string;
       targetPaneId: string;
-    }
-  | {
-      action: "launchAiTool";
-      sessionId: string;
-      tool: string;
-      savePreference: boolean;
-      targetPaneId?: string;
     };
 
 export type TmuxDashboardSessionDto = {

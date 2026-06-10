@@ -203,25 +203,8 @@ describe("TerminalProvider", () => {
     expect(createSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("routes launchAiTool messages through the provider launch path", async () => {
-    mockConfiguration();
-    provider = createProvider();
-    const { messageHandler } = resolveProvider(provider);
-    const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
-
-    messageHandler({
-      type: "launchAiTool",
-      sessionId: "tmux-a",
-      tool: "codex",
-      savePreference: true,
-    });
-    await Promise.resolve();
-
-    expect(launchSpy).toHaveBeenCalledWith("tmux-a", "codex", true, undefined);
-  });
-
   describe("native restore", () => {
-    it("restores a disconnected native instance with its selectedAiTool", async () => {
+    it("restores a disconnected native instance as a plain shell", async () => {
       mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
       const instanceStore = new InstanceStore();
       instanceStore.upsert({
@@ -294,7 +277,7 @@ describe("TerminalProvider", () => {
       expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
     });
 
-    it("does not restore without selectedAiTool", async () => {
+    it("restores disconnected native instances without selectedAiTool", async () => {
       mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
       const instanceStore = new InstanceStore();
       instanceStore.upsert({
@@ -307,11 +290,15 @@ describe("TerminalProvider", () => {
       });
 
       provider = createProvider({ instanceStore });
+      const startSpy = vi
+        .spyOn(provider["sessionRuntime"], "startOpenCode")
+        .mockResolvedValue(undefined);
 
       resolveProvider(provider);
       await flushAsyncStartup();
 
       expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+      expect(startSpy).toHaveBeenCalledTimes(1);
     });
 
     it("restores a disconnected native instance that already has backendState", async () => {
@@ -650,7 +637,7 @@ describe("TerminalProvider", () => {
     expect(view.show).toHaveBeenCalledWith(true);
   });
 
-  it("starts the default AI tool directly for non-tmux sessions", async () => {
+  it("starts a plain native shell for non-tmux sessions", async () => {
     mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
     provider = createProvider();
     const createTerminalSpy = vi.spyOn(terminalManager, "createTerminal");
@@ -661,7 +648,7 @@ describe("TerminalProvider", () => {
 
     expect(createTerminalSpy).toHaveBeenCalledWith(
       "opencode-main",
-      "opencode -c",
+      undefined,
       {},
       undefined,
       120,
@@ -771,7 +758,7 @@ describe("TerminalProvider", () => {
       expect(provider["paneStore"].getPane("zellij-pane")).toBeDefined();
     });
 
-  it("uses defaultAiTool config for non-tmux sessions", async () => {
+  it("ignores defaultAiTool on native backend startup", async () => {
     mockConfiguration({
       autoStartOnOpen: false,
       enableHttpApi: false,
@@ -786,45 +773,13 @@ describe("TerminalProvider", () => {
 
     expect(createTerminalSpy).toHaveBeenCalledWith(
       "opencode-main",
-      "codex",
+      undefined,
       {},
       undefined,
       120,
       40,
       "opencode-main",
       expect.any(String),
-    );
-  });
-
-  it("launches the selected tmux AI tool and stores it on the mapped instance", async () => {
-    mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-codex",
-        workspaceUri: "file:///workspaces/repo-codex",
-      },
-      runtime: { terminalKey: "workspace-codex", tmuxSessionId: "tmux-codex" },
-      state: "connected",
-    });
-    const listPanes = vi
-      .fn()
-      .mockResolvedValue([{ paneId: "%1", isActive: true }]);
-    const sendTextToPane = vi.fn().mockResolvedValue(undefined);
-    const tmuxSessionManager = {
-      listPanes,
-      sendTextToPane,
-    } as unknown as TmuxSessionManager;
-
-    provider = createProvider({ instanceStore, tmuxSessionManager });
-    resolveProvider(provider);
-    vi.spyOn((provider as any).sessionRuntime, "getActiveBackend").mockReturnValue("tmux");
-
-    await provider.launchAiTool("tmux-codex", "codex", true);
-
-    expect(sendTextToPane).toHaveBeenCalledWith("%1", "codex");
-    expect(instanceStore.get("workspace-codex")?.config.selectedAiTool).toBe(
-      "codex",
     );
   });
 
@@ -1307,53 +1262,6 @@ describe("TerminalProvider", () => {
     expect(createTerminalSpy).toHaveBeenCalled();
   });
 
-  it("creates a new tmux session and launches opencode when user picks opencode", async () => {
-    mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
-    const discoverSessions = vi.fn().mockResolvedValue([]);
-    const createSession = vi.fn().mockResolvedValue(undefined);
-    const ensureSession = vi.fn().mockResolvedValue({
-      action: "created",
-      session: {
-        id: "repo-b",
-        name: "repo-b",
-        workspace: "repo-b",
-        isActive: true,
-      },
-    });
-    const tmuxSessionManager = {
-      discoverSessions,
-      createSession,
-      ensureSession,
-    } as unknown as TmuxSessionManager;
-
-    provider = createProvider({ tmuxSessionManager });
-    const createTerminalSpy = vi.spyOn(terminalManager, "createTerminal");
-    resolveProvider(provider);
-
-    vscode.workspace.workspaceFolders = [
-      {
-        uri: {
-          fsPath: "/workspaces/repo-b",
-          toString: () => "file:///workspaces/repo-b",
-        },
-      },
-    ] as any;
-
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
-      label: "$(terminal) OpenCode",
-      description: "Launch OpenCode in the terminal",
-    } as any);
-    vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce(
-      undefined,
-    );
-
-    await provider.createTmuxSession();
-    await flushAsyncStartup();
-
-    expect(createSession).toHaveBeenCalledWith("repo-b", "/workspaces/repo-b");
-    expect(createTerminalSpy).toHaveBeenCalled();
-  });
-
   it("always creates the tmux session without showing a dialog", async () => {
     mockConfiguration({ autoStartOnOpen: false, enableHttpApi: false });
     const discoverSessions = vi.fn().mockResolvedValue([]);
@@ -1455,96 +1363,6 @@ describe("TerminalProvider", () => {
     });
   });
 
-  it("normalizes workspace session ids when launching the default AI tool", async () => {
-    mockConfiguration({ defaultAiTool: "opencode" });
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-saved-tool",
-        workspaceUri: "file:///workspaces/repo-saved-tool",
-        selectedAiTool: "codex",
-      },
-      runtime: {
-        terminalKey: "workspace-saved-tool",
-        tmuxSessionId: "tmux-saved-tool",
-      },
-      state: "connected",
-    });
-
-    provider = createProvider({ instanceStore });
-    const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
-
-    await provider.launchDefaultAiTool("repo-saved-tool", "%22");
-
-    expect(launchSpy).toHaveBeenCalledWith(
-      "tmux-saved-tool",
-      "codex",
-      false,
-      "%22",
-      undefined,
-    );
-  });
-
-  it("uses the configured default AI tool when no instance preference exists", async () => {
-    mockConfiguration({ defaultAiTool: "claude" });
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-default-tool",
-        workspaceUri: "file:///workspaces/repo-default-tool",
-      },
-      runtime: {
-        terminalKey: "workspace-default-tool",
-        tmuxSessionId: "tmux-default-tool",
-      },
-      state: "connected",
-    });
-
-    provider = createProvider({ instanceStore });
-    const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
-
-    await provider.launchDefaultAiTool("repo-default-tool");
-
-    expect(launchSpy).toHaveBeenCalledWith(
-      "tmux-default-tool",
-      "claude",
-      false,
-      undefined,
-      undefined,
-    );
-  });
-
-  it("launches the saved tool directly instead of forcing a selector", async () => {
-    mockConfiguration({ defaultAiTool: "opencode" });
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-force-show",
-        workspaceUri: "file:///workspaces/repo-force-show",
-        selectedAiTool: "codex",
-      },
-      runtime: {
-        terminalKey: "workspace-force-show",
-        tmuxSessionId: "tmux-force-show",
-      },
-      state: "connected",
-    });
-
-    provider = createProvider({ instanceStore });
-    const launchSpy = vi.spyOn(provider, "launchAiTool").mockResolvedValue();
-    resolveProvider(provider);
-
-    await provider.launchDefaultAiTool("repo-force-show", "%9");
-
-    expect(launchSpy).toHaveBeenCalledWith(
-      "tmux-force-show",
-      "codex",
-      false,
-      "%9",
-      undefined,
-    );
-  });
-
   it("ignores non-selector messages when a boolean postMessage reports false", () => {
     mockConfiguration();
     provider = createProvider();
@@ -1592,276 +1410,6 @@ describe("TerminalProvider", () => {
     (provider as any).flushPendingWebviewMessages(view.webview);
 
     expect(provider["pendingWebviewMessages"]).toHaveLength(0);
-  });
-
-  it("routes AI tool launches to tmux when an instance is tmux mapped", async () => {
-    mockConfiguration();
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-tmux-launch-route",
-        workspaceUri: "file:///workspaces/repo-tmux-launch-route",
-      },
-      runtime: {
-        terminalKey: "workspace-tmux-launch-route",
-        tmuxSessionId: "tmux-session-x",
-      },
-      state: "connected",
-    });
-    const listPanes = vi
-      .fn()
-      .mockResolvedValue([{ paneId: "%42", isActive: true }]);
-    const sendTextToPane = vi.fn().mockResolvedValue(undefined);
-    const tmuxSessionManager = {
-      listPanes,
-      sendTextToPane,
-    } as unknown as TmuxSessionManager;
-    const zellijSessionManager = {
-      switchSession: vi.fn(),
-      selectPane: vi.fn(),
-      sendTextToPane: vi.fn(),
-    } as any;
-
-    provider = createProvider({
-      instanceStore,
-      tmuxSessionManager,
-      zellijSessionManager,
-    });
-
-    await provider.launchAiTool("tmux-session-x", "codex", false, "%42");
-
-    expect(sendTextToPane).toHaveBeenCalledWith("%42", "codex");
-    expect(zellijSessionManager.switchSession).not.toHaveBeenCalled();
-    expect(zellijSessionManager.selectPane).not.toHaveBeenCalled();
-    expect(zellijSessionManager.sendTextToPane).not.toHaveBeenCalled();
-  });
-
-  it("switches to the target zellij session before launching into a pane", async () => {
-    mockConfiguration();
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-zellij-launch-route",
-        workspaceUri: "file:///workspaces/repo-zellij-launch-route",
-      },
-      runtime: {
-        terminalKey: "workspace-zellij-launch-route",
-        zellijSessionId: "zellij-target",
-      },
-      state: "connected",
-    });
-    const switchSession = vi.fn().mockResolvedValue(undefined);
-    const selectPane = vi.fn().mockResolvedValue(undefined);
-    const sendTextToPane = vi.fn().mockResolvedValue(undefined);
-    const zellijSessionManager = {
-      isAvailable: vi.fn().mockResolvedValue(true),
-      switchSession,
-      selectPane,
-      sendTextToPane,
-    } as any;
-
-    provider = createProvider({ instanceStore, zellijSessionManager });
-    vi.spyOn((provider as any).sessionRuntime, "getActiveBackend").mockReturnValue("zellij");
-
-    await provider.launchAiTool("zellij-target", "opencode", false, "pane-7");
-
-    expect(switchSession).toHaveBeenCalledWith("zellij-target");
-    expect(selectPane).toHaveBeenCalledWith("pane-7");
-    expect(sendTextToPane).toHaveBeenCalledWith("opencode -c", {
-      submit: true,
-    });
-    expect(switchSession.mock.invocationCallOrder[0]).toBeLessThan(
-      selectPane.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
-    );
-    expect(switchSession.mock.invocationCallOrder[0]).toBeLessThan(
-      sendTextToPane.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
-    );
-  });
-
-  it("launches AI tools against the normalized tmux session and active pane", async () => {
-    const configuration = mockConfiguration();
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-launch",
-        workspaceUri: "file:///workspaces/repo-launch",
-      },
-      runtime: {
-        terminalKey: "workspace-launch",
-        tmuxSessionId: "tmux-launch",
-      },
-      state: "connected",
-    });
-    const listPanes = vi.fn().mockResolvedValue([
-      { paneId: "%1", isActive: false },
-      { paneId: "%2", isActive: true },
-    ]);
-    const sendTextToPane = vi.fn().mockResolvedValue(undefined);
-    const tmuxSessionManager = {
-      listPanes,
-      sendTextToPane,
-    } as unknown as TmuxSessionManager;
-
-    provider = createProvider({ instanceStore, tmuxSessionManager });
-    vi.spyOn((provider as any).sessionRuntime, "getActiveBackend").mockReturnValue("tmux");
-
-    await provider.launchAiTool("repo-launch", "codex", true);
-
-    expect(configuration.update).toHaveBeenCalledWith(
-      "defaultAiTool",
-      "codex",
-      vscode.ConfigurationTarget.Global,
-    );
-    expect(listPanes).toHaveBeenCalledWith("tmux-launch", {
-      activeWindowOnly: true,
-    });
-    expect(sendTextToPane).toHaveBeenCalledWith("%2", "codex");
-    expect(instanceStore.get("workspace-launch")?.config.selectedAiTool).toBe(
-      "codex",
-    );
-  });
-
-  it("uses the provided pane id and original session id when no tmux mapping exists", async () => {
-    mockConfiguration();
-    const instanceStore = new InstanceStore();
-    instanceStore.upsert({
-      config: {
-        id: "workspace-direct-pane",
-        workspaceUri: "file:///workspaces/repo-direct-pane",
-      },
-      runtime: {
-        terminalKey: "workspace-direct-pane",
-      },
-      state: "connected",
-    });
-    const listPanes = vi.fn();
-    const sendTextToPane = vi.fn().mockResolvedValue(undefined);
-    const tmuxSessionManager = {
-      listPanes,
-      sendTextToPane,
-    } as unknown as TmuxSessionManager;
-
-    provider = createProvider({ instanceStore, tmuxSessionManager });
-    vi.spyOn((provider as any).sessionRuntime, "getActiveBackend").mockReturnValue("tmux");
-
-    await provider.launchAiTool("repo-direct-pane", "opencode", false, "%77");
-
-    expect(listPanes).not.toHaveBeenCalled();
-    expect(sendTextToPane).toHaveBeenCalledWith("%77", "opencode -c");
-    expect(
-      instanceStore.get("workspace-direct-pane")?.config.selectedAiTool,
-    ).toBe("opencode");
-  });
-
-  it("saves the tool preference even when tmux is unavailable", async () => {
-    const configuration = mockConfiguration();
-    provider = createProvider();
-
-    await provider.launchAiTool("repo-no-tmux", "claude", true);
-
-    expect(configuration.update).toHaveBeenCalledWith(
-      "defaultAiTool",
-      "claude",
-      vscode.ConfigurationTarget.Global,
-    );
-  });
-
-  it("returns early when the requested AI tool is not configured", async () => {
-    const configuration = mockConfiguration();
-    const listPanes = vi.fn();
-    const sendTextToPane = vi.fn();
-    const tmuxSessionManager = {
-      listPanes,
-      sendTextToPane,
-    } as unknown as TmuxSessionManager;
-
-    provider = createProvider({ tmuxSessionManager });
-
-    await provider.launchAiTool("repo-missing-tool", "missing-tool", true);
-
-    expect(configuration.update).toHaveBeenCalledWith(
-      "defaultAiTool",
-      "missing-tool",
-      vscode.ConfigurationTarget.Global,
-    );
-    expect(listPanes).not.toHaveBeenCalled();
-    expect(sendTextToPane).not.toHaveBeenCalled();
-  });
-
-  it("warns when no tmux pane can be resolved for AI tool launch", async () => {
-    mockConfiguration();
-    const listPanes = vi.fn().mockResolvedValue([]);
-    const sendTextToPane = vi.fn();
-    const tmuxSessionManager = {
-      listPanes,
-      sendTextToPane,
-    } as unknown as TmuxSessionManager;
-
-    provider = createProvider({ tmuxSessionManager });
-    vi.spyOn((provider as any).sessionRuntime, "getActiveBackend").mockReturnValue("tmux");
-    const warnSpy = vi.spyOn((provider as any).logger, "warn");
-
-    await provider.launchAiTool("repo-no-pane", "codex", false);
-
-    expect(sendTextToPane).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("launchAiTool skipped: no target pane"),
-    );
-  });
-
-  it("warns when tmux commands fail during AI tool launch", async () => {
-    mockConfiguration();
-    const tmuxSessionManager = {
-      listPanes: vi.fn().mockRejectedValue(new Error("tmux unavailable")),
-      sendTextToPane: vi.fn(),
-    } as unknown as TmuxSessionManager;
-
-    provider = createProvider({ tmuxSessionManager });
-    vi.spyOn((provider as any).sessionRuntime, "getActiveBackend").mockReturnValue("tmux");
-    const warnSpy = vi.spyOn((provider as any).logger, "warn");
-
-    await provider.launchAiTool("repo-launch-error", "codex", false);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to launch AI tool: tmux unavailable"),
-    );
-  });
-
-  it("launches AI tool against zellij focused pane when zellij backend active", async () => {
-    mockConfiguration();
-    const zellijSelectPane = vi.fn().mockResolvedValue(undefined);
-    const zellijSendTextToPane = vi.fn().mockResolvedValue(undefined);
-    const zellijSessionManager = {
-      isAvailable: vi.fn().mockResolvedValue(true),
-      selectPane: zellijSelectPane,
-      sendTextToPane: zellijSendTextToPane,
-    } as any;
-
-    provider = createProvider({ zellijSessionManager });
-    vi.spyOn((provider as any).sessionRuntime, "getActiveBackend").mockReturnValue("zellij");
-
-    await provider.launchAiTool("zellij-session", "codex", false, "terminal_5");
-
-    expect(zellijSelectPane).toHaveBeenCalledWith("terminal_5");
-    expect(zellijSendTextToPane).toHaveBeenCalledWith("codex", { submit: true });
-  });
-
-  it("honors the explicit backendHint when launching an AI tool", async () => {
-    mockConfiguration();
-    provider = createProvider();
-    const warnSpy = vi.spyOn((provider as any).logger, "warn");
-
-    await provider.launchAiTool(
-      "session-backend-hint",
-      "codex",
-      false,
-      undefined,
-      "native",
-    );
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("backend native does not support pane targeting"),
-    );
   });
 
   it("executeRawTmuxCommand rejects when active backend is not tmux", async () => {
@@ -2633,22 +2181,6 @@ describe("TerminalProvider", () => {
     expect(executeRawCommand).toHaveBeenNthCalledWith(3, "tmux-values", "choose-tree", ["-Z"]);
   });
 
-  it("skips zellij AI launch when the manager is unavailable and when no tool is resolved", async () => {
-    mockConfiguration();
-    provider = createProvider();
-    vi.spyOn(provider["sessionRuntime"], "getActiveBackend").mockReturnValue(
-      "zellij",
-    );
-    const warnSpy = vi.spyOn(provider["logger"], "warn");
-
-    await provider.launchAiTool("zellij-no-manager", "codex", false);
-    await provider.launchAiTool("zellij-no-tool", "missing-tool", false);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      "[TerminalProvider] launchAiTool skipped: zellij manager unavailable",
-    );
-  });
-
   it("routes remaining webview bridge callbacks through TerminalProvider", async () => {
     mockConfiguration();
     provider = createProvider();
@@ -2864,21 +2396,16 @@ describe("TerminalProvider", () => {
   });
 
   it("covers remaining TerminalProvider error and fallback branches", async () => {
-    mockConfiguration({ defaultAiTool: "", aiTools: DEFAULT_AI_TOOLS });
+    mockConfiguration();
     const throwingStore = new InstanceStore();
     vi.spyOn(throwingStore, "getActive").mockImplementation(() => {
       throw "native store down";
     });
     provider = createProvider({
       instanceStore: throwingStore,
-      zellijSessionManager: {
-        selectPane: vi.fn(async () => undefined),
-        sendTextToPane: vi.fn(async () => undefined),
-      },
     });
     const runtime = provider["sessionRuntime"];
     const logger = provider["logger"];
-    vi.spyOn(logger, "info");
     vi.spyOn(logger, "warn");
     resolveProvider(provider);
 
@@ -2891,22 +2418,6 @@ describe("TerminalProvider", () => {
     expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining("http down"),
     );
-
-    vi.spyOn(runtime, "getActiveBackend").mockReturnValue("zellij");
-    await provider.launchAiTool("zellij-pane", "codex", false, "pane-1");
-    expect(provider["zellijSessionManager"]?.selectPane).toHaveBeenCalledWith(
-      "pane-1",
-    );
-
-    const zellijManager = provider["zellijSessionManager"] as unknown as {
-      sendTextToPane: ReturnType<typeof vi.fn>;
-    };
-    vi.mocked(zellijManager.sendTextToPane).mockRejectedValueOnce("launch down");
-    await provider.launchAiTool("zellij-pane", "codex", false);
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining("launch down"),
-    );
-
   });
 
   it("covers visible and hidden autostart skip branches", () => {

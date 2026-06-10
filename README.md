@@ -10,12 +10,11 @@ If this project helps your workflow, you can [support it on GitHub Sponsors](htt
 
 ## Features
 
-- **Auto-launch AI tools**: Opens the configured AI tool automatically when the sidebar is activated
+- **Backend-first terminal**: Starts a plain shell for your chosen backend (`native`, `tmux`, or `zellij`) — no AI tool picker on open
 - **Full TUI Support**: Complete terminal emulation with xterm.js and WebGL rendering
-- **Multi-AI Tool Support**: Configure and switch between OpenCode, Claude, Codex, or custom AI tools
 - **ULW Terminal Manager**: Dedicated tmux session management surface with inline pane and window controls
 - **Tmux Integration**: Automatic tmux session discovery, workspace-scoped session filtering, and tmux status bar hidden in sidebar
-- **Native Shell Switching**: Toggle between OpenCode and a native shell in the same terminal
+- **Native shell switching**: Switch to a normal shell in the sidebar when you need it
 - **Return to Workspace Banner**: Quick navigation back to the active workspace from ULW Terminal Manager
 - **HTTP API Integration**: Bidirectional communication with OpenCode CLI via HTTP API
 - **Auto-Context Sharing**: Automatically shares editor context when terminal opens
@@ -25,11 +24,11 @@ If this project helps your workflow, you can [support it on GitHub Sponsors](htt
 - **Drag & Drop Support**: Hold Shift and drag files/folders to send as references
 - **Context Menu Integration**: Right-click files in Explorer or text in Editor to send to OpenCode
 - **Secondary Sidebar**: Dock the terminal in the secondary sidebar for split-screen workflows
-- **Configurable**: Customize command, font, terminal settings, HTTP API behavior, and AI tool preferences
+- **Configurable**: Customize font, terminal settings, backend (`ulw.terminalBackend`), and HTTP API behavior
 
 ## Architecture
 
-This extension provides a **sidebar-only** terminal MUX experience. OpenCode, Claude, Codex, or a native shell can run embedded in the VS Code sidebar Activity Bar instead of the native VS Code terminal panel.
+This extension provides a **sidebar-only** terminal MUX experience. A normal shell (or your `tmux` / `zellij` session) runs in the VS Code sidebar instead of the native terminal panel. OpenCode and other AI CLIs are optional — start them yourself in the terminal when you want them.
 
 The extension consists of two primary sidebar views:
 
@@ -106,14 +105,14 @@ npx @vscode/vsce package
 
 1. Click the ULW icon in the Activity Bar (sidebar) to open ULW Terminal Manager
 2. The ULW Terminal is available in the secondary sidebar
-3. ULW Terminal automatically starts when the terminal view is activated
-4. Interact with OpenCode directly in the sidebar
+3. With `ulw.autoStartOnOpen` enabled, ULW starts your configured backend (plain shell / tmux / zellij) when the view opens
+4. Run any CLI (including OpenCode) manually in that terminal
 
 ## Commands
 
 ### Basic Commands
 
-- **Start ULW Terminal** - Manually start the configured AI tool terminal
+- **Start ULW Terminal** - Manually start the sidebar terminal session
 - **ULW Terminal: Paste** - Paste text into the terminal
 
 ### File Reference Commands
@@ -257,21 +256,13 @@ Available settings in VS Code settings (`Cmd+,` / `Ctrl+,`):
 | `ulw.autoShareContext`  | boolean | `true`  | Auto-share editor context with OpenCode          |
 | `ulw.contextDebounceMs` | number  | `500`   | Debounce delay for context updates (100-5000 ms) |
 
-### AI Tool Settings
+### Backend and discovery
 
-| Setting               | Type    | Default                       | Description                                               |
-| --------------------- | ------- | ----------------------------- | --------------------------------------------------------- |
-| `ulw.aiTools`         | array   | `[{opencode, claude, codex}]` | Configure AI coding tools with custom paths and arguments |
-| `ulw.defaultAiTool`   | string  | `"opencode"`                  | Default AI tool for new tmux sessions                     |
-| `ulw.enableAutoSpawn` | boolean | `true`                        | Auto-spawn OpenCode if not running                        |
-
-### Tmux Settings
-
-| Setting                      | Type    | Default | Description                                                              |
-| ---------------------------- | ------- | ------- | ------------------------------------------------------------------------ |
-| `ulw.nativeShellDefault`     | string  | `""`    | Default behavior for native shell switch (`""`, `"opencode"`, `"shell"`) |
-| `ulw.tmuxSessionDefault`     | string  | `""`    | Default behavior for new tmux sessions (`""`, `"opencode"`, `"shell"`)   |
-| `ulw.showTmuxWindowControls` | boolean | `true`  | Show direct tmux session/window controls in the terminal toolbar         |
+| Setting                 | Type    | Default  | Description                                                                 |
+| ----------------------- | ------- | -------- | --------------------------------------------------------------------------- |
+| `ulw.terminalBackend`   | string  | `"tmux"` | Terminal backend: `native`, `tmux`, or `zellij` (unavailable backends fall back to native) |
+| `ulw.enableAutoSpawn`   | boolean | `true`   | When process scan finds no OpenCode instance, try spawning OpenCode in the background (discovery only; does not change sidebar startup) |
+| `ulw.showTmuxWindowControls` | boolean | `true` | Show tmux session/window controls in the terminal toolbar                   |
 
 ### Advanced Settings
 
@@ -294,7 +285,8 @@ Available settings in VS Code settings (`Cmd+,` / `Ctrl+,`):
   "ulw.enableHttpApi": true,
   "ulw.httpTimeout": 5000,
   "ulw.autoShareContext": true,
-  "ulw.defaultAiTool": "opencode"
+  "ulw.terminalBackend": "tmux",
+  "ulw.enableAutoSpawn": false
 }
 ```
 
@@ -302,7 +294,7 @@ Available settings in VS Code settings (`Cmd+,` / `Ctrl+,`):
 
 - VS Code 1.106.0 or higher
 - Node.js 20.0.0 or higher
-- OpenCode installed and accessible via `opencode` command
+- Optional: OpenCode (or another AI CLI) if you use HTTP prompts, auto-context, or `ulw.enableAutoSpawn`
 
 ## Development
 

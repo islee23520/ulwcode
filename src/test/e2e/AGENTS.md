@@ -17,8 +17,7 @@ e2e/
     ├── session-flows.e2e.ts
     ├── contributions.e2e.ts
     ├── config-comprehensive.e2e.ts
-    ├── settings.e2e.ts
-    └── ai-tool-selector.e2e.ts
+    └── settings.e2e.ts
 ```
 
 ## WHERE TO LOOK
@@ -31,7 +30,7 @@ e2e/
 | Command behavior     | `suite/command-behavior.e2e.ts`                                                | command execution assertions          |
 | Session flows        | `suite/session-flows.e2e.ts`                                                   | tmux/session workflows                |
 | Manifest/config      | `suite/contributions.e2e.ts`, `config-comprehensive.e2e.ts`, `settings.e2e.ts` | package contribution checks           |
-| AI tool selector     | `suite/ai-tool-selector.e2e.ts`                                                | tool config and command behavior      |
+
 
 ## CONVENTIONS
 

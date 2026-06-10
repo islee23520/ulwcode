@@ -14,7 +14,7 @@ terminal/
 ├── resize.ts                 # initial fit, visibility refresh, resize observer
 ├── html.ts                   # terminal container HTML rendering
 ├── terminal-container.ts     # static container template helpers
-├── ai-selector.ts/.html      # startup AI tool selector snippet
+
 ├── tmux-toolbar.ts/.html     # tmux command toolbar snippet
 └── *.test.ts
 ```

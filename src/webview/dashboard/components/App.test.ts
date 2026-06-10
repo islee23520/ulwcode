@@ -12,9 +12,7 @@ describe("dashboard App", () => {
     vi.clearAllMocks();
   });
 
-  it("forwards the dashboard AI button as a default tool launch", () => {
-    const onAction = vi.fn();
-
+  it("does not render a dashboard AI launch button", () => {
     render(
       h(App, {
         payload: {
@@ -29,26 +27,14 @@ describe("dashboard App", () => {
           ],
           workspace: "repo-a",
         },
-        onAction,
+        onAction: vi.fn(),
       }),
       document.body,
     );
 
-    const button = document.querySelector(
-      '[data-action="launchDefaultAiTool"]',
-    );
-
-    expect(button).toBeInstanceOf(HTMLButtonElement);
-
-    button?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true, cancelable: true }),
-    );
-
-    expect(onAction).toHaveBeenCalledWith({
-      action: "launchDefaultAiTool",
-      sessionId: "repo-a",
-      sessionName: "Repo A",
-    });
+    expect(
+      document.querySelector('[data-action="launchDefaultAiTool"]'),
+    ).toBeNull();
   });
 
   it("renders resolved pane tool badges for node-based panes", () => {

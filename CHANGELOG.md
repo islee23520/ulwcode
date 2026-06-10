@@ -5,6 +5,22 @@ All notable changes to the "ULW" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-06-10
+
+### Changed
+
+- Start the sidebar from `ulw.terminalBackend` only (`native`, `tmux`, or `zellij`) with a plain shell or multiplexer attach—no default AI tool or startup tool picker.
+- Remove dashboard AI launch actions and host/webview `launchAiTool` / `launchDefaultAiTool` flows.
+
+### Removed
+
+- VS Code settings `ulw.aiTools` and `ulw.defaultAiTool`.
+- AI tool selector e2e suite and related manifest/docs references.
+
+### Fixed
+
+- Align unit, coverage, and e2e tests with backend-first startup and removed launch APIs.
+
 ## [1.11.0] - 2026-06-03
 
 ### Added

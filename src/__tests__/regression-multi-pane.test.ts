@@ -327,7 +327,7 @@ describe("multi-pane regression coverage", () => {
     expect(resizeSpy).toHaveBeenCalledWith("pane-2", 88, 22);
   });
 
-  it("keeps HTTP append-prompt communication and auto-share context working in single-pane mode", async () => {
+  it("skips auto-share context when no AI tool is active on plain terminal startup", async () => {
     mockConfiguration({
       autoStartOnOpen: false,
       enableHttpApi: true,
@@ -335,26 +335,10 @@ describe("multi-pane regression coverage", () => {
     });
     provider = createProvider();
     const runtime = provider["sessionRuntime"];
-    const apiHealthSpy = vi
-      .spyOn(OpenCodeApiClient.prototype, "healthCheck")
-      .mockResolvedValue(true);
     const apiAppendSpy = vi
       .spyOn(OpenCodeApiClient.prototype, "appendPrompt")
       .mockResolvedValue(undefined);
 
-    const operator = {
-      getLaunchCommand: vi.fn(() => "opencode -c"),
-      supportsHttpApi: vi.fn(() => true),
-      supportsAutoContext: vi.fn(() => true),
-      formatFileReference: vi.fn(
-        (reference: { path: string; selectionStart?: number; selectionEnd?: number }) =>
-          `@${reference.path}#L${reference.selectionStart}-L${reference.selectionEnd}`,
-      ),
-    };
-
-    vi.spyOn(runtime["aiToolRegistry"], "getForConfig").mockReturnValue(
-      operator as never,
-    );
     vi.spyOn(runtime["contextSharingService"], "getCurrentContext").mockReturnValue({
       filePath: "src/regression.ts",
       selectionStart: 10,
@@ -365,9 +349,7 @@ describe("multi-pane regression coverage", () => {
     messageHandler({ type: "ready", cols: 110, rows: 36 });
     await flushAsyncStartup();
 
-    expect(apiHealthSpy).toHaveBeenCalled();
-    expect(apiAppendSpy).toHaveBeenCalledWith("@src/regression.ts#L10-L20");
-    expect(provider.isHttpAvailable()).toBe(true);
+    expect(apiAppendSpy).not.toHaveBeenCalled();
   });
 
   it("keeps the legacy default session identity when no pane settings exist in config", async () => {

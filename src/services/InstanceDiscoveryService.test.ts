@@ -886,21 +886,7 @@ describe("InstanceDiscoveryService", () => {
     });
   });
 
-  it("uses the default command when configured tool entries resolve to no usable tools", async () => {
-    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
-      get: vi.fn((key: string, defaultValue?: unknown) => {
-        if (key === "defaultAiTool") {
-          return "missing";
-        }
-
-        if (key === "aiTools") {
-          return [null, { name: "nameless" }];
-        }
-
-        return defaultValue;
-      }),
-      update: vi.fn(),
-    } as unknown as vscode.WorkspaceConfiguration);
+  it("uses the built-in default command when auto-spawning", async () => {
     service = new InstanceDiscoveryService();
     vi.mocked(execFile).mockReturnValueOnce(createChildProcess(37003, "exit-zero"));
     vi.spyOn(asHarness(service), "waitForSpawnReadiness").mockResolvedValueOnce(
@@ -911,7 +897,7 @@ describe("InstanceDiscoveryService", () => {
 
     expect(execFile).toHaveBeenCalledWith(
       "opencode",
-      [],
+      ["-c"],
       expect.objectContaining({
         env: expect.objectContaining({ OPENCODE_CALLER: "vscode" }),
       }),

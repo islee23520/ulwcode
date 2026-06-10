@@ -9,7 +9,7 @@
 
 ## 概要
 
-ULW は、OpenCode、Claude、Codex、カスタム AI ツール、または native shell を VS Code の標準ターミナルパネルではなく、**サイドバー内**に直接埋め込みます。
+ULW は VS Code の標準ターミナルの代わりに、**サイドバー**で terminal MUX（`native` / `tmux` / `zellij`）を動かします。OpenCode などの AI CLI は任意で、ターミナルから手動で起動します。
 
 主なビューは 2 つあります。
 
@@ -18,9 +18,8 @@ ULW は、OpenCode、Claude、Codex、カスタム AI ツール、または nati
 
 ## 主な機能
 
-- ターミナルビューが有効になると **OpenCode** を自動起動
+- ビューを開くと設定した **バックエンド**（通常シェル / `tmux` / `zellij`）のみ起動 — AI ツール選択 UI なし
 - `xterm.js` と WebGL による完全な TUI レンダリング
-- OpenCode、Claude、Codex、カスタムツールを含む複数 AI ツール対応
 - `tmux` session の自動検出とワークスペース単位のフィルタリング
 - 同じターミナル内で native shell へ切り替え可能
 - OpenCode とプロンプトやコンテキストをやり取りする HTTP API 通信
@@ -62,8 +61,8 @@ npx @vscode/vsce package
 
 1. `tmux` session を管理するときは **ULW Terminal Manager** を開きます。
 2. セカンダリサイドバーで **ULW Terminal** を開きます。
-3. 自動起動を使うか、手動で OpenCode を起動します。
-4. サイドバー内でそのまま OpenCode を操作します。
+3. `ulw.autoStartOnOpen` でバックエンドを自動起動するか、手動で開始します。
+4. シェルや multiplexer を使い、必要なら OpenCode などを手動で起動します。
 
 ### よく使うショートカット
 
@@ -137,8 +136,8 @@ ULW は、OpenCode とより安定して通信するために HTTP API を使用
 
 | 設定                           | 説明                                                                                        |
 | ------------------------------ | ------------------------------------------------------------------------------------------- |
-| `ulw.autoStart`                | ビュー有効化時に OpenCode を自動起動                                                        |
-| `ulw.autoStartOnOpen`          | サイドバーを開いたときに OpenCode を自動起動                                                |
+| `ulw.autoStart`                | ビュー有効化時にターミナルセッションを自動起動                                              |
+| `ulw.autoStartOnOpen`          | サイドバーを開いたときにターミナル起動（`ulw.terminalBackend`）                             |
 | `ulw.fontSize`                 | ターミナルのフォントサイズ                                                                  |
 | `ulw.fontFamily`               | ターミナルのフォントファミリー                                                              |
 | `ulw.autoSwitchKoreanKeyboard` | 韓英キーボード配列の入力ミスを検出したら macOS のシステム入力ソースを自動切替。既定では無効 |
@@ -154,15 +153,12 @@ ULW は、OpenCode とより安定して通信するために HTTP API を使用
 | `ulw.autoShareContext`  | エディタのコンテキストを自動共有 |
 | `ulw.contextDebounceMs` | コンテキスト更新の debounce 遅延 |
 
-### AI ツールと tmux 動作
+### バックエンドとインスタンス検出
 
-| 設定                     | 説明                               |
-| ------------------------ | ---------------------------------- |
-| `ulw.aiTools`            | 利用可能な AI ツールの設定         |
-| `ulw.defaultAiTool`      | 新しい `tmux` session の既定ツール |
-| `ulw.enableAutoSpawn`    | OpenCode が未起動なら自動起動      |
-| `ulw.nativeShellDefault` | native shell 切り替え時の既定動作  |
-| `ulw.tmuxSessionDefault` | 新しい `tmux` session の既定動作   |
+| 設定                  | 説明                                                                 |
+| --------------------- | -------------------------------------------------------------------- |
+| `ulw.terminalBackend` | サイドバー起動時の `native` / `tmux` / `zellij`                      |
+| `ulw.enableAutoSpawn` | プロセススキャンで OpenCode が見つからない場合のバックグラウンド起動（サイドバー UI とは別） |
 
 ## 要件
 

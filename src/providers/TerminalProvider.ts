@@ -13,13 +13,12 @@ import { AiToolFileReference } from "../services/aiTools/AiToolOperator";
 import { TmuxPaneSyncService } from "../services/TmuxPaneSyncService";
 import { ZellijPaneSyncService } from "../services/ZellijPaneSyncService";
 import {
-  AiToolConfig,
+
   BackendPaneConfig,
   HostMessage,
   TMUX_RAW_ALLOWED_SUBCOMMANDS,
   TerminalBackendType,
-  detectAiToolName,
-  resolveAiToolConfigs,
+
 } from "../types";
 import type { TmuxRawSubcommand } from "../types";
 import { AiToolOperatorRegistry } from "../services/aiTools/AiToolOperatorRegistry";
@@ -148,8 +147,6 @@ export class TerminalProvider
         this.sessionRuntime.formatDroppedFiles(paths, { useAtSyntax }),
       formatPastedImage: (tempPath) =>
         this.sessionRuntime.formatPastedImage(tempPath),
-      launchAiTool: (sessionId, toolName, savePreference, targetPaneId) =>
-        this.launchAiTool(sessionId, toolName, savePreference, targetPaneId),
       executeRawTmuxCommand: (subcommand, args) =>
         this.executeRawTmuxCommand(subcommand, args),
       zoomTmuxPane: () => this.zoomTmuxPane(),
@@ -526,104 +523,6 @@ export class TerminalProvider
     this.terminalManager.writeToTerminal(this.activeTerminalId, prompt);
   }
 
-  public async launchAiTool(
-    sessionId: string,
-    toolName: string,
-    savePreference: boolean,
-    targetPaneId?: string,
-    backendHint?: TerminalBackendType,
-  ): Promise<void> {
-    if (savePreference) {
-      const config = vscode.workspace.getConfiguration("ulw");
-      await config.update(
-        "defaultAiTool",
-        toolName,
-        vscode.ConfigurationTarget.Global,
-      );
-    }
-
-    const tool = this.sessionRuntime.resolveToolByName(toolName);
-    if (!tool) {
-      return;
-    }
-
-    const instanceId =
-      this.sessionRuntime.resolveInstanceIdFromSessionId(sessionId);
-    this.sessionRuntime.rememberSelectedTool(tool.name, instanceId);
-
-    const operator = this.aiToolRegistry.getForConfig(tool);
-    const launchCommand = operator.getLaunchCommand(tool);
-    const instance = this.instanceStore?.get(instanceId);
-    const activeBackend = this.sessionRuntime.getActiveBackend();
-    const effectiveBackend: TerminalBackendType = backendHint
-      ? backendHint
-      : instance?.runtime.tmuxSessionId
-        ? "tmux"
-        : instance?.runtime.zellijSessionId
-          ? "zellij"
-          : activeBackend;
-
-    try {
-      if (effectiveBackend === "zellij") {
-        if (!this.zellijSessionManager) {
-          this.logger.warn(
-            "[TerminalProvider] launchAiTool skipped: zellij manager unavailable",
-          );
-          return;
-        }
-        const effectiveZellijSessionId =
-          this.sessionRuntime.resolveZellijSessionIdForInstance(instanceId) ??
-          sessionId;
-        if (typeof this.zellijSessionManager.switchSession === "function") {
-          await this.zellijSessionManager.switchSession(
-            effectiveZellijSessionId,
-          );
-        }
-        if (targetPaneId) {
-          await this.zellijSessionManager.selectPane(targetPaneId);
-        }
-        await this.zellijSessionManager.sendTextToPane(launchCommand, {
-          submit: true,
-        });
-        return;
-      }
-
-      if (effectiveBackend !== "tmux" || !this.tmuxSessionManager) {
-        this.logger.warn(
-          `[TerminalProvider] launchAiTool skipped: backend ${effectiveBackend} does not support pane targeting`,
-        );
-        return;
-      }
-
-      const effectiveSessionId =
-        this.sessionRuntime.resolveTmuxSessionIdForInstance(instanceId) ??
-        sessionId;
-      let paneIdToUse: string | undefined = targetPaneId;
-      if (!paneIdToUse) {
-        const panes = await this.tmuxSessionManager.listPanes(
-          effectiveSessionId,
-          { activeWindowOnly: true },
-        );
-        const targetPane = panes.find((p) => p.isActive) ?? panes[0];
-        paneIdToUse = targetPane?.paneId;
-      }
-      if (paneIdToUse) {
-        await this.tmuxSessionManager.sendTextToPane(
-          paneIdToUse,
-          launchCommand,
-        );
-      } else {
-        this.logger.warn(
-          `[TerminalProvider] launchAiTool skipped: no target pane for session ${effectiveSessionId}`,
-        );
-      }
-    } catch (error) {
-      this.logger.warn(
-        `[TerminalProvider] Failed to launch AI tool: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
   private handleMessage(message: unknown, surfacePaneId?: string): void {
     const scopedMessage = this.withSurfacePaneId(message, surfacePaneId);
     if (this.isPaneScopedWebviewMessage(scopedMessage)) {
@@ -703,69 +602,6 @@ export class TerminalProvider
     return [input.trim()];
   }
 
-  public async launchDefaultAiTool(
-    sessionId: string,
-    targetPaneId?: string,
-    backendHint?: TerminalBackendType,
-  ): Promise<void> {
-    const config = vscode.workspace.getConfiguration("ulw");
-    const instanceId =
-      this.sessionRuntime.resolveInstanceIdFromSessionId(sessionId);
-    const effectiveSessionId =
-      this.sessionRuntime.resolveTmuxSessionIdForInstance(instanceId) ??
-      sessionId;
-    const savedTool =
-      this.instanceStore?.get(instanceId)?.config.selectedAiTool ??
-      config.get<string>("defaultAiTool", "");
-    const tools: AiToolConfig[] = resolveAiToolConfigs(
-      config.get("aiTools", []),
-    );
-
-    const runningTool = this.tmuxSessionManager
-      ? await this.detectRunningTmuxAiTool(
-          effectiveSessionId,
-          targetPaneId,
-          tools,
-        )
-      : undefined;
-    if (runningTool) {
-      this.sessionRuntime.rememberSelectedTool(runningTool, instanceId);
-      return;
-    }
-
-    if (savedTool) {
-      await this.launchAiTool(
-        effectiveSessionId,
-        savedTool,
-        false,
-        targetPaneId,
-        backendHint,
-      );
-    }
-  }
-
-  private async detectRunningTmuxAiTool(
-    sessionId: string,
-    targetPaneId: string | undefined,
-    tools: AiToolConfig[],
-  ): Promise<string | undefined> {
-    if (!this.tmuxSessionManager || !sessionId) {
-      return undefined;
-    }
-
-    try {
-      const panes = await this.tmuxSessionManager.listPanes(sessionId, {
-        activeWindowOnly: true,
-      });
-      const targetPane = targetPaneId
-        ? panes.find((pane) => pane.paneId === targetPaneId)
-        : panes.find((pane) => pane.isActive);
-      return detectAiToolName(targetPane?.currentCommand, tools);
-    } catch {
-      return undefined;
-    }
-  }
-
   private getNativeRestoreRecord():
     | ReturnType<InstanceStore["getActive"]>
     | undefined {
@@ -782,8 +618,7 @@ export class TerminalProvider
     if (
       !record ||
       record.state !== "disconnected" ||
-      record.config.terminalBackend !== "native" ||
-      !record.config.selectedAiTool
+      record.config.terminalBackend !== "native"
     ) {
       return undefined;
     }
@@ -798,11 +633,9 @@ export class TerminalProvider
       return false;
     }
 
-    const selectedAiTool = record.config.selectedAiTool;
     this.logger.info(
       `[TerminalProvider] Restoring native terminal for ${record.config.id}`,
     );
-    this.sessionRuntime.rememberSelectedTool(selectedAiTool, record.config.id);
     await this.sessionRuntime.startOpenCode();
     return true;
   }

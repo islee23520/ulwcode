@@ -55,8 +55,6 @@ describe("TerminalDashboardProvider", () => {
       setActive?: ReturnType<typeof vi.fn>;
     };
     terminalProvider?: {
-      launchDefaultAiTool: ReturnType<typeof vi.fn>;
-      launchAiTool: ReturnType<typeof vi.fn>;
       switchToZellijSession?: ReturnType<typeof vi.fn>;
       killTmuxSession?: ReturnType<typeof vi.fn>;
     };
@@ -684,47 +682,7 @@ describe("TerminalDashboardProvider", () => {
     });
   });
 
-  it("launches the default AI tool when the dashboard sends an explicit action", async () => {
-    const terminalProvider = {
-      launchDefaultAiTool: vi.fn().mockResolvedValue(undefined),
-      launchAiTool: vi.fn(),
-    };
-    const { provider } = createProvider({
-      discoverSessions: vi
-        .fn()
-        .mockResolvedValue([
-          { id: "repo-a", name: "Repo A", workspace: "repo-a", isActive: true },
-        ]),
-      listPanes: vi.fn().mockResolvedValue([
-        {
-          paneId: "%1",
-          index: 0,
-          title: "active",
-          isActive: true,
-          currentPath: "/workspaces/repo-a",
-        },
-      ]),
-      terminalProvider,
-    });
-
-    const { view, messageHandler } = resolveProvider(provider);
-    await flushPromises();
-    vi.mocked(view.webview.postMessage).mockClear();
-
-    await messageHandler({
-      action: "launchDefaultAiTool",
-      sessionId: "repo-a",
-      sessionName: "Repo A",
-    });
-
-    expect(terminalProvider.launchDefaultAiTool).toHaveBeenCalledWith(
-      "repo-a",
-      "%1",
-    );
-    expect(view.webview.postMessage).not.toHaveBeenCalled();
-  });
-
-  it("does not auto-launch the default AI tool after dashboard create, createWindow, or splitPane actions", async () => {
+  it("does not auto-launch AI tools after dashboard create, createWindow, or splitPane actions", async () => {
     const discoverSessions = vi
       .fn()
       .mockResolvedValue([
@@ -773,9 +731,6 @@ describe("TerminalDashboardProvider", () => {
       {
         workingDirectory: "/workspaces/repo-a/packages/app",
       },
-    );
-    expect(view.webview.postMessage).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: "launchDefaultAiTool" }),
     );
   });
 
@@ -1127,11 +1082,7 @@ describe("TerminalDashboardProvider", () => {
     );
   });
 
-  it("routes pane, window, and AI launch actions through tmux and terminal services", async () => {
-    const terminalProvider = {
-      launchDefaultAiTool: vi.fn(),
-      launchAiTool: vi.fn().mockResolvedValue(undefined),
-    };
+  it("routes pane and window actions through tmux services", async () => {
     const listPanes = vi.fn().mockResolvedValue([
       {
         paneId: "%1",
@@ -1148,7 +1099,6 @@ describe("TerminalDashboardProvider", () => {
           { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
         ]),
       listPanes,
-      terminalProvider,
     });
 
     const { view, messageHandler } = resolveProvider(provider);
@@ -1193,12 +1143,6 @@ describe("TerminalDashboardProvider", () => {
       sourcePaneId: "%1",
       targetPaneId: "%2",
     });
-    await messageHandler({
-      action: "launchAiTool",
-      sessionId: "repo-a",
-      tool: "claude",
-      savePreference: true,
-    });
 
     expect(vi.mocked(tmuxSessionManager.createWindow)).toHaveBeenCalledWith(
       "repo-a",
@@ -1232,19 +1176,10 @@ describe("TerminalDashboardProvider", () => {
       "%1",
       "%2",
     );
-    expect(terminalProvider.launchAiTool).toHaveBeenCalledWith(
-      "repo-a",
-      "claude",
-      true,
-      undefined,
-      "tmux",
-    );
   });
 
   it("routes zellij tab and pane actions through the zellij manager", async () => {
     const terminalProvider = {
-      launchDefaultAiTool: vi.fn(),
-      launchAiTool: vi.fn().mockResolvedValue(undefined),
       switchToZellijSession: vi.fn().mockResolvedValue(undefined),
       killTmuxSession: vi.fn().mockResolvedValue(undefined),
     };
@@ -1356,184 +1291,6 @@ describe("TerminalDashboardProvider", () => {
     expect(zellijSwitchSession).toHaveBeenCalledWith("repo-a");
   });
 
-  it("uses the active pane target when launching the default AI tool and falls back gracefully on pane lookup errors", async () => {
-    const launchDefaultAiTool = vi.fn().mockResolvedValue(undefined);
-    const terminalProvider = {
-      launchDefaultAiTool,
-      launchAiTool: vi.fn(),
-    };
-    const listPanes = vi
-      .fn()
-      .mockResolvedValueOnce([
-        {
-          paneId: "%9",
-          index: 1,
-          title: "active",
-          isActive: true,
-          currentPath: "/workspaces/repo-a",
-        },
-      ])
-      .mockRejectedValueOnce(new Error("no panes"));
-    const { provider } = createProvider({
-      discoverSessions: vi
-        .fn()
-        .mockResolvedValue([
-          { id: "repo-a", name: "Repo A", workspace: "repo-a", isActive: true },
-        ]),
-      listPanes,
-      terminalProvider,
-    });
-
-    const { view, messageHandler } = resolveProvider(provider);
-    await flushPromises();
-    vi.mocked(view.webview.postMessage).mockClear();
-
-    await messageHandler({
-      action: "launchDefaultAiTool",
-      sessionId: "repo-a",
-      sessionName: "Repo A",
-    });
-    await messageHandler({
-      action: "launchDefaultAiTool",
-      sessionId: "repo-a",
-      sessionName: "Repo A",
-    });
-
-    expect(launchDefaultAiTool).toHaveBeenNthCalledWith(
-      1,
-      "repo-a",
-      "%9",
-    );
-    expect(launchDefaultAiTool).toHaveBeenNthCalledWith(
-      2,
-      "repo-a",
-      undefined,
-    );
-    expect(view.webview.postMessage).not.toHaveBeenCalled();
-  });
-
-  it("does not relaunch a detected tmux AI tool when it is already running", async () => {
-    const terminalProvider = {
-      launchDefaultAiTool: vi.fn(),
-      launchAiTool: vi.fn().mockResolvedValue(undefined),
-    };
-    const { provider } = createProvider({
-      discoverSessions: vi
-        .fn()
-        .mockResolvedValue([
-          { id: "repo-a", name: "Repo A", workspace: "repo-a", isActive: true },
-        ]),
-      listPanes: vi.fn().mockResolvedValue([
-        {
-          paneId: "%9",
-          index: 1,
-          title: "active",
-          isActive: true,
-          currentCommand: "opencode",
-          currentPath: "/workspaces/repo-a",
-        },
-      ]),
-      terminalProvider,
-    });
-
-    const { view, messageHandler } = resolveProvider(provider);
-    await flushPromises();
-    vi.mocked(view.webview.postMessage).mockClear();
-
-    await messageHandler({
-      action: "launchDefaultAiTool",
-      sessionId: "repo-a",
-      sessionName: "Repo A",
-    });
-
-    expect(view.webview.postMessage).not.toHaveBeenCalled();
-    expect(terminalProvider.launchDefaultAiTool).not.toHaveBeenCalled();
-    expect(terminalProvider.launchAiTool).not.toHaveBeenCalled();
-  });
-
-  it("does not relaunch a detected zellij AI tool when pane metadata includes it", async () => {
-    const terminalProvider = {
-      launchDefaultAiTool: vi.fn(),
-      launchAiTool: vi.fn().mockResolvedValue(undefined),
-    };
-    const { provider, zellijSwitchSession } = createProvider({
-      discoverSessions: vi.fn().mockResolvedValue([]),
-      zellijDiscoverSessions: vi.fn().mockResolvedValue([
-        { id: "repo-a", name: "Repo A", workspace: "repo-a", isActive: true },
-      ]),
-      zellijListPanes: vi.fn().mockResolvedValue([
-        {
-          id: "terminal_1",
-          title: "Claude Code",
-          isFocused: true,
-          isFloating: false,
-        },
-      ]),
-      zellijListTabs: vi.fn().mockResolvedValue([
-        { index: 1, name: "main", isActive: true },
-      ]),
-      terminalProvider,
-    });
-
-    const { view, messageHandler } = resolveProvider(provider);
-    await flushPromises();
-    vi.mocked(view.webview.postMessage).mockClear();
-
-    await messageHandler({
-      action: "launchDefaultAiTool",
-      sessionId: "repo-a",
-      sessionName: "Repo A",
-    });
-
-    expect(view.webview.postMessage).not.toHaveBeenCalled();
-    expect(terminalProvider.launchDefaultAiTool).not.toHaveBeenCalled();
-    expect(zellijSwitchSession).toHaveBeenCalledWith("repo-a");
-    expect(terminalProvider.launchAiTool).not.toHaveBeenCalled();
-  });
-
-  it("launches through TerminalProvider before the dashboard webview resolves", async () => {
-    const terminalProvider = {
-      launchDefaultAiTool: vi.fn().mockResolvedValue(undefined),
-      launchAiTool: vi.fn(),
-    };
-    const { provider } = createProvider({ terminalProvider });
-
-    await provider.launchDefaultAiTool("repo-a", "%1");
-
-    expect(terminalProvider.launchDefaultAiTool).toHaveBeenCalledWith(
-      "repo-a",
-      "%1",
-    );
-  });
-
-  it("logs AI tool launch failures without throwing", async () => {
-    const logger = {
-      debug: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    };
-    const terminalProvider = {
-      launchDefaultAiTool: vi.fn(),
-      launchAiTool: vi.fn().mockRejectedValue(new Error("boom")),
-    };
-    const { provider } = createProvider({ logger, terminalProvider });
-
-    const { messageHandler } = resolveProvider(provider);
-    await flushPromises();
-
-    await messageHandler({
-      action: "launchAiTool",
-      sessionId: "repo-a",
-      tool: "claude",
-      savePreference: false,
-      targetPaneId: "%3",
-    });
-
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to launch AI tool: boom"),
-    );
-  });
-
   it("selects the next workspace session after killing the active tmux session", async () => {
     const discoverSessions = vi
       .fn()
@@ -1639,7 +1396,6 @@ describe("TerminalDashboardProvider", () => {
       | (() => void)
       | undefined;
     disposeHandler?.();
-    await provider.launchDefaultAiTool("repo-a", "Repo A");
 
     expect(discoverSessions).toHaveBeenCalledTimes(1);
     expect(view.webview.postMessage).toHaveBeenCalledTimes(1);
@@ -1750,8 +1506,6 @@ describe("TerminalDashboardProvider", () => {
 
   it("handles zellij split, swap no-op, and active-session replacement after zellij kill", async () => {
     const terminalProvider = {
-      launchDefaultAiTool: vi.fn(),
-      launchAiTool: vi.fn(),
       switchToZellijSession: vi.fn().mockResolvedValue(undefined),
       killTmuxSession: vi.fn().mockResolvedValue(undefined),
     };
@@ -1951,69 +1705,6 @@ describe("TerminalDashboardProvider", () => {
     );
   });
 
-  it("uses zellij focused pane targets and handles missing terminal providers", async () => {
-    const terminalProvider = {
-      launchDefaultAiTool: vi.fn(),
-      launchAiTool: vi.fn().mockResolvedValue(undefined),
-    };
-    const { provider } = createProvider({
-      discoverSessions: vi.fn().mockResolvedValue([]),
-      zellijDiscoverSessions: vi.fn().mockResolvedValue([
-        { id: "zellij-a", name: "zellij-a", workspace: "repo-a", isActive: true },
-      ]),
-      zellijListPanes: vi.fn().mockResolvedValue([
-        { id: "terminal_1", title: "one", isFocused: false },
-        { id: "terminal_2", title: "two", isFocused: true },
-      ]),
-      zellijListTabs: vi.fn().mockResolvedValue([
-        { index: 1, name: "main", isActive: true },
-      ]),
-      terminalProvider,
-    });
-
-    const { view, messageHandler } = resolveProvider(provider);
-    await flushPromises();
-    vi.mocked(view.webview.postMessage).mockClear();
-    await messageHandler({
-      action: "launchDefaultAiTool",
-      sessionId: "zellij-a",
-      sessionName: "Zellij A",
-    });
-    await messageHandler({
-      action: "launchAiTool",
-      sessionId: "zellij-a",
-      tool: "claude",
-      savePreference: true,
-      targetPaneId: "terminal_2",
-    });
-
-    expect(terminalProvider.launchDefaultAiTool).toHaveBeenCalledWith(
-      "zellij-a",
-      "terminal_2",
-    );
-    expect(terminalProvider.launchAiTool).toHaveBeenCalledWith(
-      "zellij-a",
-      "claude",
-      true,
-      "terminal_2",
-      "zellij",
-    );
-
-    const noTerminalProvider = createProvider();
-    const { messageHandler: noTerminalHandler } = resolveProvider(
-      noTerminalProvider.provider,
-    );
-    await flushPromises();
-    await expect(
-      noTerminalHandler({
-        action: "launchAiTool",
-        sessionId: "repo-a",
-        tool: "claude",
-        savePreference: false,
-      }),
-    ).resolves.toBeUndefined();
-  });
-
   it("covers tmux pane fallback targets and zellij optional pane branches", async () => {
     const { provider, tmuxSessionManager } = createProvider({
       discoverSessions: vi.fn().mockResolvedValue([
@@ -2203,7 +1894,6 @@ describe("TerminalDashboardProvider", () => {
     const secondView = resolveProvider(viewProvider.provider).view;
     const firstDispose = vi.mocked(firstView.onDidDispose).mock.calls[0]?.[0] as () => void;
     firstDispose();
-    await viewProvider.provider.launchDefaultAiTool("repo-a", "Repo A");
     expect(secondView.webview.postMessage).not.toHaveBeenCalled();
 
     const panelProvider = createProvider();
@@ -2267,31 +1957,6 @@ describe("TerminalDashboardProvider", () => {
     await flushPromises();
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("pane string down"));
 
-    const selectorProvider = createProvider({
-      logger,
-      discoverSessions: vi.fn().mockResolvedValue([
-        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
-      ]),
-      listPanes: vi.fn().mockResolvedValue([
-        { paneId: "%1", index: 0, title: "inactive", isActive: false },
-      ]),
-    });
-    const { messageHandler: selectorHandler } = resolveProvider(selectorProvider.provider);
-    await flushPromises();
-    await selectorHandler({ action: "launchDefaultAiTool", sessionId: "repo-a", sessionName: "Repo A" });
-
-    const selectorErrorProvider = createProvider({
-      logger,
-      discoverSessions: vi.fn().mockResolvedValue([
-        { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
-      ]),
-      listPanes: vi.fn().mockRejectedValue("pane lookup down"),
-    });
-    const { messageHandler: selectorErrorHandler } = resolveProvider(selectorErrorProvider.provider);
-    await flushPromises();
-    await selectorErrorHandler({ action: "launchDefaultAiTool", sessionId: "repo-a", sessionName: "Repo A" });
-    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining("pane lookup down"));
-
     const splitFallbackProvider = createProvider({
       discoverSessions: vi.fn().mockResolvedValue([
         { id: "repo-a", name: "repo-a", workspace: "repo-a", isActive: true },
@@ -2352,15 +2017,6 @@ describe("TerminalDashboardProvider", () => {
     vi.mocked(actionErrorProvider.tmuxSessionManager.selectPane).mockRejectedValueOnce(new Error("select error"));
     await actionErrorHandler({ action: "switchPane", sessionId: "repo-a", paneId: "%1" });
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("select error"));
-
-    const launchErrorProvider = createProvider({
-      logger,
-      terminalProvider: { launchDefaultAiTool: vi.fn(), launchAiTool: vi.fn().mockRejectedValue("launch down") },
-    });
-    const { messageHandler: launchErrorHandler } = resolveProvider(launchErrorProvider.provider);
-    await flushPromises();
-    await launchErrorHandler({ action: "launchAiTool", sessionId: "repo-a", tool: "claude", savePreference: false });
-    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("launch down"));
 
     vscode.workspace.workspaceFolders = [{ uri: { fsPath: "/workspaces/repo-a" } }];
     const nativeShellProvider = createProvider({

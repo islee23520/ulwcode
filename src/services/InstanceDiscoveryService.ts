@@ -218,12 +218,8 @@ export class InstanceDiscoveryService {
   }
 
   private async spawnOpenCode(): Promise<OpenCodeInstance | undefined> {
-    const config = vscode.workspace.getConfiguration("ulw");
-    const defaultToolName = config.get<string>("defaultAiTool", "opencode");
-    const toolConfigs = resolveAiToolConfigs(config.get("aiTools", []));
-    const tool =
-      toolConfigs.find((candidate) => candidate.name === defaultToolName) ??
-      toolConfigs[0];
+    const toolConfigs = resolveAiToolConfigs([]);
+    const tool = toolConfigs[0];
     const command = (
       tool ? getToolLaunchCommand(tool) : DEFAULT_COMMAND
     ).trim();

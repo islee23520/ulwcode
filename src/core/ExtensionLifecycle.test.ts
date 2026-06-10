@@ -10,6 +10,7 @@ import { TmuxSessionManager } from "../services/TmuxSessionManager";
 import { ZellijSessionManager } from "../services/ZellijSessionManager";
 import { TmuxPaneSyncService } from "../services/TmuxPaneSyncService";
 import { ZellijPaneSyncService } from "../services/ZellijPaneSyncService";
+import { SessionWindowHandoffService } from "../services/SessionWindowHandoffService";
 import type * as vscodeTypes from "../test/mocks/vscode";
 
 const vscode = await vi.importActual<typeof vscodeTypes>(
@@ -150,8 +151,12 @@ describe("ExtensionLifecycle", () => {
     });
 
     it("should consume selected project handoff into the active instance", async () => {
-      const selectedWorkspaceUri = "file:///workspace/selected";
-      const otherWorkspaceUri = "file:///workspace/other";
+      const selectedWorkspaceUri = vscode.Uri.parse(
+        "file:///workspace/selected",
+      ).toString();
+      const otherWorkspaceUri = vscode.Uri.parse(
+        "file:///workspace/other",
+      ).toString();
       const pendingHandoffsKey = "ulw.pendingSessionWindowHandoffs";
       let storedHandoffs: readonly unknown[] = [
         {
@@ -172,8 +177,21 @@ describe("ExtensionLifecycle", () => {
         },
       ];
       vscode.workspace.workspaceFolders = [
-        { uri: vscode.Uri.parse(selectedWorkspaceUri) },
-      ];
+        {
+          uri: {
+            fsPath: "/workspace/selected",
+            toString: () => selectedWorkspaceUri,
+          },
+        },
+      ] as typeof vscode.workspace.workspaceFolders;
+      vi.mocked(mockContext.workspaceState.get).mockImplementation(
+        (key: string, defaultValue: unknown) => {
+          if (key === "ulw.instances.workspace") {
+            return { instances: [], activeInstanceId: undefined };
+          }
+          return defaultValue;
+        },
+      );
       vi.mocked(mockContext.globalState.get).mockImplementation(
         (key: string, defaultValue: unknown) => {
           if (key === pendingHandoffsKey) {
@@ -192,33 +210,46 @@ describe("ExtensionLifecycle", () => {
           }
         },
       );
+      const consumeHandoffSpy = vi
+        .spyOn(SessionWindowHandoffService.prototype, "consumeHandoff")
+        .mockResolvedValue({
+          id: "selected-handoff",
+          workspaceUri: selectedWorkspaceUri,
+          sessionId: "selected-session",
+          backend: "zellij",
+          label: "Selected Project",
+          createdAt: Date.now(),
+        });
+      vi.spyOn(ZellijSessionManager.prototype, "isAvailable").mockResolvedValue(
+        true,
+      );
 
       await lifecycle.activate(mockContext);
+
+      expect(consumeHandoffSpy).toHaveBeenCalledWith(selectedWorkspaceUri);
 
       const maybeStore = Reflect.get(lifecycle, "instanceStore");
       expect(maybeStore).toBeInstanceOf(InstanceStore);
       if (!(maybeStore instanceof InstanceStore)) {
         throw new Error("Expected ExtensionLifecycle to initialize InstanceStore");
       }
-      const activeRecord = maybeStore.getActive();
+      const handoffRecord = maybeStore
+        .getAll()
+        .find((record) => record.runtime.zellijSessionId === "selected-session");
 
-      expect(activeRecord.config.workspaceUri).toBe(selectedWorkspaceUri);
-      expect(activeRecord.config.label).toBe("Selected Project");
-      expect(activeRecord.config.terminalBackend).toBe("zellij");
-      expect(activeRecord.runtime.zellijSessionId).toBe("selected-session");
-      expect(activeRecord.runtime.tmuxSessionId).toBeUndefined();
+      expect(handoffRecord).toBeDefined();
+      expect(handoffRecord!.config.workspaceUri).toBe(selectedWorkspaceUri);
+      expect(handoffRecord!.config.label).toBe("Selected Project");
+      expect(handoffRecord!.config.terminalBackend).toBe("zellij");
+      expect(handoffRecord!.runtime.zellijSessionId).toBe("selected-session");
+      expect(handoffRecord!.runtime.tmuxSessionId).toBeUndefined();
+      expect(maybeStore.getActive().config.id).toBe(handoffRecord!.config.id);
       expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
         "ulw.focus",
       );
-      expect(mockContext.globalState.update).toHaveBeenCalledWith(
-        pendingHandoffsKey,
-        [
-          expect.objectContaining({
-            id: "other-handoff",
-            workspaceUri: otherWorkspaceUri,
-          }),
-        ],
-      );
+      expect(
+        SessionWindowHandoffService.prototype.consumeHandoff,
+      ).toHaveBeenCalledWith(selectedWorkspaceUri);
     });
 
     it("should skip duplicate activation attempts", async () => {

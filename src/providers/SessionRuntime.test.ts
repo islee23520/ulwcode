@@ -782,7 +782,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       );
     });
 
-    it("launches the startup tool inside newly created tmux workspace sessions", async () => {
+    it("attaches tmux workspace sessions without auto-launching a default AI tool", async () => {
       setConfiguration({
         terminalBackend: "tmux" satisfies TerminalBackendType,
         defaultAiTool: "opencode",
@@ -801,17 +801,10 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       vi.mocked(mockTmuxSessionManager.listPanes).mockResolvedValue([
         { paneId: "%1", isActive: true },
       ] as unknown as Awaited<ReturnType<TmuxSessionManager["listPanes"]>>);
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "opencode"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
 
       await sessionRuntime.startOpenCode();
 
-      expect(mockTmuxSessionManager.sendTextToPane).toHaveBeenCalledWith(
-        "%1",
-        "opencode",
-      );
+      expect(mockTmuxSessionManager.sendTextToPane).not.toHaveBeenCalled();
       expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
         "default",
         "tmux attach-session -t project-a \\; set-option -u status off",
@@ -852,10 +845,9 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
 
     });
 
-    it("warns and returns when tmux session has no panes", async () => {
+    it("launches a pending AI tool inside newly created tmux sessions when explicitly requested", async () => {
       setConfiguration({
         terminalBackend: "tmux" satisfies TerminalBackendType,
-        defaultAiTool: "opencode",
         aiTools: [{ name: "opencode", label: "OpenCode", path: "", args: [] }],
       });
       upsertInstance({ workspaceUri: "file:///workspace/project-a" });
@@ -868,78 +860,33 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
           isActive: true,
         },
       });
-      vi.mocked(mockTmuxSessionManager.listPanes).mockResolvedValue([]);
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "opencode"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
-
-      await sessionRuntime.startOpenCode();
-
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining("no panes available"),
-      );
-      expect(mockTmuxSessionManager.sendTextToPane).not.toHaveBeenCalled();
-    });
-
-    it("warns when launching the startup tool in tmux fails", async () => {
-      setConfiguration({
-        terminalBackend: "tmux" satisfies TerminalBackendType,
-        defaultAiTool: "opencode",
-        aiTools: [{ name: "opencode", label: "OpenCode", path: "", args: [] }],
-      });
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
-        action: "created" as const,
-        session: {
-          id: "project-a",
-          name: "project-a",
-          workspace: "/workspace/project-a",
-          isActive: true,
+      vi.mocked(mockTmuxSessionManager.listPanes).mockResolvedValue([
+        { paneId: "%1", isActive: true },
+      ] as unknown as Awaited<ReturnType<TmuxSessionManager["listPanes"]>>);
+      vi.spyOn(
+        sessionRuntime as unknown as {
+          resolveToolForStartup: () => Promise<AiToolConfig | undefined>;
         },
+        "resolveToolForStartup",
+      ).mockResolvedValue({
+        name: "opencode",
+        label: "OpenCode",
+        path: "",
+        args: [],
       });
-      vi.mocked(mockTmuxSessionManager.listPanes).mockRejectedValue(
-        new Error("tmux unavailable"),
-      );
       vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
         getLaunchCommand: vi.fn(() => "opencode"),
         supportsHttpApi: vi.fn(() => false),
       } as never);
+      (
+        sessionRuntime as unknown as { pendingLaunchToolName?: string }
+      ).pendingLaunchToolName = "opencode";
 
       await sessionRuntime.startOpenCode();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to launch tool in tmux session"),
-      );
-      expect(mockTmuxSessionManager.sendTextToPane).not.toHaveBeenCalled();
-    });
-
-    it("warns with a stringified non-Error when tmux launch fails", async () => {
-      setConfiguration({
-        terminalBackend: "tmux" satisfies TerminalBackendType,
-        defaultAiTool: "opencode",
-        aiTools: [{ name: "opencode", label: "OpenCode", path: "", args: [] }],
-      });
-      upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
-        action: "created" as const,
-        session: {
-          id: "project-a",
-          name: "project-a",
-          workspace: "/workspace/project-a",
-          isActive: true,
-        },
-      });
-      vi.mocked(mockTmuxSessionManager.listPanes).mockRejectedValue("tmux unavailable");
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "opencode"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
-
-      await sessionRuntime.startOpenCode();
-
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining("tmux unavailable"),
+      expect(mockTmuxSessionManager.sendTextToPane).toHaveBeenCalledWith(
+        "%1",
+        "opencode",
       );
     });
 
@@ -1068,7 +1015,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       ).toBeUndefined();
     });
 
-    it("calls nativeTerminalManager.create() for native backend", async () => {
+    it("starts native backend with a plain shell without nativeTerminalManager tool launch", async () => {
       setConfiguration({
         terminalBackend: "native" satisfies TerminalBackendType,
       });
@@ -1076,30 +1023,13 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         workspaceUri: "file:///workspace/project-a",
         selectedAiTool: "preferred-tool",
       });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<{
-            name: string;
-            args: string[];
-          }>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "preferred-tool", args: ["--chat"] });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "run-tool"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
 
       await sessionRuntime.startOpenCode();
 
-      expect(mockNativeTerminalManager.create).toHaveBeenCalledWith("default", {
-        command: "run-tool",
-        args: ["--chat"],
-        cwd: "/workspace/project-a",
-      });
+      expect(mockNativeTerminalManager.create).not.toHaveBeenCalled();
       expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
         "default",
-        "run-tool",
+        undefined,
         {},
         undefined,
         undefined,
@@ -1138,22 +1068,12 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         mockAiToolRegistry,
         mockCallbacks,
       );
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<{ name: string }>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "preferred-tool" });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "run-tool"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
 
       await expect(sessionRuntime.startOpenCode()).resolves.toBeUndefined();
 
       expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
         "default",
-        "run-tool",
+        undefined,
         {},
         undefined,
         undefined,
@@ -1169,7 +1089,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       ).toBeUndefined();
     });
 
-    it("native instance saves backendState on startOpenCode", async () => {
+    it("native instance does not save backendState when starting a plain shell", async () => {
       setConfiguration({
         terminalBackend: "native" satisfies TerminalBackendType,
       });
@@ -1177,63 +1097,14 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         workspaceUri: "file:///workspace/project-a",
         selectedAiTool: "preferred-tool",
       });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<{
-            name: string;
-            args: string[];
-          }>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "preferred-tool", args: ["--chat"] });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "run-tool"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
-
-      const launchPlan = {
-        backend: "native",
-        restoreMode: "recreate" as const,
-        launchSpec: {
-          command: "run-tool",
-          args: ["--chat"],
-          cwd: "/workspace/project-a",
-          name: "default",
-        },
-        state: {
-          version: 1 as const,
-          backend: "native" as const,
-          restoreMode: "recreate" as const,
-          launchSpec: {
-            command: "run-tool",
-            args: ["--chat"],
-            cwd: "/workspace/project-a",
-            name: "default",
-          },
-          createdAt: 12345,
-        },
-      } satisfies ReturnType<NativeTerminalManager["create"]>;
-      vi.mocked(mockNativeTerminalManager.create).mockReturnValueOnce(
-        launchPlan,
-      );
 
       await sessionRuntime.startOpenCode();
 
-      expect(instanceStore.get("default")?.runtime.backendState).toEqual({
-        version: 1,
-        backend: "native",
-        restoreMode: "recreate",
-        launchSpec: {
-          command: "run-tool",
-          args: ["--chat"],
-          cwd: "/workspace/project-a",
-          name: "default",
-        },
-        createdAt: 12345,
-      });
+      expect(mockNativeTerminalManager.create).not.toHaveBeenCalled();
+      expect(instanceStore.get("default")?.runtime.backendState).toBeUndefined();
     });
 
-    it("ignores mismatched persisted backendState version during native startup", async () => {
+    it("ignores persisted backendState during plain native startup", async () => {
       setConfiguration({
         terminalBackend: "native" satisfies TerminalBackendType,
       });
@@ -1261,30 +1132,13 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         },
         state: "disconnected",
       });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<{ name: string }>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "preferred-tool" });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "run-tool"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
 
       await expect(sessionRuntime.startOpenCode()).resolves.toBeUndefined();
 
-      expect(mockNativeTerminalManager.create).toHaveBeenCalledWith("default", {
-        command: "run-tool",
-        args: undefined,
-        cwd: "/workspace/project-a",
-      });
-      expect(instanceStore.get("default")?.runtime.backendState).toEqual(
-        expect.objectContaining({
-          version: 1,
-          backend: "native",
-        }),
-      );
+      expect(mockNativeTerminalManager.create).not.toHaveBeenCalled();
+      expect(
+        instanceStore.get("default")?.runtime.backendState,
+      ).toBeUndefined();
     });
 
     it("tmux instance does not save backendState", async () => {
@@ -1358,21 +1212,11 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         workspaceUri: "file:///workspace/project-a",
         selectedAiTool: "preferred-tool",
       });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<{ name: string }>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "preferred-tool" });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "run-tool"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
 
       await sessionRuntime.startOpenCode();
-      expect(instanceStore.get("default")?.runtime.backendState?.backend).toBe(
-        "native",
-      );
+      expect(
+        instanceStore.get("default")?.runtime.backendState,
+      ).toBeUndefined();
 
       sessionRuntime.resetState(false);
       setConfiguration({
@@ -1443,22 +1287,12 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         mockAiToolRegistry,
         mockCallbacks,
       );
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<{ name: string }>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "preferred-tool" });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "run-tool"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
 
       await expect(sessionRuntime.startOpenCode()).resolves.toBeUndefined();
 
       expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
         "default",
-        "run-tool",
+        undefined,
         {},
         undefined,
         undefined,
@@ -1471,7 +1305,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       ).toBeUndefined();
     });
 
-    it("launches the selected tool directly when tmux is unavailable", async () => {
+    it("starts a plain native shell when tmux is unavailable", async () => {
       upsertInstance({
         workspaceUri: "file:///workspace/project-a",
         selectedAiTool: "preferred-tool",
@@ -1494,29 +1328,14 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
         mockAiToolRegistry,
         mockCallbacks,
       );
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<{ name: string }>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "preferred-tool" });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "run-tool"),
-        supportsHttpApi: vi.fn(() => true),
-      } as never);
-      vi.mocked(mockPortManager.assignPortToTerminal).mockReturnValue(4312);
-      vi.spyOn(sessionRuntime, "pollForHttpReadiness").mockResolvedValue();
 
       await sessionRuntime.startOpenCode();
 
       expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
         "default",
-        "run-tool",
-        {
-          _EXTENSION_OPENCODE_PORT: "4312",
-          OPENCODE_CALLER: "vscode",
-        },
-        4312,
+        undefined,
+        {},
+        undefined,
         undefined,
         undefined,
         "default",
@@ -1525,7 +1344,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       expect(
         instanceStore.get("default")?.runtime.tmuxSessionId,
       ).toBeUndefined();
-      expect(instanceStore.get("default")?.runtime.port).toBe(4312);
+      expect(instanceStore.get("default")?.runtime.port).toBeUndefined();
     });
 
     it("starts a native backend from the home directory when no workspace is open", async () => {
@@ -1534,27 +1353,13 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       });
       vscode.workspace.workspaceFolders = undefined;
       upsertInstance({ selectedAiTool: "preferred-tool" });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<{ name: string }>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "preferred-tool" });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "run-tool"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
 
       await sessionRuntime.startOpenCode();
 
-      expect(mockNativeTerminalManager.create).toHaveBeenCalledWith("default", {
-        command: "run-tool",
-        args: undefined,
-        cwd: os.homedir(),
-      });
+      expect(mockNativeTerminalManager.create).not.toHaveBeenCalled();
       expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
         "default",
-        "run-tool",
+        undefined,
         {},
         undefined,
         undefined,
@@ -1564,21 +1369,14 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       );
     });
 
-    it("starts a tmux-backed tool session with HTTP enabled", async () => {
+    it("starts a tmux-backed session without auto-launching tools or HTTP ports", async () => {
       upsertInstance({ workspaceUri: "file:///workspace/project-a" });
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<{ name: string }>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "preferred-tool" });
       vi.spyOn(
         sessionRuntime as unknown as {
           startExternalChangeMonitoring: (sessionId: string) => Promise<void>;
         },
         "startExternalChangeMonitoring",
       ).mockResolvedValue();
-      vi.spyOn(sessionRuntime, "pollForHttpReadiness").mockResolvedValue();
       vi.mocked(mockTmuxSessionManager.ensureSession).mockResolvedValue({
         action: "created",
         session: {
@@ -1588,11 +1386,6 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
           isActive: true,
         },
       });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "run-tool"),
-        supportsHttpApi: vi.fn(() => true),
-      } as never);
-      vi.mocked(mockPortManager.assignPortToTerminal).mockReturnValue(4312);
 
       await sessionRuntime.startOpenCode();
 
@@ -1606,11 +1399,8 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
         "default",
         "tmux attach-session -t workspace-session \\; set-option -u status off",
-        {
-          _EXTENSION_OPENCODE_PORT: "4312",
-          OPENCODE_CALLER: "vscode",
-        },
-        4312,
+        {},
+        undefined,
         undefined,
         undefined,
         "default",
@@ -1619,7 +1409,7 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       expect(instanceStore.get("default")?.runtime.tmuxSessionId).toBe(
         "workspace-session",
       );
-      expect(instanceStore.get("default")?.runtime.port).toBe(4312);
+      expect(instanceStore.get("default")?.runtime.port).toBeUndefined();
       expect(postMessageMock).toHaveBeenCalledWith({
         type: "activeSession",
         sessionName: "workspace-session",
@@ -2264,23 +2054,13 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       setConfiguration({ terminalBackend: "tmux" satisfies TerminalBackendType });
       upsertInstance({ selectedAiTool: "codex" });
       vi.mocked(mockTmuxSessionManager.discoverSessions).mockResolvedValue([]);
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<AiToolConfig>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "codex", label: "Codex", path: "", args: [] });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "codex"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
 
       await sessionRuntime.startOpenCode();
 
       expect(sessionRuntime.getActiveBackend()).toBe("native");
       expect(mockTerminalManager.createTerminal).toHaveBeenCalledWith(
         "default",
-        "codex",
+        undefined,
         {},
         undefined,
         undefined,
@@ -2316,8 +2096,11 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       expect(sessionRuntime.getActiveBackend()).toBe("native");
     });
 
-    it("returns early when startup tool selection is cancelled", async () => {
+    it("returns early when an explicit pending tool cannot be resolved", async () => {
       setConfiguration({ terminalBackend: "native" satisfies TerminalBackendType });
+      (
+        sessionRuntime as unknown as { pendingLaunchToolName?: string }
+      ).pendingLaunchToolName = "missing-tool";
       vi.spyOn(
         sessionRuntime as unknown as {
           resolveToolForStartup: () => Promise<AiToolConfig | undefined>;
@@ -2331,9 +2114,15 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
       expect(sessionRuntime.isStartedFlag()).toBe(false);
     });
 
-    it("handles HTTP port assignment failures without aborting startup", async () => {
-      setConfiguration({ terminalBackend: "native" satisfies TerminalBackendType });
+    it("handles HTTP port assignment failures without aborting explicit tool launch", async () => {
+      setConfiguration({
+        terminalBackend: "native" satisfies TerminalBackendType,
+        enableHttpApi: true,
+      });
       upsertInstance({ selectedAiTool: "codex" });
+      (
+        sessionRuntime as unknown as { pendingLaunchToolName?: string }
+      ).pendingLaunchToolName = "codex";
       vi.spyOn(
         sessionRuntime as unknown as {
           resolveToolForStartup: () => Promise<AiToolConfig>;
@@ -2368,16 +2157,6 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     it("creates a fresh instance record when none exists", async () => {
       setConfiguration({ terminalBackend: "native" satisfies TerminalBackendType });
       instanceStore.remove("default");
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<AiToolConfig>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "codex", label: "Codex", path: "", args: [] });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "codex"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
 
       await sessionRuntime.startOpenCode();
 
@@ -2389,16 +2168,6 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     it("logs instance-store update failures", async () => {
       setConfiguration({ terminalBackend: "native" satisfies TerminalBackendType });
       upsertInstance();
-      vi.spyOn(
-        sessionRuntime as unknown as {
-          resolveToolForStartup: () => Promise<AiToolConfig>;
-        },
-        "resolveToolForStartup",
-      ).mockResolvedValue({ name: "codex", label: "Codex", path: "", args: [] });
-      vi.mocked(mockAiToolRegistry.getForConfig).mockReturnValue({
-        getLaunchCommand: vi.fn(() => "codex"),
-        supportsHttpApi: vi.fn(() => false),
-      } as never);
       vi.spyOn(instanceStore, "upsert").mockImplementation(() => {
         throw new Error("store read failed");
       });
@@ -3494,9 +3263,10 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
     });
 
     it("resolves stored tools and skips persistence without records", () => {
-      setConfiguration({
-        aiTools: [{ name: "codex", label: "Codex", path: "", args: [] }],
-        defaultAiTool: "codex",
+      instanceStore.upsert({
+        config: { id: "stored-tool-instance", selectedAiTool: "codex" },
+        runtime: { terminalKey: "stored-tool-instance" },
+        state: "connected",
       });
       vi.mocked(mockAiToolRegistry.matchesName).mockImplementation(
         (tool, name) => tool.name === name,
@@ -3506,8 +3276,15 @@ describe("SessionRuntime - Workspace Session Resolution", () => {
           sessionRuntime as unknown as {
             resolveStoredTool: (id?: string) => AiToolConfig | undefined;
           }
-        ).resolveStoredTool("missing")?.name,
+        ).resolveStoredTool("stored-tool-instance")?.name,
       ).toBe("codex");
+      expect(
+        (
+          sessionRuntime as unknown as {
+            resolveStoredTool: (id?: string) => AiToolConfig | undefined;
+          }
+        ).resolveStoredTool("missing"),
+      ).toBeUndefined();
       sessionRuntime.rememberSelectedTool("codex", "missing");
       expect(instanceStore.get("missing")).toBeUndefined();
     });

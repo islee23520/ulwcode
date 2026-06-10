@@ -10,7 +10,6 @@ export interface SessionCardProps {
   windows?: TmuxDashboardWindowDto[];
   tools?: AiToolConfig[];
   onActivate: (sessionId: string, workspaceUri: string | undefined) => void;
-  onLaunchDefaultAiTool: (sessionId: string, sessionName: string) => void;
   onKill: (sessionId: string) => void;
 }
 
@@ -19,7 +18,6 @@ export const SessionCard: FunctionComponent<SessionCardProps> = ({
   windows,
   tools = [],
   onActivate,
-  onLaunchDefaultAiTool,
   onKill,
 }) => {
   const activeClass = session.isActive ? " active" : "";
@@ -74,20 +72,6 @@ export const SessionCard: FunctionComponent<SessionCardProps> = ({
       h(
         "div",
         { class: "row", style: "gap: 8px;" },
-        h(
-          "button",
-          {
-            type: "button",
-            "data-action": "launchDefaultAiTool",
-            "data-session-id": session.id,
-            title: "Launch AI Tool",
-            onClick: (event: MouseEvent): void => {
-              event.stopPropagation();
-              onLaunchDefaultAiTool(session.id, session.name);
-            },
-          },
-          "AI",
-        ),
         h(
           "button",
           {

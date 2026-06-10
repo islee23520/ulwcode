@@ -2,7 +2,7 @@
   "name": "opencode-sidebar-tui",
   "displayName": "ulwcode-sidebar-terminal",
   "description": "sidebar terminal Extension for VS Code with tmux, zellij, and native terminal support",
-  "version": "1.11.6",
+  "version": "1.12.0",
   "publisher": "islee23520",
   "icon": "icon.png",
   "engines": {
@@ -566,89 +566,6 @@
             "warning"
           ],
           "description": "Diagnostic severities that trigger code actions"
-        },
-        "ulw.aiTools": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "editPresentation": "editButton",
-            "required": [
-              "name",
-              "label"
-            ],
-            "order": [
-              "name",
-              "label",
-              "path",
-              "args",
-              "aliases",
-              "operator"
-            ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "Unique identifier (e.g. 'opencode', 'claude')"
-              },
-              "label": {
-                "type": "string",
-                "description": "Display name shown in the tool selector"
-              },
-              "path": {
-                "type": "string",
-                "description": "Path to the executable. Empty = resolve from PATH"
-              },
-              "args": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Arguments to pass when launching"
-              },
-              "aliases": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Alternative names that resolve to this tool"
-              },
-              "operator": {
-                "type": "string",
-                "description": "Operator ID for tool-specific launch and routing behavior"
-              }
-            }
-          },
-          "default": [
-            {
-              "name": "opencode",
-              "label": "OpenCode",
-              "path": "",
-              "args": [],
-              "operator": "opencode"
-            },
-            {
-              "name": "claude",
-              "label": "Claude",
-              "path": "",
-              "args": [],
-              "aliases": [
-                "claude"
-              ],
-              "operator": "claude"
-            },
-            {
-              "name": "codex",
-              "label": "Codex",
-              "path": "",
-              "args": [],
-              "operator": "codex"
-            }
-          ],
-          "description": "Configure AI coding tools. Use Add Item to add new tools, Edit to modify, Delete to remove."
-        },
-        "ulw.defaultAiTool": {
-          "type": "string",
-          "default": "opencode",
-          "description": "Name of the default AI tool to launch when creating a new terminal session"
         },
         "ulw.projectList.openedOnly": {
           "type": "boolean",

@@ -41,9 +41,5 @@ suite("Command registration", () => {
       .properties as Record<string, { default: unknown }>;
 
     assert.strictEqual(properties["ulw.autoStartOnOpen"].default, true);
-    assert.strictEqual(
-      properties["ulw.defaultAiTool"].default,
-      "opencode",
-    );
   });
 });
