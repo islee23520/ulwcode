@@ -545,7 +545,7 @@
     "lint": "eslint src --ext ts",
     "format": "prettier --write \"src/**/*.{ts,js,json,css,md}\"",
     "test": "vitest run",
-    "pretest:e2e": "npm run compile && npm run compile:e2e",
+    "pretest:e2e": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\" && npm run compile && npm run compile:e2e",
     "test:e2e": "vscode-test",
     "test:all": "npm run test && npm run test:e2e",
     "test:watch": "vitest",

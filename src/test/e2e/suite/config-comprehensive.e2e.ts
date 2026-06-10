@@ -199,7 +199,7 @@ suite("Comprehensive configuration contributions", () => {
     const properties = getConfigurationProperties(extension);
     const expectedPropertyIds = Object.keys(configurationSpecs).sort();
 
-    assert.strictEqual(expectedPropertyIds.length, 28);
+    assert.strictEqual(expectedPropertyIds.length, 27);
     assert.deepStrictEqual(Object.keys(properties).sort(), expectedPropertyIds);
   });
 

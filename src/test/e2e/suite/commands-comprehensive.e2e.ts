@@ -56,7 +56,7 @@ const commandCategories = {
     "ulw.tmuxKillWindow",
     "ulw.tmuxSelectWindow",
   ],
-  tmuxToolbar: ["ulw.toggleTmuxCommandToolbar"],
+  tmuxToolbar: ["ulw.toggleTmuxCommandToolbar", "ulw.tmuxRefresh"],
 } as const satisfies Record<string, readonly string[]>;
 
 function allExpectedCommands(): string[] {
@@ -87,7 +87,7 @@ suite("Comprehensive command registration", () => {
       packageJSON.contributes?.commands?.map(({ command }) => command) ?? [];
     const expectedCommands = allExpectedCommands();
 
-    assert.strictEqual(expectedCommands.length, 39);
+    assert.strictEqual(expectedCommands.length, 36);
     assert.deepStrictEqual(
       [...new Set(expectedCommands)].sort(),
       [...expectedCommands].sort(),
