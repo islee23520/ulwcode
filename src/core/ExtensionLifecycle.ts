@@ -544,8 +544,6 @@ export class ExtensionLifecycle {
     this.outputChannelService?.info("Deactivating ULW...");
     this.activated = false;
 
-    await this.promptKillTmuxSessions();
-
     if (this.tuiProviderRegistration) {
       this.tuiProviderRegistration.dispose();
       this.tuiProviderRegistration = undefined;

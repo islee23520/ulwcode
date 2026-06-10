@@ -124,7 +124,8 @@ export const window = {
 };
 
 export const workspace = {
-  getConfiguration: vi.fn(() => ({
+  getConfiguration: vi.fn((section?: string) => ({
+    section,
     get: vi.fn((key: string, defaultValue?: any) => {
       void key;
       return defaultValue;

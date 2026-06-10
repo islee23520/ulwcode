@@ -151,4 +151,15 @@ describe("package manifest branding", () => {
     expect(svg).toContain('fill="currentColor"');
     expect(svg).not.toContain("<text");
   });
+
+  it("cleans generated dist output before webpack builds", () => {
+    const { scripts } = readManifest() as unknown as {
+      readonly scripts: Record<string, string>;
+    };
+
+    expect(scripts.compile).toContain("rmSync('dist'");
+    expect(scripts.package).toContain("rmSync('dist'");
+    expect(scripts.package).toContain("webpack --mode production");
+    expect(scripts["vscode:prepublish"]).toBe("npm run package");
+  });
 });

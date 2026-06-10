@@ -424,10 +424,7 @@ describe("ExtensionLifecycle", () => {
       expect(outputChannel.dispose).toHaveBeenCalled();
     });
 
-    it("should dispose all initialized collaborators and clear references", async () => {
-      const promptKillSpy = vi
-        .spyOn(lifecycle as any, "promptKillTmuxSessions")
-        .mockResolvedValue(undefined);
+    it("should dispose all initialized collaborators without showing shutdown prompts", async () => {
       const logger = { info: vi.fn(), dispose: vi.fn() };
       const tuiProvider = { dispose: vi.fn() };
       const terminalManager = { dispose: vi.fn() };
@@ -437,6 +434,10 @@ describe("ExtensionLifecycle", () => {
       const tuiProviderRegistration = { dispose: vi.fn() };
       const tmuxPaneSyncService = { dispose: vi.fn() };
       const zellijPaneSyncService = { dispose: vi.fn() };
+      const tmuxSessionManager = {
+        discoverSessions: vi.fn().mockResolvedValue([{ id: "active-tmux" }]),
+        killSession: vi.fn(),
+      };
 
       Reflect.set(lifecycle, "outputChannelService", logger);
       Reflect.set(lifecycle, "tuiProvider", tuiProvider);
@@ -452,10 +453,11 @@ describe("ExtensionLifecycle", () => {
       Reflect.set(lifecycle, "tuiProviderRegistration", tuiProviderRegistration);
       Reflect.set(lifecycle, "tmuxPaneSyncService", tmuxPaneSyncService);
       Reflect.set(lifecycle, "zellijPaneSyncService", zellijPaneSyncService);
+      Reflect.set(lifecycle, "tmuxSessionManager", tmuxSessionManager);
 
       await lifecycle.deactivate();
 
-      expect(promptKillSpy).toHaveBeenCalledTimes(1);
+      expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
       expect(tuiProvider.dispose).toHaveBeenCalledTimes(1);
       expect(terminalManager.dispose).toHaveBeenCalledTimes(1);
       expect(logger.dispose).toHaveBeenCalledTimes(1);
