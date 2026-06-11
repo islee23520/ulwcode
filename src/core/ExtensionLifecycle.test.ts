@@ -919,7 +919,7 @@ describe("ExtensionLifecycle", () => {
     it("should send a relative cwd reference when a workspace is open", async () => {
       vi.useFakeTimers();
 
-      const focus = vi.fn();
+      const focusExistingTarget = vi.fn().mockResolvedValue(undefined);
       const terminalManager = { writeToTerminal: vi.fn() };
       vscode.window.activeTerminal = {
         shellIntegration: { cwd: { fsPath: "/repo/packages/core" } },
@@ -931,19 +931,73 @@ describe("ExtensionLifecycle", () => {
         "packages/core",
       );
       Reflect.set(lifecycle, "terminalManager", terminalManager);
-      Reflect.set(lifecycle, "tuiProvider", { focus });
+      Reflect.set(lifecycle, "tuiProvider", { focusExistingTarget });
 
-      (lifecycle as any).sendTerminalCwd();
+      const sendTerminalCwd = Reflect.get(lifecycle, "sendTerminalCwd");
+      expect(sendTerminalCwd).toBeTypeOf("function");
+      if (typeof sendTerminalCwd !== "function") {
+        throw new Error("sendTerminalCwd helper is not callable");
+      }
+
+      sendTerminalCwd.call(lifecycle);
       await vi.runAllTimersAsync();
 
       expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
         "opencode-main",
         "@packages/core ",
       );
-      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
         "ulw.focus",
       );
-      expect(focus).toHaveBeenCalledTimes(1);
+      expect(focusExistingTarget).toHaveBeenCalledTimes(1);
+    });
+
+    it("should route terminal-focus cwd references to the active instance terminal without spawning", async () => {
+      vi.useFakeTimers();
+
+      const focusExistingTarget = vi.fn().mockResolvedValue(undefined);
+      const terminalManager = { writeToTerminal: vi.fn() };
+      const instanceStore = new InstanceStore();
+      instanceStore.upsert({
+        config: { id: "tmux-instance" },
+        runtime: {
+          terminalKey: "tmux-terminal-key",
+          tmuxSessionId: "tmux-session",
+        },
+        state: "connected",
+      });
+      instanceStore.setActive("tmux-instance");
+      vscode.window.activeTerminal = {
+        shellIntegration: { cwd: { fsPath: "/repo" } },
+      };
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: "/repo" } },
+      ] as never;
+      vi.mocked(vscode.workspace.asRelativePath).mockReturnValue(".");
+      Reflect.set(lifecycle, "instanceStore", instanceStore);
+      Reflect.set(lifecycle, "terminalManager", terminalManager);
+      Reflect.set(lifecycle, "tuiProvider", {
+        focusExistingTarget,
+        startAtConfiguredLocation: vi.fn(),
+      });
+
+      const sendTerminalCwd = Reflect.get(lifecycle, "sendTerminalCwd");
+      expect(sendTerminalCwd).toBeTypeOf("function");
+      if (typeof sendTerminalCwd !== "function") {
+        throw new Error("sendTerminalCwd helper is not callable");
+      }
+
+      sendTerminalCwd.call(lifecycle);
+      await vi.runAllTimersAsync();
+
+      expect(terminalManager.writeToTerminal).toHaveBeenCalledWith(
+        "tmux-terminal-key",
+        "@. ",
+      );
+      expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+        "ulw.focus",
+      );
+      expect(focusExistingTarget).toHaveBeenCalledTimes(1);
     });
 
     it("should send an absolute cwd reference when no workspace is open", () => {
@@ -962,16 +1016,27 @@ describe("ExtensionLifecycle", () => {
       );
     });
 
-    it("should not focus a provider without a callable focus method", async () => {
+    it("should not focus when autoFocusOnSend is disabled", async () => {
       vi.useFakeTimers();
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn((key: string, defaultValue?: unknown) => {
+          if (key === "autoFocusOnSend") {
+            return false;
+          }
+          return defaultValue;
+        }),
+        inspect: vi.fn(() => undefined),
+        update: vi.fn(),
+      } as never);
 
+      const focusExistingTarget = vi.fn().mockResolvedValue(undefined);
       const terminalManager = { writeToTerminal: vi.fn() };
       vscode.window.activeTerminal = {
         shellIntegration: { cwd: { fsPath: "/tmp/project" } },
       };
       vscode.workspace.workspaceFolders = undefined;
       Reflect.set(lifecycle, "terminalManager", terminalManager);
-      Reflect.set(lifecycle, "tuiProvider", {});
+      Reflect.set(lifecycle, "tuiProvider", { focusExistingTarget });
 
       (lifecycle as any).sendTerminalCwd();
       await vi.runAllTimersAsync();
@@ -980,6 +1045,10 @@ describe("ExtensionLifecycle", () => {
         "opencode-main",
         "@/tmp/project ",
       );
+      expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+        "ulw.focus",
+      );
+      expect(focusExistingTarget).not.toHaveBeenCalled();
     });
   });
 

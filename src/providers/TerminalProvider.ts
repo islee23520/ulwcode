@@ -309,6 +309,15 @@ export class TerminalProvider
     this.focus();
   }
 
+  public async focusExistingTarget(): Promise<void> {
+    if (this._panel) {
+      this.focus();
+      return;
+    }
+
+    await this.revealSidebarView();
+  }
+
   public async toggleEditorAttachment(): Promise<void> {
     if (this.editorPanels.size > 0) {
       const panels = [...this.editorPanels];

@@ -28,6 +28,7 @@ type ProviderMock = Pick<
   | "toggleEditorAttachment"
   | "startAtConfiguredLocation"
   | "focusAtConfiguredLocation"
+  | "focusExistingTarget"
 >;
 
 type OutputChannelMock = Pick<OutputChannelService, "info" | "warn" | "error">;
@@ -44,6 +45,7 @@ function createProviderMock(): ProviderMock {
     toggleEditorAttachment: vi.fn(),
     startAtConfiguredLocation: vi.fn(),
     focusAtConfiguredLocation: vi.fn(),
+    focusExistingTarget: vi.fn(),
   };
 }
 
@@ -64,6 +66,7 @@ function mockConfiguration(options?: {
     terminalDefaultLocation = "editor",
   } = options ?? {};
   const configuration = {
+    section: undefined,
     get: vi.fn((key: string, defaultValue?: unknown) => {
       if (key === "autoFocusOnSend") {
         return autoFocusOnSend;
@@ -214,13 +217,13 @@ describe("registerTerminalCommands", () => {
       '[DIAG:sendToTerminal] terminalId="terminal-1" textLength=13',
     );
     expect(deps.sendPrompt).toHaveBeenCalledWith("selected text\n");
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
       "ulw.focus",
     );
 
     vi.advanceTimersByTime(100);
 
-    expect(deps.provider?.focus).toHaveBeenCalledTimes(1);
+    expect(deps.provider?.focusExistingTarget).toHaveBeenCalledTimes(1);
   });
 
   it("does not send selected text when there is no editor or selection", () => {
@@ -299,13 +302,13 @@ describe("registerTerminalCommands", () => {
     );
     expect(successDeps.sendPrompt).toHaveBeenCalledWith("@src/file.ts#L1 ");
 
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
       "ulw.focus",
     );
 
     vi.advanceTimersByTime(100);
 
-    expect(successDeps.provider?.focus).toHaveBeenCalledTimes(1);
+    expect(successDeps.provider?.focusExistingTarget).toHaveBeenCalledTimes(1);
 
     vi.clearAllMocks();
     mockAutoFocusOnSend(true);
@@ -338,6 +341,37 @@ describe("registerTerminalCommands", () => {
     expect(noEditorDeps.sendPrompt).not.toHaveBeenCalled();
   });
 
+  it("does not start a terminal when sending an @mention to an existing provider", () => {
+    const deps = createDependencies();
+    const document = new vscode.TextDocument(
+      vscode.Uri.file("/workspace/file.ts"),
+      "content",
+    );
+    const selection = new vscode.Selection(0, 0, 0, 1);
+    vscode.window.activeTextEditor = new vscode.TextEditor(
+      document,
+      selection,
+    );
+    vi.mocked(deps.provider!.formatEditorReference).mockReturnValue(
+      "@src/file.ts#L1",
+    );
+
+    const commands = registerAndGetCommands(deps);
+    getCommand(commands, "ulw.sendAtMention")();
+
+    expect(deps.sendPrompt).toHaveBeenCalledWith("@src/file.ts#L1 ");
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "ulw.focus",
+    );
+    expect(deps.provider?.focusAtConfiguredLocation).not.toHaveBeenCalled();
+    expect(deps.provider?.startAtConfiguredLocation).not.toHaveBeenCalled();
+    expect(deps.provider?.openInEditorTab).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(100);
+
+    expect(deps.provider?.focusExistingTarget).toHaveBeenCalledTimes(1);
+  });
+
   it("skips focus after sending an @mention when autoFocusOnSend is disabled", () => {
     mockAutoFocusOnSend(false);
     const deps = createDependencies();
@@ -364,7 +398,7 @@ describe("registerTerminalCommands", () => {
 
     vi.runAllTimers();
 
-    expect(deps.provider?.focus).not.toHaveBeenCalled();
+    expect(deps.provider?.focusExistingTarget).not.toHaveBeenCalled();
   });
 
   it("sends all open file references while filtering unsupported tabs", () => {
@@ -403,7 +437,35 @@ describe("registerTerminalCommands", () => {
 
     vi.advanceTimersByTime(100);
 
-    expect(deps.provider?.focus).toHaveBeenCalledTimes(1);
+    expect(deps.provider?.focusExistingTarget).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start a terminal when sending all open files to an existing provider", () => {
+    const deps = createDependencies();
+    const fileUri = vscode.Uri.parse("file:///workspace/a.ts");
+    vi.mocked(deps.provider!.formatUriReference).mockReturnValueOnce(
+      "@workspace/a.ts",
+    );
+    vscode.window.tabGroups.all = [
+      {
+        tabs: [{ input: new vscode.TabInputText(fileUri) }],
+      },
+    ];
+
+    const commands = registerAndGetCommands(deps);
+    getCommand(commands, "ulw.sendAllOpenFiles")();
+
+    expect(deps.sendPrompt).toHaveBeenCalledWith("@workspace/a.ts ");
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "ulw.focus",
+    );
+    expect(deps.provider?.focusAtConfiguredLocation).not.toHaveBeenCalled();
+    expect(deps.provider?.startAtConfiguredLocation).not.toHaveBeenCalled();
+    expect(deps.provider?.openInEditorTab).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(100);
+
+    expect(deps.provider?.focusExistingTarget).toHaveBeenCalledTimes(1);
   });
 
   it("does not send all open files when no supported file refs exist", () => {
@@ -458,7 +520,7 @@ describe("registerTerminalCommands", () => {
 
     vi.advanceTimersByTime(100);
 
-    expect(deps.provider?.focus).toHaveBeenCalledTimes(1);
+    expect(deps.provider?.focusExistingTarget).toHaveBeenCalledTimes(1);
   });
 
   it("ignores file sends without context sharing or usable uri arguments", () => {

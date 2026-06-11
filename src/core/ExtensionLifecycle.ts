@@ -489,11 +489,8 @@ export class ExtensionLifecycle {
 
     const config = vscode.workspace.getConfiguration("ulw");
     if (config.get<boolean>("autoFocusOnSend", true)) {
-      vscode.commands.executeCommand("ulw.focus");
       setTimeout(() => {
-        if (typeof this.tuiProvider?.focus === "function") {
-          this.tuiProvider.focus();
-        }
+        void this.tuiProvider?.focusExistingTarget?.();
       }, 100);
     }
   }

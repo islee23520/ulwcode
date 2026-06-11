@@ -32,9 +32,8 @@ function focusTerminalIfConfigured(
 ): void {
   const config = vscode.workspace.getConfiguration("ulw");
   if (config.get<boolean>("autoFocusOnSend", true)) {
-    vscode.commands.executeCommand("ulw.focus");
     setTimeout(() => {
-      provider?.focus();
+      void provider?.focusExistingTarget();
     }, 100);
   }
 }

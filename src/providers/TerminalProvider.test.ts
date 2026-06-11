@@ -563,6 +563,79 @@ describe("TerminalProvider", () => {
     });
   });
 
+  it("focuses an existing editor target without opening or starting a terminal", async () => {
+    mockConfiguration({ terminalDefaultLocation: "editor" });
+    provider = createProvider();
+    resolveProvider(provider);
+    const startSpy = vi.spyOn(provider["sessionRuntime"], "startOpenCode");
+    await provider.openInEditorTab();
+    const panel = vi.mocked(vscode.window.createWebviewPanel).mock.results[0]
+      ?.value;
+    expect(panel).toBeDefined();
+    if (!panel) {
+      return;
+    }
+    vi.clearAllMocks();
+
+    await provider.focusExistingTarget();
+
+    expect(vscode.window.createWebviewPanel).not.toHaveBeenCalled();
+    expect(startSpy).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "workbench.action.lockEditorGroup",
+    );
+    expect(panel.reveal).toHaveBeenCalledWith(vscode.ViewColumn.Active);
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      paneId: "ulw-editor-1",
+      type: "focusTerminal",
+    });
+  });
+
+  it("focuses the existing sidebar target without opening or starting a terminal", async () => {
+    mockConfiguration({ terminalDefaultLocation: "sidebar" });
+    provider = createProvider();
+    resolveProvider(provider);
+    const view = vscode.WebviewView();
+    await provider.resolveWebviewView(
+      view as unknown as vscodeApi.WebviewView,
+      vscode.WebviewViewResolveContext(),
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+    );
+    const startSpy = vi.spyOn(provider["sessionRuntime"], "startOpenCode");
+    vi.clearAllMocks();
+
+    await provider.focusExistingTarget();
+
+    expect(vscode.window.createWebviewPanel).not.toHaveBeenCalled();
+    expect(startSpy).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "workbench.view.extension.ulwContainer",
+    );
+    expect(view.show).toHaveBeenCalledWith(true);
+    expect(view.webview.postMessage).toHaveBeenCalledWith({
+      paneId: "default",
+      type: "focusTerminal",
+    });
+  });
+
+  it("selects the sidebar without opening or starting when no target exists yet", async () => {
+    mockConfiguration({ terminalDefaultLocation: "editor" });
+    provider = createProvider();
+    const startSpy = vi.spyOn(provider["sessionRuntime"], "startOpenCode");
+    vi.clearAllMocks();
+
+    await provider.focusExistingTarget();
+
+    expect(vscode.window.createWebviewPanel).not.toHaveBeenCalled();
+    expect(startSpy).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "workbench.view.extension.ulwContainer",
+    );
+  });
+
   it("falls back to the editor location for invalid terminal.defaultLocation values", async () => {
     mockConfiguration({ terminalDefaultLocation: "floating" });
     provider = createProvider();
