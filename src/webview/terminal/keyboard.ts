@@ -10,6 +10,8 @@ const ALT_ARROW_WORD_SEQUENCES: Readonly<Record<string, string>> = {
   ArrowRight: "\x1bf",
 } as const;
 
+const CTRL_ENTER_SEQUENCE = "\x1b[13;5u";
+
 export interface KeyboardHandlerOptions {
   /** Whether the platform is macOS (auto-detected if omitted). */
   isMac?: boolean;
@@ -74,6 +76,13 @@ export function createKeyboardHandler(options: KeyboardHandlerOptions = {}) {
     !event.metaKey &&
     !event.altKey;
 
+  const isCtrlEnter = (event: KeyboardEvent): boolean =>
+    event.key === "Enter" &&
+    event.ctrlKey &&
+    !event.shiftKey &&
+    !event.metaKey &&
+    !event.altKey;
+
   const getAltArrowWordSequence = (event: KeyboardEvent): string | undefined => {
     if (
       event.type !== "keydown" ||
@@ -100,6 +109,13 @@ export function createKeyboardHandler(options: KeyboardHandlerOptions = {}) {
       event.preventDefault();
       event.stopPropagation();
       options.sendInput("\n");
+      return false;
+    }
+
+    if (isCtrlEnter(event) && event.type === "keydown" && options.sendInput) {
+      event.preventDefault();
+      event.stopPropagation();
+      options.sendInput(CTRL_ENTER_SEQUENCE);
       return false;
     }
 

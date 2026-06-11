@@ -427,4 +427,48 @@ describe("createKeyboardHandler", () => {
       expect(sendInput).toHaveBeenCalledWith("\n");
     });
   });
+
+  describe("Ctrl+Enter handling", () => {
+    it("sends a modified Enter sequence on macOS", () => {
+      const sendInput = vi.fn();
+      const keyboard = createKeyboardHandler({ isMac: true, sendInput });
+
+      const event = createKeyboardEvent({
+        key: "Enter",
+        code: "Enter",
+        ctrlKey: true,
+      });
+
+      expect(keyboard.handler(event)).toBe(false);
+      expect(event.defaultPrevented).toBe(true);
+      expect(sendInput).toHaveBeenCalledWith("\x1b[13;5u");
+    });
+
+    it("sends a modified Enter sequence on Windows/Linux", () => {
+      const sendInput = vi.fn();
+      const keyboard = createKeyboardHandler({ isMac: false, sendInput });
+
+      const event = createKeyboardEvent({
+        key: "Enter",
+        code: "Enter",
+        ctrlKey: true,
+      });
+
+      expect(keyboard.handler(event)).toBe(false);
+      expect(event.defaultPrevented).toBe(true);
+      expect(sendInput).toHaveBeenCalledWith("\x1b[13;5u");
+    });
+
+    it("does not intercept Ctrl+Enter when sendInput is missing", () => {
+      const keyboard = createKeyboardHandler({ isMac: true });
+
+      const event = createKeyboardEvent({
+        key: "Enter",
+        code: "Enter",
+        ctrlKey: true,
+      });
+
+      expect(keyboard.handler(event)).toBe(true);
+    });
+  });
 });
