@@ -33,14 +33,14 @@ You must add the following secrets to your GitHub repository (**Settings** → *
 
 ### 2. Trigger the Workflow
 
-To publish a new version (e.g., `0.1.5`):
+To publish a new version (e.g., `1.12.4`):
 
 ```bash
 # Update version in package.json and create tag
-npm version 0.1.5
+npm version 1.12.4
 
 # Push the tag to GitHub
-git push origin v0.1.5
+git push origin v1.12.4
 ```
 
 The workflow at `.github/workflows/publish.yml` will automatically build, package, and publish the extension to both marketplaces.
@@ -53,10 +53,10 @@ The workflow at `.github/workflows/publish.yml` will automatically build, packag
 
 1. Go to https://marketplace.visualstudio.com/manage
 2. Sign in with your **Microsoft account**
-3. If you don't have a publisher named "ilseoblee":
+3. If you don't have a publisher named "islee23520":
    - Click **"Create publisher"**
    - Fill in:
-     - **Publisher ID**: `ilseoblee` (must match package.json)
+     - **Publisher ID**: `islee23520` (must match package.json)
      - **Display Name**: Your display name
      - **Email**: Your email address
 
@@ -82,14 +82,14 @@ The workflow at `.github/workflows/publish.yml` will automatically build, packag
 Open terminal in the project directory and run:
 
 ```bash
-npx @vscode/vsce login ilseoblee
+npx @vscode/vsce login islee23520
 ```
 
 When prompted, paste your Personal Access Token.
 
 ### Step 4: Publish the Extension
 
-#### Option A: Publish Current Version (0.1.4)
+#### Option A: Publish Current Version (1.12.3)
 
 ```bash
 npx @vscode/vsce publish
@@ -98,20 +98,20 @@ npx @vscode/vsce publish
 #### Option B: Publish and Increment Version
 
 ```bash
-# Patch version (0.1.4 -> 0.1.5)
+# Patch version (1.12.3 -> 1.12.4)
 npx @vscode/vsce publish patch
 
-# Minor version (0.1.4 -> 0.2.0)
+# Minor version (1.12.3 -> 1.13.0)
 npx @vscode/vsce publish minor
 
-# Major version (0.1.4 -> 1.0.0)
+# Major version (1.12.3 -> 2.0.0)
 npx @vscode/vsce publish major
 ```
 
 ### Step 5: Verify Publication
 
 1. Wait 5-10 minutes for marketplace indexing
-2. Visit: https://marketplace.visualstudio.com/items?itemName=ilseoblee.ulwcode
+2. Visit: https://marketplace.visualstudio.com/items?itemName=islee23520.opencode-sidebar-tui
 3. Search in VS Code: "ULW"
 
 ---
@@ -140,21 +140,21 @@ ovsx publish -p YOUR_OVSX_TOKEN
 
 ### Step 4: Verify
 
-Visit: [https://open-vsx.org/extension/ilseoblee/ulwcode](https://open-vsx.org/extension/ilseoblee/ulwcode)
+Visit: [https://open-vsx.org/extension/islee23520/opencode-sidebar-tui](https://open-vsx.org/extension/islee23520/opencode-sidebar-tui)
 
 ---
 
 ## Publishing Status
 
 **Current Status**: 🚢 Ready for automated publishing
-**Current Version**: 0.1.4
+**Current Version**: 1.12.3
 
 ## Prerequisites Checklist
 
 - ✅ Extension built and packaged
-- ✅ Version: 0.1.4
-- ✅ Publisher: ilseoblee
-- ✅ Repository: https://github.com/ilseoblee/ulwcode
+- ✅ Version: 1.12.3
+- ✅ Publisher: islee23520
+- ✅ Repository: https://github.com/islee23520/ulwcode.git
 - ✅ License: MIT
 - ✅ README: Comprehensive documentation
 
@@ -162,7 +162,7 @@ Visit: [https://open-vsx.org/extension/ilseoblee/ulwcode](https://open-vsx.org/e
 
 ### "Publisher not found"
 
-- Ensure you created the publisher "ilseoblee" in Step 1
+- Ensure you created the publisher "islee23520" in Step 1
 - Verify the publisher ID matches package.json exactly
 
 ### "Invalid PAT token"
@@ -202,10 +202,10 @@ npx @vscode/vsce ls
 npx @vscode/vsce package
 
 # Show publisher info
-npx @vscode/vsce show ilseoblee
+npx @vscode/vsce show islee23520.opencode-sidebar-tui
 
 # Unpublish (use carefully!)
-npx @vscode/vsce unpublish ilseoblee.ulwcode
+npx @vscode/vsce unpublish islee23520.opencode-sidebar-tui
 ```
 
 ## Support
