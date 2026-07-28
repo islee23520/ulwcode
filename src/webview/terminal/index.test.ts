@@ -6,6 +6,7 @@ const fit = vi.fn();
 const terminalWrite = vi.fn();
 const terminalFocus = vi.fn();
 const terminalDispose = vi.fn();
+const terminalGetSelection = vi.fn(() => "selected output");
 const terminalOptions: Record<string, unknown> = {};
 let terminalConstructorOptions: Record<string, unknown> | undefined;
 let dataListener: ((data: string) => void) | undefined;
@@ -27,6 +28,7 @@ vi.mock("@xterm/xterm", () => ({
     public readonly write = terminalWrite;
     public readonly focus = terminalFocus;
     public readonly dispose = terminalDispose;
+    public readonly getSelection = terminalGetSelection;
     public constructor(options: Record<string, unknown>) {
       terminalConstructorOptions = options;
     }
@@ -89,7 +91,9 @@ describe("createTerminalView", () => {
   });
 
   it("bridges one xterm instance to the minimal message contract", () => {
-    const view = createTerminalView(document.createElement("div"));
+    const container = document.createElement("div");
+    const view = createTerminalView(container);
+    // The mouseup below happens after every existing host/webview contract case.
 
     dataListener?.("echo hi\r");
     resizeListener?.({ cols: 100, rows: 30 });
@@ -116,6 +120,7 @@ describe("createTerminalView", () => {
         data: { type: "exit", code: 9 },
       }),
     );
+    container.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
 
     expect(postMessage).toHaveBeenCalledWith({
       type: "ready",
@@ -138,6 +143,10 @@ describe("createTerminalView", () => {
     expect(terminalWrite).toHaveBeenCalledWith(
       expect.stringContaining("Shell exited with code 9"),
     );
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "copy",
+      text: "selected output",
+    });
     expect(terminalOptions).toMatchObject({
       fontSize: 16,
       fontFamily: "monospace",

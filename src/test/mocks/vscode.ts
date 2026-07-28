@@ -73,6 +73,10 @@ export function fireConfigurationChange(section: string): void {
 
 export const env = {
   shell: "/bin/mock-shell",
+  clipboard: {
+    writeText: vi.fn(async (_text: string) => undefined),
+    readText: vi.fn(async () => ""),
+  },
 };
 
 export const window = {
@@ -84,6 +88,8 @@ export function resetMocks(): void {
   window.registerWebviewViewProvider.mockClear();
   workspace.getConfiguration.mockClear();
   env.shell = "/bin/mock-shell";
+  env.clipboard.writeText.mockClear();
+  env.clipboard.readText.mockClear();
 }
 
 export default {

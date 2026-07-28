@@ -11,7 +11,8 @@ export interface TerminalConfig {
 export type WebviewMessage =
   | { readonly type: "ready"; readonly cols: number; readonly rows: number }
   | { readonly type: "input"; readonly data: string }
-  | { readonly type: "resize"; readonly cols: number; readonly rows: number };
+  | { readonly type: "resize"; readonly cols: number; readonly rows: number }
+  | { readonly type: "copy"; readonly text: string };
 
 export type HostMessage =
   | { readonly type: "output"; readonly data: string }

@@ -13,7 +13,7 @@ It intentionally has no terminal multiplexer, session manager, AI integration, H
 
 The shell starts in the first workspace folder. When no workspace is open, it starts in the user's home directory.
 
-The terminal automatically inherits the active VS Code terminal palette, including ANSI colors, cursor colors, selections, and live theme changes.
+The terminal automatically inherits the active VS Code terminal palette, including ANSI colors, cursor colors, selections, and live theme changes. Drag-selecting terminal text copies the finished selection to the system clipboard.
 
 ## Settings
 

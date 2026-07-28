@@ -90,6 +90,30 @@ describe("TerminalProvider", () => {
     });
   });
 
+  it("copies drag-selected terminal text through the host clipboard", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+
+    webview.send({ type: "copy", text: "selected output" });
+
+    expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith(
+      "selected output",
+    );
+  });
+
+  it("ignores empty drag selections", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+
+    webview.send({ type: "copy", text: "" });
+
+    expect(vscode.env.clipboard.writeText).not.toHaveBeenCalled();
+  });
+
   it("kills the native shell when disposed", () => {
     const manager = new TerminalManager();
     const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);

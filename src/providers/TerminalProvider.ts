@@ -104,6 +104,11 @@ export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "resize":
         this.terminalManager.resize(TERMINAL_ID, message.cols, message.rows);
         break;
+      case "copy":
+        if (message.text) {
+          void vscode.env.clipboard.writeText(message.text);
+        }
+        break;
     }
   }
 

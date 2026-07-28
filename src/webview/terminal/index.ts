@@ -33,6 +33,13 @@ export function createTerminalView(container: HTMLElement): TerminalView {
   });
   const resizeObserver = new ResizeObserver(() => fitAddon.fit());
   resizeObserver.observe(container);
+  const copySelection = () => {
+    const text = terminal.getSelection();
+    if (text) {
+      postMessage({ type: "copy", text });
+    }
+  };
+  container.addEventListener("mouseup", copySelection);
   const disposeThemeWatcher = watchTerminalTheme(() => {
     terminal.options.theme = readTerminalTheme();
   });
@@ -73,6 +80,7 @@ export function createTerminalView(container: HTMLElement): TerminalView {
     terminal,
     dispose() {
       window.removeEventListener("message", messageHandler);
+      container.removeEventListener("mouseup", copySelection);
       resizeObserver.disconnect();
       disposeThemeWatcher();
       inputDisposable.dispose();
