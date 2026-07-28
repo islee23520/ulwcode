@@ -5,13 +5,17 @@ import { ExtensionLifecycle } from "./ExtensionLifecycle";
 
 vi.mock("node-pty", async () => vi.importActual("../test/mocks/node-pty"));
 
+function createContext() {
+  return {
+    extensionUri: vscode.Uri.file("/extension"),
+    subscriptions: [] as vscode.Disposable[],
+  };
+}
+
 describe("ExtensionLifecycle", () => {
   it("registers exactly one secondary-sidebar provider", () => {
     vscode.resetMocks();
-    const context = {
-      extensionUri: vscode.Uri.file("/extension"),
-      subscriptions: [] as vscode.Disposable[],
-    };
+    const context = createContext();
     const lifecycle = new ExtensionLifecycle();
 
     lifecycle.activate(context as never);
@@ -26,10 +30,7 @@ describe("ExtensionLifecycle", () => {
 
   it("exposes terminal events and delegates API operations", () => {
     vscode.resetMocks();
-    const context = {
-      extensionUri: vscode.Uri.file("/extension"),
-      subscriptions: [] as vscode.Disposable[],
-    };
+    const context = createContext();
     const lifecycle = new ExtensionLifecycle();
     const api = lifecycle.activate(context as never);
     const manager = lifecycle["terminalManager"] as TerminalManager;
@@ -56,5 +57,22 @@ describe("ExtensionLifecycle", () => {
     lifecycle.dispose();
     expect(lifecycle["terminalManager"]).toBeUndefined();
     expect(lifecycle["provider"]).toBeUndefined();
+  });
+
+  it("opens the terminal in the editor group when toggled", () => {
+    vscode.resetMocks();
+    const context = createContext();
+    const lifecycle = new ExtensionLifecycle();
+    lifecycle.activate(context as never);
+
+    lifecycle.toggleEditorLocation();
+
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledOnce();
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
+      "ulw.terminalEditor",
+      "ULW Terminal",
+      expect.anything(),
+      expect.objectContaining({ enableScripts: true }),
+    );
   });
 });

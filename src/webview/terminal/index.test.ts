@@ -20,6 +20,16 @@ vi.mock("@xterm/addon-fit", () => ({
   },
 }));
 
+vi.mock("@xterm/addon-webgl", () => ({
+  WebglAddon: class {
+    public activate(): void {}
+    public dispose(): void {}
+    public onContextLoss(listener: () => void): void {
+      listener();
+    }
+  },
+}));
+
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
     public readonly cols = 80;
@@ -29,11 +39,25 @@ vi.mock("@xterm/xterm", () => ({
     public readonly focus = terminalFocus;
     public readonly dispose = terminalDispose;
     public readonly getSelection = terminalGetSelection;
+    private container?: HTMLElement;
     public constructor(options: Record<string, unknown>) {
       terminalConstructorOptions = options;
     }
-    public loadAddon(): void {}
-    public open(): void {}
+    public loadAddon(addon: unknown): void {
+      if (addon && typeof addon === "object" && "activate" in addon) {
+        (addon as { activate(): void }).activate();
+        if (this.container) {
+          const canvas = document.createElement("canvas");
+          this.container.querySelector(".xterm-screen")?.appendChild(canvas);
+        }
+      }
+    }
+    public open(container: HTMLElement): void {
+      this.container = container;
+      const screen = document.createElement("div");
+      screen.className = "xterm-screen";
+      container.appendChild(screen);
+    }
     public onData(listener: (data: string) => void) {
       dataListener = listener;
       return { dispose: vi.fn() };
@@ -49,6 +73,16 @@ vi.mock("@xterm/xterm", () => ({
 
 const postMessage = vi.fn();
 vi.mock("../shared/vscode-api", () => ({ postMessage }));
+
+vi.mock("@xterm/addon-webgl", () => ({
+  WebglAddon: class {
+    public activate(): void {}
+    public dispose(): void {}
+    public onContextLoss(listener: () => void): void {
+      listener();
+    }
+  },
+}));
 
 const themeMocks = vi.hoisted(() => ({
   initialTheme: { background: "#101010", foreground: "#f0f0f0" },
@@ -90,10 +124,16 @@ describe("createTerminalView", () => {
     }) as typeof requestAnimationFrame;
   });
 
+  it("loads the WebGL renderer instead of the DOM renderer", () => {
+    const container = document.createElement("div");
+    createTerminalView(container);
+
+    expect(container.querySelector(".xterm-screen canvas")).not.toBeNull();
+  });
+
   it("bridges one xterm instance to the minimal message contract", () => {
     const container = document.createElement("div");
     const view = createTerminalView(container);
-    // The mouseup below happens after every existing host/webview contract case.
 
     dataListener?.("echo hi\r");
     resizeListener?.({ cols: 100, rows: 30 });

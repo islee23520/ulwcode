@@ -5,6 +5,15 @@ All notable changes to the "ULW" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.6] - 2026-07-28
+
+### Added
+
+- Restore WebGL renderer for faster terminal rendering and smoother Korean/English IME input.
+- Restore image paste support with clipboard data URL handling and temp file saving.
+- Add sidebar ↔ editor group toggle command.
+- Add editor/explorer context menu commands to send selection or file to terminal.
+
 ## [1.12.5] - 2026-07-28
 
 ### Fixed

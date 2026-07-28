@@ -114,6 +114,56 @@ describe("TerminalProvider", () => {
     expect(vscode.env.clipboard.writeText).not.toHaveBeenCalled();
   });
 
+  it("saves pasted images and posts their path to the terminal", async () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+
+    webview.send({
+      type: "imagePasted",
+      data: "data:image/png;base64,ZmFrZQ==",
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "clipboardImage" }),
+    );
+  });
+
+  it("rejects oversized images", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+    const largeBase64 = Buffer.alloc(6 * 1024 * 1024).toString("base64");
+
+    webview.send({
+      type: "imagePasted",
+      data: `data:image/png;base64,${largeBase64}`,
+    });
+
+    expect(webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "clipboardImage" }),
+    );
+  });
+
+  it("rejects malformed image data", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+
+    webview.send({ type: "imagePasted", data: "not-a-data-url" });
+
+    expect(webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "clipboardImage" }),
+    );
+  });
+
   it("kills the native shell when disposed", () => {
     const manager = new TerminalManager();
     const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);

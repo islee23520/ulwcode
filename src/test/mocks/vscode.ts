@@ -79,13 +79,50 @@ export const env = {
   },
 };
 
+export const ViewColumn = {
+  Active: -1,
+  Beside: -2,
+  One: 1,
+};
+
+export const commands = {
+  registerCommand: vi.fn((commandId: string, _handler: (...args: unknown[]) => unknown) => {
+    void commandId;
+    return new Disposable();
+  }),
+  executeCommand: vi.fn(async (_command: string, ..._args: unknown[]) => undefined),
+};
+
 export const window = {
   registerWebviewViewProvider: vi.fn(() => new Disposable()),
+  createWebviewPanel: vi.fn(() => ({
+    webview: {
+      options: {},
+      html: "",
+      onDidReceiveMessage: vi.fn(),
+      postMessage: vi.fn(),
+      asWebviewUri: vi.fn((uri: unknown) => uri),
+      cspSource: "",
+    },
+    visible: true,
+    onDidDispose: vi.fn(),
+    reveal: vi.fn(),
+    dispose: vi.fn(),
+  })),
+  onDidChangeActiveTextEditor: vi.fn((listener: unknown) => {
+    void listener;
+    return new Disposable();
+  }),
+  activeTextEditor: undefined as unknown,
 };
 
 export function resetMocks(): void {
   setConfiguration({});
+  commands.registerCommand.mockClear();
+  commands.executeCommand.mockClear();
   window.registerWebviewViewProvider.mockClear();
+  window.createWebviewPanel.mockClear();
+  window.onDidChangeActiveTextEditor.mockClear();
   workspace.getConfiguration.mockClear();
   env.shell = "/bin/mock-shell";
   env.clipboard.writeText.mockClear();

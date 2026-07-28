@@ -12,10 +12,12 @@ export type WebviewMessage =
   | { readonly type: "ready"; readonly cols: number; readonly rows: number }
   | { readonly type: "input"; readonly data: string }
   | { readonly type: "resize"; readonly cols: number; readonly rows: number }
-  | { readonly type: "copy"; readonly text: string };
+  | { readonly type: "copy"; readonly text: string }
+  | { readonly type: "imagePasted"; readonly data: string };
 
 export type HostMessage =
   | { readonly type: "output"; readonly data: string }
   | { readonly type: "exit"; readonly code: number; readonly signal?: number }
   | ({ readonly type: "config" } & TerminalConfig)
-  | { readonly type: "focus" };
+  | { readonly type: "focus" }
+  | { readonly type: "clipboardImage"; readonly filePath: string };

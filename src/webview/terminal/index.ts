@@ -1,4 +1,5 @@
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import type { HostMessage } from "../../types";
 import { postMessage } from "../shared/vscode-api";
@@ -8,6 +9,9 @@ export interface TerminalView {
   readonly terminal: Terminal;
   dispose(): void;
 }
+
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 export function createTerminalView(container: HTMLElement): TerminalView {
   const terminal = new Terminal({
@@ -24,6 +28,16 @@ export function createTerminalView(container: HTMLElement): TerminalView {
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
   terminal.open(container);
+
+  try {
+    const webglAddon = new WebglAddon();
+    webglAddon.onContextLoss(() => {
+      webglAddon.dispose();
+    });
+    terminal.loadAddon(webglAddon);
+  } catch (error) {
+    console.warn("WebGL renderer unavailable, using DOM renderer:", error);
+  }
 
   const inputDisposable = terminal.onData((data) => {
     postMessage({ type: "input", data });
@@ -43,6 +57,33 @@ export function createTerminalView(container: HTMLElement): TerminalView {
   const disposeThemeWatcher = watchTerminalTheme(() => {
     terminal.options.theme = readTerminalTheme();
   });
+
+  const handlePasteEvent = (event: ClipboardEvent): void => {
+    const items = Array.from(event.clipboardData?.items ?? []);
+    const imageItem = items.find((item) =>
+      ALLOWED_IMAGE_TYPES.includes(item.type as (typeof ALLOWED_IMAGE_TYPES)[number]),
+    );
+    if (!imageItem) {
+      return;
+    }
+
+    const blob = imageItem.getAsFile();
+    if (!blob || blob.size > MAX_IMAGE_SIZE) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        postMessage({ type: "imagePasted", data: reader.result });
+      }
+    };
+    reader.readAsDataURL(blob);
+  };
+  container.addEventListener("paste", handlePasteEvent);
 
   const messageHandler = (event: MessageEvent<HostMessage>) => {
     const message = event.data;
@@ -66,6 +107,9 @@ export function createTerminalView(container: HTMLElement): TerminalView {
       case "focus":
         terminal.focus();
         break;
+      case "clipboardImage":
+        terminal.paste(message.filePath);
+        break;
     }
   };
   window.addEventListener("message", messageHandler);
@@ -81,6 +125,7 @@ export function createTerminalView(container: HTMLElement): TerminalView {
     dispose() {
       window.removeEventListener("message", messageHandler);
       container.removeEventListener("mouseup", copySelection);
+      container.removeEventListener("paste", handlePasteEvent);
       resizeObserver.disconnect();
       disposeThemeWatcher();
       inputDisposable.dispose();

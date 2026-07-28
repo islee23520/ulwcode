@@ -44,11 +44,16 @@ describe("minimal sidebar terminal topology", () => {
     ]);
   });
 
-  it("exposes no auxiliary commands menus or keybindings", () => {
+  it("exposes only terminal-related commands", () => {
     const contributes = readManifest().contributes;
+    const commands = (contributes.commands ?? []) as readonly { command: string }[];
+    const commandIds = commands.map((c) => c.command).sort();
 
-    expect(contributes.commands).toBeUndefined();
-    expect(contributes.menus).toBeUndefined();
+    expect(commandIds).toEqual([
+      "ulw.sendFileToTerminal",
+      "ulw.sendSelectionToTerminal",
+      "ulw.toggleEditorLocation",
+    ]);
     expect(contributes.keybindings).toBeUndefined();
   });
 
