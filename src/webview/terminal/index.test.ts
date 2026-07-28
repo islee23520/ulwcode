@@ -1,171 +1,157 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from "vitest";
-import { createContextMenuPasteHandler, createWheelHandler } from "./index";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const createWheelEvent = (
-  init: WheelEventInit,
-): WheelEvent => {
-  const event = new WheelEvent("wheel", {
-    bubbles: true,
-    cancelable: true,
-    ...init,
-  });
-  return event;
-};
+const fit = vi.fn();
+const terminalWrite = vi.fn();
+const terminalFocus = vi.fn();
+const terminalDispose = vi.fn();
+const terminalOptions: Record<string, unknown> = {};
+let terminalConstructorOptions: Record<string, unknown> | undefined;
+let dataListener: ((data: string) => void) | undefined;
+let resizeListener:
+  | ((size: { readonly cols: number; readonly rows: number }) => void)
+  | undefined;
 
-describe("createWheelHandler", () => {
-  describe("on Windows with no TUI mouse tracking", () => {
-    const makeHandler = (overrides?: {
-      scrollLines?: (count: number) => void;
-    }) =>
-      createWheelHandler({
-        isWindows: () => true,
-        getMouseTrackingMode: () => "none",
-        scrollLines: overrides?.scrollLines ?? vi.fn(),
-      });
+vi.mock("@xterm/addon-fit", () => ({
+  FitAddon: class {
+    public fit = fit;
+  },
+}));
 
-    it("scrolls down on positive deltaY", () => {
-      const scrollLines = vi.fn();
-      const handler = makeHandler({ scrollLines });
+vi.mock("@xterm/xterm", () => ({
+  Terminal: class {
+    public readonly cols = 80;
+    public readonly rows = 24;
+    public readonly options = terminalOptions;
+    public readonly write = terminalWrite;
+    public readonly focus = terminalFocus;
+    public readonly dispose = terminalDispose;
+    public constructor(options: Record<string, unknown>) {
+      terminalConstructorOptions = options;
+    }
+    public loadAddon(): void {}
+    public open(): void {}
+    public onData(listener: (data: string) => void) {
+      dataListener = listener;
+      return { dispose: vi.fn() };
+    }
+    public onResize(
+      listener: (size: { readonly cols: number; readonly rows: number }) => void,
+    ) {
+      resizeListener = listener;
+      return { dispose: vi.fn() };
+    }
+  },
+}));
 
-      const event = createWheelEvent({ deltaY: 120 });
-      handler(event);
+const postMessage = vi.fn();
+vi.mock("../shared/vscode-api", () => ({ postMessage }));
 
-      expect(scrollLines).toHaveBeenCalledWith(3);
-      expect(event.defaultPrevented).toBe(true);
-    });
+const themeMocks = vi.hoisted(() => ({
+  initialTheme: { background: "#101010", foreground: "#f0f0f0" },
+  updatedTheme: { background: "#202020", foreground: "#e0e0e0" },
+  themeChangeListener: undefined as (() => void) | undefined,
+  disposeThemeWatcher: vi.fn(),
+  readTerminalTheme: vi.fn(),
+}));
+vi.mock("./theme", () => ({
+  readTerminalTheme: themeMocks.readTerminalTheme,
+  watchTerminalTheme(listener: () => void) {
+    themeMocks.themeChangeListener = listener;
+    return themeMocks.disposeThemeWatcher;
+  },
+}));
 
-    it("scrolls up on negative deltaY", () => {
-      const scrollLines = vi.fn();
-      const handler = makeHandler({ scrollLines });
+class TestResizeObserver {
+  public observe(): void {}
+  public disconnect(): void {}
+}
 
-      const event = createWheelEvent({ deltaY: -120 });
-      handler(event);
+const { createTerminalView } = await import("./index");
 
-      expect(scrollLines).toHaveBeenCalledWith(-3);
-      expect(event.defaultPrevented).toBe(true);
-    });
-
-    it("calls preventDefault and stopPropagation", () => {
-      const handler = makeHandler();
-      const event = createWheelEvent({ deltaY: 100 });
-
-      const stopSpy = vi.spyOn(event, "stopPropagation");
-
-      handler(event);
-
-      expect(event.defaultPrevented).toBe(true);
-      expect(stopSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe("on Windows with TUI mouse tracking active", () => {
-    const makeHandler = (mode: string) =>
-      createWheelHandler({
-        isWindows: () => true,
-        getMouseTrackingMode: () => mode,
-        scrollLines: vi.fn(),
-      });
-
-    it("does not intercept when mouseTrackingMode is button", () => {
-      const handler = makeHandler("button");
-      const event = createWheelEvent({ deltaY: 120 });
-
-      handler(event);
-
-      expect(event.defaultPrevented).toBe(false);
-    });
-
-    it("does not intercept when mouseTrackingMode is any", () => {
-      const handler = makeHandler("any");
-      const event = createWheelEvent({ deltaY: 120 });
-
-      handler(event);
-
-      expect(event.defaultPrevented).toBe(false);
-    });
-  });
-
-  describe("guard conditions", () => {
-    it("does not intercept on non-Windows platforms", () => {
-      const scrollLines = vi.fn();
-      const handler = createWheelHandler({
-        isWindows: () => false,
-        getMouseTrackingMode: () => "none",
-        scrollLines,
-      });
-
-      const event = createWheelEvent({ deltaY: 120 });
-      handler(event);
-
-      expect(scrollLines).not.toHaveBeenCalled();
-      expect(event.defaultPrevented).toBe(false);
-    });
-
-    it("does not intercept when Ctrl is held", () => {
-      const scrollLines = vi.fn();
-      const handler = createWheelHandler({
-        isWindows: () => true,
-        getMouseTrackingMode: () => "none",
-        scrollLines,
-      });
-
-      const event = createWheelEvent({ deltaY: 120, ctrlKey: true });
-      handler(event);
-
-      expect(scrollLines).not.toHaveBeenCalled();
-      expect(event.defaultPrevented).toBe(false);
-    });
-
-    it("does not intercept when deltaY is zero", () => {
-      const scrollLines = vi.fn();
-      const handler = createWheelHandler({
-        isWindows: () => true,
-        getMouseTrackingMode: () => "none",
-        scrollLines,
-      });
-
-      const event = createWheelEvent({ deltaY: 0 });
-      handler(event);
-
-      expect(scrollLines).not.toHaveBeenCalled();
-      expect(event.defaultPrevented).toBe(false);
-    });
+describe("createTerminalView", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dataListener = undefined;
+    resizeListener = undefined;
+    terminalConstructorOptions = undefined;
+    themeMocks.themeChangeListener = undefined;
+    themeMocks.readTerminalTheme
+      .mockReset()
+      .mockReturnValueOnce(themeMocks.initialTheme)
+      .mockReturnValue(themeMocks.updatedTheme);
+    globalThis.ResizeObserver = TestResizeObserver as never;
+    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }) as typeof requestAnimationFrame;
   });
 
-  describe("regression: Windows scroll after removing global MOUSE_ENABLE", () => {
-    it("scrolls normally when no TUI has enabled mouse tracking", () => {
-      const scrollLines = vi.fn();
-      const handler = createWheelHandler({
-        isWindows: () => true,
-        getMouseTrackingMode: () => "none",
-        scrollLines,
-      });
+  it("bridges one xterm instance to the minimal message contract", () => {
+    const view = createTerminalView(document.createElement("div"));
 
-      const event = createWheelEvent({ deltaY: 100 });
-      handler(event);
+    dataListener?.("echo hi\r");
+    resizeListener?.({ cols: 100, rows: 30 });
+    window.dispatchEvent(
+      new MessageEvent("message", { data: { type: "output", data: "hi" } }),
+    );
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "config",
+          fontSize: 16,
+          fontFamily: "monospace",
+          cursorBlink: false,
+          cursorStyle: "bar",
+          scrollback: 5000,
+        },
+      }),
+    );
+    window.dispatchEvent(
+      new MessageEvent("message", { data: { type: "focus" } }),
+    );
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { type: "exit", code: 9 },
+      }),
+    );
 
-      expect(scrollLines).toHaveBeenCalledWith(3);
-      expect(event.defaultPrevented).toBe(true);
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "ready",
+      cols: 80,
+      rows: 24,
     });
-  });
-});
-
-describe("createContextMenuPasteHandler", () => {
-  it("requests host paste and suppresses the browser menu on right-click", () => {
-    const requestPaste = vi.fn();
-    const handler = createContextMenuPasteHandler({ requestPaste });
-    const event = new MouseEvent("contextmenu", {
-      bubbles: true,
-      cancelable: true,
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "input",
+      data: "echo hi\r",
     });
-    const stopSpy = vi.spyOn(event, "stopPropagation");
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "resize",
+      cols: 100,
+      rows: 30,
+    });
+    expect(terminalWrite).toHaveBeenCalledWith("hi");
+    expect(terminalConstructorOptions).toMatchObject({
+      theme: themeMocks.initialTheme,
+    });
+    expect(terminalWrite).toHaveBeenCalledWith(
+      expect.stringContaining("Shell exited with code 9"),
+    );
+    expect(terminalOptions).toMatchObject({
+      fontSize: 16,
+      fontFamily: "monospace",
+      cursorBlink: false,
+      cursorStyle: "bar",
+      scrollback: 5000,
+    });
+    expect(terminalFocus).toHaveBeenCalled();
 
-    handler(event);
+    themeMocks.themeChangeListener?.();
+    expect(terminalOptions.theme).toEqual(themeMocks.updatedTheme);
 
-    expect(event.defaultPrevented).toBe(true);
-    expect(stopSpy).toHaveBeenCalled();
-    expect(requestPaste).toHaveBeenCalledTimes(1);
+    view.dispose();
+    expect(terminalDispose).toHaveBeenCalledOnce();
+    expect(themeMocks.disposeThemeWatcher).toHaveBeenCalledOnce();
   });
 });

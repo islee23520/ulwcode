@@ -1,242 +1,141 @@
-import * as vscode from "vscode";
-import * as pty from "node-pty";
 import * as os from "os";
-import * as path from "path";
+import * as pty from "node-pty";
+import * as vscode from "vscode";
 
-export interface Terminal {
-  id: string;
-  process: pty.IPty;
-  onData: vscode.EventEmitter<{ id: string; data: string }>;
-  onExit: vscode.EventEmitter<string>;
-  port?: number;
-  instanceId?: string;
+export interface TerminalDataEvent {
+  readonly id: string;
+  readonly data: string;
 }
 
-export class TerminalManager {
-  private terminals: Map<string, Terminal> = new Map();
-  private instanceToTerminal: Map<string, string> = new Map();
-  private readonly _onData = new vscode.EventEmitter<{
-    id: string;
-    data: string;
-  }>();
-  private readonly _onExit = new vscode.EventEmitter<string>();
+export interface TerminalExitEvent {
+  readonly id: string;
+  readonly code: number;
+  readonly signal?: number;
+}
 
-  /**
-   * Generation counter per terminal id. Incremented on kill so that stale
-   * `ptyProcess.onExit` callbacks (which cannot be removed) are silently
-   * ignored when a new terminal is later created with the same id.
-   */
-  private exitGenerations: Map<string, number> = new Map();
+export interface TerminalStartEvent {
+  readonly id: string;
+  readonly pid: number;
+}
 
-  readonly onData = this._onData.event;
-  readonly onExit = this._onExit.event;
+export class TerminalManager implements vscode.Disposable {
+  private readonly terminals = new Map<string, pty.IPty>();
+  private readonly generations = new Map<string, number>();
+  private readonly dataEmitter = new vscode.EventEmitter<TerminalDataEvent>();
+  private readonly exitEmitter = new vscode.EventEmitter<TerminalExitEvent>();
+  private readonly startEmitter = new vscode.EventEmitter<TerminalStartEvent>();
 
-  /**
-   * Creates a terminal process and registers it by terminal id.
-   */
-  createTerminal(
+  public readonly onData = this.dataEmitter.event;
+  public readonly onExit = this.exitEmitter.event;
+  public readonly onStart = this.startEmitter.event;
+
+  public createTerminal(
     id: string,
-    command?: string,
-    env?: Record<string, string>,
-    port?: number,
-    cols?: number,
-    rows?: number,
-    instanceId?: string,
-    cwd?: string,
-  ): Terminal {
-    if (this.terminals.has(id)) {
-      this.killTerminal(id);
+    cols: number,
+    rows: number,
+    cwd = this.resolveWorkingDirectory(),
+  ): pty.IPty {
+    const existing = this.terminals.get(id);
+    if (existing) {
+      return existing;
     }
 
-    const { shell, args: shellArgs } = this.getShellConfig(!!command);
-    const ptyArgs = command ? [...shellArgs, command] : shellArgs;
+    const configuration = vscode.workspace.getConfiguration("ulw");
+    const configuredShell = configuration.get<string>("shellPath", "").trim();
+    const shell = configuredShell || vscode.env.shell || this.defaultShell();
+    const args = configuration.get<readonly string[]>("shellArgs", []);
+    const generation = (this.generations.get(id) ?? 0) + 1;
+    this.generations.set(id, generation);
 
-    const onDataEmitter = new vscode.EventEmitter<{
-      id: string;
-      data: string;
-    }>();
-    const onExitEmitter = new vscode.EventEmitter<string>();
-
-    const windowsDefaults: Record<string, string> =
-      process.platform === "win32"
-        ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows" }
-        : {};
-
-    const mergedEnv: Record<string, string> = {
-      ...windowsDefaults,
-      ...process.env,
-      TERM: "xterm-256color",
-      ...env,
-    } as Record<string, string>;
-
-    const ptyProcess = pty.spawn(shell, ptyArgs, {
+    const process = pty.spawn(shell, [...args], {
       name: "xterm-256color",
-      cols: cols || 80,
-      rows: rows || 24,
-      cwd:
-        cwd ||
-        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
-        os.homedir(),
-      env: mergedEnv,
-      handleFlowControl: false,
+      cols: this.normalizeDimension(cols, 80),
+      rows: this.normalizeDimension(rows, 24),
+      cwd,
+      env: this.buildEnvironment(),
     });
 
-    const generation = this.exitGenerations.get(id) ?? 0;
-
-    ptyProcess.onData((data) => {
-      // Ignore stale data from killed processes (same guard as onExit).
-      // When a terminal is killed and recreated with the same id, the old
-      // pty process may still emit a few data events before fully exiting.
-      if ((this.exitGenerations.get(id) ?? 0) !== generation) {
+    this.terminals.set(id, process);
+    this.startEmitter.fire({ id, pid: process.pid });
+    process.onData((data) => {
+      if (this.generations.get(id) === generation) {
+        this.dataEmitter.fire({ id, data });
+      }
+    });
+    process.onExit(({ exitCode, signal }) => {
+      if (this.generations.get(id) !== generation) {
         return;
       }
-      onDataEmitter.fire({ id, data });
-      this._onData.fire({ id, data });
+      this.terminals.delete(id);
+      this.exitEmitter.fire({ id, code: exitCode, signal });
     });
 
-    ptyProcess.onExit(() => {
-      if ((this.exitGenerations.get(id) ?? 0) !== generation) {
-        return;
-      }
-      onExitEmitter.fire(id);
-      this._onExit.fire(id);
-      this.terminals.delete(id);
-      this.removeInstanceMappingForTerminal(id);
-    });
-
-    const terminal: Terminal = {
-      id,
-      process: ptyProcess,
-      onData: onDataEmitter,
-      onExit: onExitEmitter,
-      port,
-      instanceId,
-    };
-
-    this.terminals.set(id, terminal);
-    if (instanceId) {
-      this.instanceToTerminal.set(instanceId, id);
-    }
-
-    return terminal;
+    return process;
   }
 
-  getTerminal(id: string): Terminal | undefined {
-    return this.terminals.get(id);
+  public hasTerminal(id: string): boolean {
+    return this.terminals.has(id);
   }
 
-  /**
-   * Gets a terminal by instance id.
-   */
-  getByInstance(instanceId: string): Terminal | undefined {
-    const terminalId = this.instanceToTerminal.get(instanceId);
-    if (!terminalId) {
-      return undefined;
-    }
-
-    return this.terminals.get(terminalId);
+  public terminalCount(): number {
+    return this.terminals.size;
   }
 
-  writeToTerminal(id: string, data: string): void {
+  public write(id: string, data: string): void {
+    this.terminals.get(id)?.write(data);
+  }
+
+  public resize(id: string, cols: number, rows: number): void {
     const terminal = this.terminals.get(id);
-    if (terminal) {
-      terminal.process.write(data);
-    }
-  }
-
-  resizeTerminal(id: string, cols: number, rows: number): void {
-    const terminal = this.terminals.get(id);
-    if (terminal) {
-      terminal.process.resize(cols, rows);
-    }
-  }
-
-  /**
-   * Kills a terminal by terminal id and cleans related mappings.
-   */
-  killTerminal(id: string): void {
-    const terminal = this.terminals.get(id);
-    if (terminal) {
-      this.exitGenerations.set(id, (this.exitGenerations.get(id) ?? 0) + 1);
-      terminal.process.kill();
-      terminal.onData.dispose();
-      terminal.onExit.dispose();
-      this.terminals.delete(id);
-      this.removeInstanceMappingForTerminal(id);
-    }
-  }
-
-  /**
-   * Kills a terminal associated with the given instance id.
-   */
-  killByInstance(instanceId: string): void {
-    const terminalId = this.instanceToTerminal.get(instanceId);
-    if (!terminalId) {
+    if (!terminal || cols < 1 || rows < 1) {
       return;
     }
-
-    this.killTerminal(terminalId);
-    this.instanceToTerminal.delete(instanceId);
+    terminal.resize(cols, rows);
   }
 
-  /**
-   * Disposes all terminals and manager event emitters.
-   */
-  dispose(): void {
-    for (const [id] of this.terminals) {
-      this.killTerminal(id);
+  public kill(id: string): void {
+    const terminal = this.terminals.get(id);
+    if (!terminal) {
+      return;
     }
-    this.instanceToTerminal.clear();
-    this.exitGenerations.clear();
-    this._onData.dispose();
-    this._onExit.dispose();
+    this.generations.set(id, (this.generations.get(id) ?? 0) + 1);
+    this.terminals.delete(id);
+    terminal.kill();
   }
 
-  /**
-   * Removes an instance-to-terminal mapping by terminal id.
-   */
-  private removeInstanceMappingForTerminal(terminalId: string): void {
-    for (const [
-      instanceId,
-      mappedTerminalId,
-    ] of this.instanceToTerminal.entries()) {
-      if (mappedTerminalId === terminalId) {
-        this.instanceToTerminal.delete(instanceId);
-        break;
+  public dispose(): void {
+    for (const id of [...this.terminals.keys()]) {
+      this.kill(id);
+    }
+    this.dataEmitter.dispose();
+    this.exitEmitter.dispose();
+    this.startEmitter.dispose();
+  }
+
+  private resolveWorkingDirectory(): string {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.homedir();
+  }
+
+  private defaultShell(): string {
+    if (process.platform === "win32") {
+      return process.env.COMSPEC ?? "cmd.exe";
+    }
+    return process.env.SHELL ?? "/bin/sh";
+  }
+
+  private buildEnvironment(): Record<string, string> {
+    const environment: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined) {
+        environment[key] = value;
       }
     }
+    environment.TERM = "xterm-256color";
+    environment.COLORTERM = "truecolor";
+    return environment;
   }
 
-  private getShellConfig(
-    runCommand = false,
-  ): { shell: string; args: string[] } {
-    const config = vscode.workspace.getConfiguration("ulw");
-    const overrideShell = config.get<string>("shellPath");
-    const overrideArgs = config.get<string[]>("shellArgs");
-
-    const shell =
-      overrideShell ||
-      vscode.env.shell ||
-      (process.platform === "win32"
-        ? process.env.COMSPEC || "cmd.exe"
-        : process.env.SHELL || "/bin/bash");
-
-    if (overrideArgs && overrideArgs.length > 0) {
-      return { shell, args: overrideArgs };
-    }
-
-    if (!runCommand) {
-      return { shell, args: [] };
-    }
-
-    const shellName = path.win32.basename(shell).toLowerCase();
-    const isWin = process.platform === "win32" || shell.includes("\\") || shell.includes(":\\");
-    if (isWin) {
-      if (shellName === "cmd.exe" || shellName === "cmd" || shellName.endsWith("cmd.exe"))
-        return { shell, args: ["/k"] };
-      if (shellName.includes("powershell") || shellName.includes("pwsh") || shellName.endsWith("pwsh.exe"))
-        return { shell, args: ["-NoExit", "-Command"] };
-    }
-    return { shell, args: ["-c"] };
+  private normalizeDimension(value: number, fallback: number): number {
+    return Number.isInteger(value) && value > 0 ? value : fallback;
   }
 }

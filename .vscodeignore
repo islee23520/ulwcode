@@ -1,11 +1,13 @@
 # Development files
 .vscode/**
 .vscode-test/**
+.vscode-test.js
 .github/**
 src/**
 test/**
 out/**
 build/**
+docs/**
 
 # Local agent/workflow artifacts
 .agent/**
@@ -23,6 +25,7 @@ build/**
 
 # Build configuration
 tsconfig.json
+tsconfig.e2e.json
 webpack.config.js
 .gitignore
 .editorconfig
@@ -49,6 +52,7 @@ dist/**/*.map
 
 # AI agent knowledge base
 AGENTS.md
+.npmignore
 
 # Test coverage
 coverage/

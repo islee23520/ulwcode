@@ -1,171 +1,21 @@
-# ULW ガイド
+# ULW サイドバーターミナル
 
-[English](../en/README.md) · [한국어](../ko/README.md) · [日本語](../ja/README.md)
+ULW は VS Code のセカンダリサイドバーでネイティブシェルターミナルを 1 つだけ実行します。
 
-- [ドキュメント一覧](../README.md)
-- [ルート README](../../README.md)
+## 使い方
 
-このガイドでは、**ULW** を VS Code の Open TUI terminal MUX としてインストールし、日常的に使う方法を説明します。
+セカンダリサイドバーを開き、**ULW** を選択します。ワークスペースがある場合は最初のワークスペースフォルダー、ない場合はホームディレクトリでシェルが起動します。
 
-## 概要
+## 設定
 
-ULW は VS Code の標準ターミナルの代わりに、**サイドバー**で terminal MUX（`native` / `tmux` / `zellij`）を動かします。OpenCode などの AI CLI は任意で、ターミナルから手動で起動します。
+フォント、カーソル、スクロールバック、シェル実行ファイル、引数は次の設定で変更できます。
 
-主なビューは 2 つあります。
+- `ulw.fontSize`
+- `ulw.fontFamily`
+- `ulw.cursorBlink`
+- `ulw.cursorStyle`
+- `ulw.scrollback`
+- `ulw.shellPath`
+- `ulw.shellArgs`
 
-1. **ULW Terminal**: セカンダリサイドバーで動作するメインの TUI セッション
-2. **ULW Terminal Manager**: `tmux` の session、pane、window を管理する画面
-
-## 主な機能
-
-- ビューを開くと設定した **バックエンド**（通常シェル / `tmux` / `zellij`）のみ起動 — AI ツール選択 UI なし
-- `xterm.js` と WebGL による完全な TUI レンダリング
-- `tmux` session の自動検出とワークスペース単位のフィルタリング
-- 同じターミナル内で native shell へ切り替え可能
-- OpenCode とプロンプトやコンテキストをやり取りする HTTP API 通信
-- `@filename#L10-L20` 形式のファイル参照
-- コンテキストメニュー、ドラッグ＆ドロップ、キーボードショートカット対応
-
-## インストール
-
-### VS Code Marketplace からインストール
-
-1. VS Code を開きます。
-2. `Cmd+Shift+X` または `Ctrl+Shift+X` で Extensions を開きます。
-3. **ULW** を検索します。
-4. **Install** をクリックします。
-
-### OpenVSX からインストール
-
-VSCodium、Gitpod、Eclipse Theia などの互換 IDE では次の手順でインストールできます。
-
-1. 拡張機能ビューを開きます。
-2. **ULW** を検索します。
-3. **Install** をクリックします。
-
-または [OpenVSX ページ](https://open-vsx.org/extension/islee23520/opencode-sidebar-tui) を利用できます。
-
-### ソースからインストール
-
-```bash
-git clone https://github.com/islee23520/ulwcode.git
-cd ulwcode
-npm install
-npm run compile
-npx @vscode/vsce package
-```
-
-その後、Extensions ビューの **Install from VSIX** から生成された VSIX をインストールします。
-
-## クイックスタート
-
-1. `tmux` session を管理するときは **ULW Terminal Manager** を開きます。
-2. セカンダリサイドバーで **ULW Terminal** を開きます。
-3. `ulw.autoStartOnOpen` でバックエンドを自動起動するか、手動で開始します。
-4. シェルや multiplexer を使い、必要なら OpenCode などを手動で起動します。
-
-### よく使うショートカット
-
-| ショートカット             | 操作                                 |
-| -------------------------- | ------------------------------------ |
-| `Cmd+Alt+L` / `Ctrl+Alt+L` | 現在のファイル参照を送信             |
-| `Cmd+Alt+A` / `Ctrl+Alt+A` | 開いているすべてのファイル参照を送信 |
-| `Cmd+Alt+T` / `Ctrl+Alt+T` | `tmux` session を参照                |
-| `Cmd+V` / `Ctrl+V`         | ターミナルへ貼り付け                 |
-
-## ファイルとコンテキストの共有
-
-ULW は、複数の方法で OpenCode にコンテキストを渡せます。
-
-- **ファイル参照コマンド**: `@filename`、`@filename#L10`、`@filename#L10-L20`
-- **コンテキストメニュー連携**: ファイル、フォルダ、エディタ選択範囲の送信
-- **ドラッグ＆ドロップ**: **Shift** を押したままファイルやフォルダをターミナルへドロップ
-- **自動コンテキスト共有**: ターミナルを開いたときに、開いているファイルと現在の選択範囲を自動送信
-
-ファイル参照の書式は、どの言語ガイドでも同じです。
-
-- `@filename`
-- `@filename#L10`
-- `@filename#L10-L20`
-
-## ULW Terminal Manager と tmux
-
-**ULW Terminal Manager** は、`tmux` ワークフローを制御するための中心的な画面です。
-
-次の機能を提供します。
-
-- 既存 session の自動検出
-- ワークスペース単位のフィルタリング
-- pane の分割、フォーカス移動、サイズ変更、入れ替え、終了
-- window の移動、作成、選択、終了
-- 現在のワークスペース session に戻るためのバナー
-- 縦方向のスペースを確保するため、サイドバー内では `tmux` ステータスバーを非表示
-
-### よく使う tmux 操作
-
-- **Spawn Tmux Session for Workspace**
-- **Select OpenCode Tmux Session**
-- **Switch Tmux Session**
-- **Split Pane Horizontal / Vertical**
-- **Create Window**
-- **Kill Pane / Kill Window / Kill Session**
-
-## HTTP API 連携
-
-ULW は、OpenCode とより安定して通信するために HTTP API を使用します。
-
-### 役割
-
-- OpenCode の HTTP サーバーを自動検出
-- リクエスト送信前に `/health` を確認
-- `/tui/append-prompt` へプロンプトとファイル参照を送信
-- リトライ処理とタイムアウト制御
-
-### 動作の流れ
-
-1. OpenCode が ephemeral port で HTTP サーバーを起動します。
-2. 拡張機能がそのポートを検出します。
-3. 拡張機能がプロンプトとコンテキストを HTTP 経由で送信します。
-4. サイドバー WebView がターミナルの入出力をレンダリングします。
-
-## 主要な設定
-
-実際の VS Code 設定キーと一致させる必要があるため、主要な設定名は英語のままにしています。
-
-### ターミナルと起動動作
-
-| 設定                           | 説明                                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------- |
-| `ulw.autoStart`                | ビュー有効化時にターミナルセッションを自動起動                                              |
-| `ulw.autoStartOnOpen`          | サイドバーを開いたときにターミナル起動（`ulw.terminalBackend`）                             |
-| `ulw.fontSize`                 | ターミナルのフォントサイズ                                                                  |
-| `ulw.fontFamily`               | ターミナルのフォントファミリー                                                              |
-| `ulw.autoSwitchKoreanKeyboard` | 韓英キーボード配列の入力ミスを検出したら macOS のシステム入力ソースを自動切替。既定では無効 |
-| `ulw.terminal.defaultLocation` | 既定のターミナル位置: `editor` または `sidebar`                                             |
-| `ulw.autoFocusOnSend`          | ファイル参照送信後に ULW へフォーカス                                                       |
-
-### HTTP API とコンテキスト共有
-
-| 設定                    | 説明                             |
-| ----------------------- | -------------------------------- |
-| `ulw.enableHttpApi`     | HTTP API 通信を有効化            |
-| `ulw.httpTimeout`       | リクエストのタイムアウト (ms)    |
-| `ulw.autoShareContext`  | エディタのコンテキストを自動共有 |
-| `ulw.contextDebounceMs` | コンテキスト更新の debounce 遅延 |
-
-### バックエンドとインスタンス検出
-
-| 設定                  | 説明                                                                 |
-| --------------------- | -------------------------------------------------------------------- |
-| `ulw.terminalBackend` | サイドバー起動時の `native` / `tmux` / `zellij`                      |
-| `ulw.enableAutoSpawn` | プロセススキャンで OpenCode が見つからない場合のバックグラウンド起動（サイドバー UI とは別） |
-
-## 要件
-
-- VS Code `1.106.0` 以上
-- Node.js `20.0.0` 以上
-- `opencode` コマンドで実行できる OpenCode がインストール済みであること
-
-## さらに詳しく
-
-完全なコマンド一覧、すべての設定表、開発ワークフロー、実装の詳細は [ルート README](../../README.md) を参照してください。
+既定値と開発コマンドは [README](../../README.md) を参照してください。

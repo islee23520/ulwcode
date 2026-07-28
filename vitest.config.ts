@@ -6,7 +6,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/**/*.test.ts"],
-    exclude: ["node_modules", "dist", "out"],
+    exclude: ["node_modules", "dist", "out", "src/test/e2e/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -14,22 +14,23 @@ export default defineConfig({
         lines: 80,
         functions: 80,
         branches: 70,
-        statements: 80,
+        statements: 80
       },
       exclude: [
         "node_modules/",
         "dist/",
         "out/",
         "src/**/*.test.ts",
-        "src/webview/**",
-      ],
+        "src/test/mocks/**",
+        "src/webview/main.ts"
+      ]
     },
     mockReset: true,
-    restoreMocks: true,
+    restoreMocks: true
   },
   resolve: {
     alias: {
-      vscode: "./src/test/mocks/vscode.ts",
-    },
-  },
+      vscode: "./src/test/mocks/vscode.ts"
+    }
+  }
 });

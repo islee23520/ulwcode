@@ -1,59 +1,47 @@
 import { vi } from "vitest";
 
 export interface MockPtyProcess {
-  pid: number;
-  onData: (callback: (data: string) => void) => void;
-  onExit: (callback: (exitCode: number, signal?: number) => void) => void;
-  write: (data: string) => void;
-  resize: (cols: number, rows: number) => void;
-  kill: (signal?: string) => void;
-  pause: () => void;
-  resume: () => void;
-  _dataCallbacks: Array<(data: string) => void>;
-  _exitCallbacks: Array<(exitCode: number, signal?: number) => void>;
-  _simulateData: (data: string) => void;
-  _simulateExit: (exitCode: number, signal?: number) => void;
+  readonly pid: number;
+  readonly write: ReturnType<typeof vi.fn>;
+  readonly resize: ReturnType<typeof vi.fn>;
+  readonly kill: ReturnType<typeof vi.fn>;
+  onData(listener: (data: string) => void): { dispose(): void };
+  onExit(listener: (event: { exitCode: number; signal?: number }) => void): {
+    dispose(): void;
+  };
+  emitData(data: string): void;
+  emitExit(exitCode: number, signal?: number): void;
 }
 
 export function createMockPtyProcess(): MockPtyProcess {
-  const dataCallbacks: Array<(data: string) => void> = [];
-  const exitCallbacks: Array<(exitCode: number, signal?: number) => void> = [];
-
-  const mockProcess: MockPtyProcess = {
+  const dataListeners = new Set<(data: string) => void>();
+  const exitListeners = new Set<
+    (event: { exitCode: number; signal?: number }) => void
+  >();
+  return {
     pid: 12345,
-    onData: vi.fn((callback: (data: string) => void) => {
-      dataCallbacks.push(callback);
-    }),
-    onExit: vi.fn((callback: (exitCode: number, signal?: number) => void) => {
-      exitCallbacks.push(callback);
-    }),
-    write: vi.fn((data: string) => {
-      mockProcess._dataCallbacks.forEach((cb) => cb(data));
-    }),
-    resize: vi.fn((cols: number, rows: number) => {}),
-    kill: vi.fn((signal?: string) => {
-      mockProcess._exitCallbacks.forEach((cb) => cb(0, undefined));
-    }),
-    pause: vi.fn(),
-    resume: vi.fn(),
-    _dataCallbacks: dataCallbacks,
-    _exitCallbacks: exitCallbacks,
-    _simulateData: (data: string) => {
-      dataCallbacks.forEach((cb) => cb(data));
+    write: vi.fn(),
+    resize: vi.fn(),
+    kill: vi.fn(),
+    onData(listener) {
+      dataListeners.add(listener);
+      return { dispose: () => dataListeners.delete(listener) };
     },
-    _simulateExit: (exitCode: number, signal?: number) => {
-      exitCallbacks.forEach((cb) => cb(exitCode, signal));
+    onExit(listener) {
+      exitListeners.add(listener);
+      return { dispose: () => exitListeners.delete(listener) };
+    },
+    emitData(data) {
+      for (const listener of dataListeners) {
+        listener(data);
+      }
+    },
+    emitExit(exitCode, signal) {
+      for (const listener of exitListeners) {
+        listener({ exitCode, signal });
+      }
     },
   };
-
-  return mockProcess;
 }
 
-export const spawn = vi.fn((file: string, args: string[], options: any) => {
-  return createMockPtyProcess();
-});
-
-export default {
-  spawn,
-  createMockPtyProcess,
-};
+export const spawn = vi.fn(() => createMockPtyProcess());

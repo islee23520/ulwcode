@@ -1,8 +1,8 @@
 {
   "name": "opencode-sidebar-tui",
-  "displayName": "ulwcode-sidebar-terminal",
-  "description": "sidebar terminal Extension for VS Code with tmux, zellij, and native terminal support",
-  "version": "1.12.3",
+  "displayName": "ULW Sidebar Terminal",
+  "description": "A fast native shell terminal in the VS Code secondary sidebar.",
+  "version": "1.12.4",
   "publisher": "islee23520",
   "icon": "icon.png",
   "engines": {
@@ -15,8 +15,7 @@
   "keywords": [
     "terminal",
     "sidebar",
-    "tui",
-    "ai"
+    "shell"
   ],
   "repository": {
     "type": "git",
@@ -24,9 +23,6 @@
   },
   "license": "MIT",
   "main": "./dist/extension.js",
-  "activationEvents": [
-    "onStartupFinished"
-  ],
   "contributes": {
     "viewsContainers": {
       "secondarySidebar": [
@@ -43,344 +39,52 @@
           "id": "ulw",
           "name": "Terminal",
           "type": "webview",
-          "icon": "resources/ulwcode-sidebar.svg",
-          "initialOrder": 1
+          "icon": "resources/ulwcode-sidebar.svg"
         }
       ]
     },
-    "commands": [
-      {
-        "command": "ulw.start",
-        "title": "Start ULW Terminal",
-        "category": "ULW"
-      },
-      {
-        "command": "ulw.focus",
-        "title": "ULW: Focus Terminal"
-      },
-      {
-        "command": "ulw.sendToTerminal",
-        "title": "Send to Active Terminal",
-        "category": "ULW"
-      },
-      {
-        "command": "ulw.sendAtMention",
-        "title": "Send File Reference (@file)",
-        "category": "ULW"
-      },
-      {
-        "command": "ulw.sendAllOpenFiles",
-        "title": "Send All Open File References",
-        "category": "ULW"
-      },
-      {
-        "command": "ulw.sendFileToTerminal",
-        "title": "Send to Agent Terminal",
-        "category": "ULW"
-      },
-      {
-        "command": "ulw.paste",
-        "title": "Paste",
-        "category": "ULW",
-        "icon": "$(clippy)"
-      },
-      {
-        "command": "ulw.openInNewWindow",
-        "title": "Open Tmux Session in New Window",
-        "category": "ULW",
-        "icon": "$(empty-window)"
-      },
-      {
-        "command": "ulw.openSessionInNewWindow",
-        "title": "Open Session in New Window",
-        "category": "ULW",
-        "icon": "$(empty-window)"
-      },
-      {
-        "command": "ulw.spawnForWorkspace",
-        "title": "Spawn Tmux Session for Workspace",
-        "category": "ULW",
-        "icon": "$(add)"
-      },
-      {
-        "command": "ulw.selectInstance",
-        "title": "Select Agent Tmux Session",
-        "category": "ULW",
-        "icon": "$(server-environment)"
-      },
-      {
-        "command": "ulw.switchTmuxSession",
-        "title": "Switch Tmux Session",
-        "category": "ULW"
-      },
-      {
-        "command": "ulw.createTmuxSession",
-        "title": "ULW: Create Tmux Session"
-      },
-      {
-        "command": "ulw.browseTmuxSessions",
-        "title": "Browse Tmux Sessions",
-        "category": "ULW",
-        "icon": "$(server-environment)"
-      },
-      {
-        "command": "ulw.switchNativeShell",
-        "title": "Switch to Native Shell",
-        "category": "ULW"
-      },
-      {
-        "command": "ulw.killNativeShell",
-        "title": "ULW: Kill Native Shell"
-      },
-      {
-        "command": "ulw.toggleTmuxCommandToolbar",
-        "title": "Toggle Tmux Command Toolbar",
-        "category": "ULW",
-        "icon": "$(terminal-tmux)"
-      },
-      {
-        "command": "ulw.openTerminalInEditor",
-        "title": "Open Terminal in Editor",
-        "category": "ULW",
-        "icon": {
-          "light": "resources/ulwcode-activity-bar.svg",
-          "dark": "resources/ulwcode-activity-bar-dark.svg"
-        }
-      },
-      {
-        "command": "ulw.openNewSessionTerminalInEditor",
-        "title": "Open New Session Terminal in Editor",
-        "category": "ULW",
-        "icon": "$(empty-window)"
-      },
-      {
-        "command": "ulw.restoreTerminalToSidebar",
-        "title": "Restore Terminal to Sidebar",
-        "category": "ULW",
-        "icon": "$(layout-sidebar-left)"
-      },
-      {
-        "command": "ulw.tmuxSwitchPane",
-        "title": "Switch to Pane",
-        "category": "ULW",
-        "icon": "$(check)"
-      },
-      {
-        "command": "ulw.tmuxSplitPaneH",
-        "title": "Split Pane Side by Side",
-        "category": "ULW",
-        "icon": "$(split-horizontal)"
-      },
-      {
-        "command": "ulw.tmuxSplitPaneV",
-        "title": "Split Pane Top/Bottom",
-        "category": "ULW",
-        "icon": "$(split-vertical)"
-      },
-      {
-        "command": "ulw.tmuxSplitPaneWithCommand",
-        "title": "Split Pane with Command",
-        "category": "ULW",
-        "icon": "$(terminal)"
-      },
-      {
-        "command": "ulw.tmuxSendTextToPane",
-        "title": "Send Text to Pane",
-        "category": "ULW",
-        "icon": "$(file-symlink-file)"
-      },
-      {
-        "command": "ulw.tmuxResizePane",
-        "title": "Resize Pane",
-        "category": "ULW",
-        "icon": "$(move)"
-      },
-      {
-        "command": "ulw.tmuxSwapPane",
-        "title": "Swap Panes",
-        "category": "ULW",
-        "icon": "$(arrow-swap)"
-      },
-      {
-        "command": "ulw.tmuxKillPane",
-        "title": "Kill Pane",
-        "category": "ULW",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "ulw.tmuxNextWindow",
-        "title": "Next Window",
-        "category": "ULW",
-        "icon": "$(chevron-right)"
-      },
-      {
-        "command": "ulw.tmuxPrevWindow",
-        "title": "Previous Window",
-        "category": "ULW",
-        "icon": "$(chevron-left)"
-      },
-      {
-        "command": "ulw.tmuxCreateWindow",
-        "title": "Create Window",
-        "category": "ULW",
-        "icon": "$(add)"
-      },
-      {
-        "command": "ulw.tmuxKillWindow",
-        "title": "Kill Window",
-        "category": "ULW",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "ulw.tmuxSelectWindow",
-        "title": "Select Window",
-        "category": "ULW",
-        "icon": "$(list-selection)"
-      },
-      {
-        "command": "ulw.tmuxKillSession",
-        "title": "Kill Session",
-        "category": "ULW",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "ulw.killTmuxSession",
-        "title": "ULW: Kill Tmux Session"
-      },
-      {
-        "command": "ulw.tmuxRefresh",
-        "title": "Restart Terminal",
-        "category": "ULW",
-        "icon": "$(refresh)"
-      }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "ulw.toggleTmuxCommandToolbar",
-          "group": "navigation",
-          "when": "view == ulw"
-        }
-      ],
-      "editor/title": [
-        {
-          "command": "ulw.openTerminalInEditor",
-          "group": "navigation@1",
-          "when": "ulw.active"
-        }
-      ],
-      "explorer/context": [
-        {
-          "command": "ulw.sendFileToTerminal",
-          "group": "2_workspace",
-          "when": "!explorerResourceIsFolder"
-        },
-        {
-          "command": "ulw.sendFileToTerminal",
-          "group": "2_workspace",
-          "when": "explorerResourceIsFolder"
-        }
-      ],
-      "editor/context": [
-        {
-          "command": "ulw.sendAtMention",
-          "group": "navigation"
-        }
-      ]
-    },
-    "keybindings": [
-      {
-        "command": "ulw.sendAtMention",
-        "key": "ctrl+alt+l",
-        "mac": "cmd+alt+l",
-        "when": "editorTextFocus || terminalFocus"
-      },
-      {
-        "command": "ulw.sendAllOpenFiles",
-        "key": "ctrl+alt+a",
-        "mac": "cmd+alt+a",
-        "when": "editorTextFocus || terminalFocus"
-      },
-      {
-        "command": "ulw.browseTmuxSessions",
-        "key": "ctrl+alt+t",
-        "mac": "cmd+alt+t",
-        "when": "focusedView == 'ulw'"
-      },
-      {
-        "command": "-workbench.action.quickOpen",
-        "key": "ctrl+p",
-        "when": "focusedView == 'ulw'"
-      },
-      {
-        "command": "-workbench.action.quickOpenNavigateNextInFilePicker",
-        "key": "ctrl+p",
-        "when": "inFilesPicker && inQuickOpen"
-      },
-      {
-        "command": "ulw.paste",
-        "key": "ctrl+v",
-        "mac": "cmd+v",
-        "when": "focusedView == 'ulw'"
-      },
-      {
-        "command": "ulw.toggleTmuxCommandToolbar",
-        "key": "ctrl+alt+m",
-        "mac": "cmd+alt+m",
-        "when": "focusedView == 'ulw'"
-      }
-    ],
     "configuration": {
-      "title": "ULW",
+      "title": "ULW Terminal",
       "properties": {
         "ulw.fontSize": {
           "type": "number",
           "default": 14,
-          "minimum": 6,
-          "maximum": 25,
-          "description": "Terminal font size in pixels"
+          "minimum": 8,
+          "maximum": 72,
+          "description": "Terminal font size."
         },
         "ulw.fontFamily": {
           "type": "string",
-          "default": "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', 'CascadiaCode NF', Menlo, monospace",
-          "description": "Terminal font family (Nerd Font recommended for Powerline/glyph support)"
+          "default": "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', Menlo, monospace",
+          "description": "Terminal font family."
         },
         "ulw.cursorBlink": {
           "type": "boolean",
           "default": true,
-          "description": "Enable cursor blinking"
+          "description": "Whether the terminal cursor blinks."
         },
         "ulw.cursorStyle": {
           "type": "string",
-          "default": "block",
           "enum": [
             "block",
             "underline",
             "bar"
           ],
-          "description": "Cursor style"
+          "default": "block",
+          "description": "Terminal cursor style."
         },
         "ulw.scrollback": {
           "type": "number",
           "default": 10000,
           "minimum": 0,
           "maximum": 100000,
-          "description": "Maximum number of lines in scrollback buffer"
-        },
-        "ulw.autoFocusOnSend": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically focus ULW after sending file references or text"
-        },
-        "ulw.autoStartOnOpen": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically start the AI tool when the sidebar is opened. When false, shows a tool selector each time."
+          "description": "Number of terminal scrollback lines."
         },
         "ulw.shellPath": {
           "type": "string",
           "default": "",
-          "description": "Custom shell path to use for the terminal. Leave empty to use VS Code's default shell. Useful for specifying PowerShell, Git Bash, or other shells on Windows."
+          "scope": "machine-overridable",
+          "description": "Optional shell executable. Empty uses the VS Code or system default shell."
         },
         "ulw.shellArgs": {
           "type": "array",
@@ -388,150 +92,8 @@
             "type": "string"
           },
           "default": [],
-          "description": "Custom arguments to pass to the shell. Leave empty for automatic detection. Example: [\"/c\"] for cmd.exe or [\"-Command\"] for PowerShell."
-        },
-        "ulw.sendKeybindingsToShell": {
-          "type": "boolean",
-          "default": true,
-          "description": "Send Ctrl/Cmd + letter shortcuts (including Ctrl+P) directly to the sidebar terminal instead of letting VS Code intercept them. This extension's main purpose is running opencode (a TUI with its own keybindings), so the default is ON. You can turn it off if you prefer normal IDE shortcuts even when the sidebar terminal is focused. Control keys like Ctrl+C are always sent to the terminal."
-        },
-        "ulw.autoSwitchKoreanKeyboard": {
-          "type": "boolean",
-          "default": false,
-          "description": "Automatically switch the macOS system input source between English and Korean when the sidebar terminal detects likely Korean/English keyboard layout mistakes. Disabled by default."
-        },
-        "ulw.showTmuxWindowControls": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show direct tmux session and window controls (+S, previous window, +W, next window) in the terminal toolbar. Turn this off to keep only the tmux command menu."
-        },
-        "ulw.autoShareContext": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically share editor context (open files, selections) with OpenCode"
-        },
-        "ulw.httpTimeout": {
-          "type": "number",
-          "default": 5000,
-          "minimum": 1000,
-          "maximum": 30000,
-          "description": "HTTP API request timeout in milliseconds for communication with OpenCode"
-        },
-        "ulw.enableHttpApi": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable HTTP API for bidirectional communication between VS Code and OpenCode"
-        },
-        "ulw.logLevel": {
-          "type": "string",
-          "enum": [
-            "debug",
-            "info",
-            "warn",
-            "error"
-          ],
-          "default": "info",
-          "description": "Log output level for ULW"
-        },
-        "ulw.contextDebounceMs": {
-          "type": "number",
-          "default": 500,
-          "minimum": 100,
-          "maximum": 5000,
-          "description": "Debounce delay for context updates (ms)"
-        },
-        "ulw.maxDiagnosticLength": {
-          "type": "number",
-          "default": 500,
-          "minimum": 100,
-          "maximum": 2000,
-          "description": "Maximum length of diagnostic messages"
-        },
-        "ulw.enableAutoSpawn": {
-          "type": "boolean",
-          "default": false,
-          "description": "When enabled, discovery may spawn OpenCode in the background if no instance is found (does not affect sidebar terminal startup)"
-        },
-        "ulw.terminalBackend": {
-          "type": "string",
-          "default": "tmux",
-          "enum": [
-            "native",
-            "tmux",
-            "zellij"
-          ],
-          "enumDescriptions": [
-            "Native terminal — basic shell only, no multiplexer features (panes, tabs, sessions)",
-            "Tmux — full session, pane, and window management via tmux",
-            "Zellij — full session, pane, and tab management via zellij"
-          ],
-          "description": "Select the terminal backend. Unavailable backends safely fall back to native.",
-          "order": 1
-        },
-        "ulw.terminal.defaultLocation": {
-          "type": "string",
-          "default": "editor",
-          "enum": [
-            "editor",
-            "sidebar"
-          ],
-          "enumDescriptions": [
-            "Open ULW as a VS Code editor tab by default.",
-            "Show and use the ULW secondary sidebar terminal by default."
-          ],
-          "description": "Choose where ULW opens by default. Use editor for a separate terminal window inside VS Code, or sidebar to expose the secondary sidebar terminal.",
-          "order": 2
-        },
-        "ulw.collapseSecondaryBarOnEditorOpen": {
-          "type": "boolean",
-          "default": true,
-          "description": "Close the secondary sidebar before moving the terminal into an editor group so the new editor tab gets the full workspace width."
-        },
-        "ulw.codeActionSeverities": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "error",
-              "warning",
-              "information",
-              "hint"
-            ]
-          },
-          "default": [
-            "error",
-            "warning"
-          ],
-          "description": "Diagnostic severities that trigger code actions"
-        },
-        "ulw.pane.defaultSplitDirection": {
-          "type": "string",
-          "default": "horizontal",
-          "enum": [
-            "horizontal",
-            "vertical"
-          ],
-          "description": "Default direction when splitting a terminal pane"
-        },
-        "ulw.pane.focusOnClick": {
-          "type": "boolean",
-          "default": true,
-          "description": "Focus a pane when clicking on it"
-        },
-        "ulw.pane.showPaneActions": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show pane action buttons (split, close) in the terminal"
-        },
-        "ulw.pane.renderer": {
-          "type": "string",
-          "default": "auto",
-          "enum": [
-            "webgl",
-            "canvas",
-            "auto"
-          ],
-          "description": "Terminal renderer: webgl (fast), canvas (fallback), or auto (webgl up to 4 panes, then canvas)"
+          "scope": "machine-overridable",
+          "description": "Arguments passed to the shell executable."
         }
       }
     }
@@ -552,17 +114,6 @@
     "test:coverage": "vitest run --coverage",
     "build-and-install": "npx @vscode/vsce package -o build/extension.vsix && code --install-extension build/extension.vsix --force"
   },
-  "dependencies": {
-    "@xterm/addon-fit": "^0.11.0",
-    "@xterm/addon-web-links": "^0.12.0",
-    "@xterm/addon-webgl": "^0.19.0",
-    "@xterm/xterm": "^6.0.0",
-    "node-pty": "^1.2.0-beta.11",
-    "preact": "^10.29.1"
-  },
-  "overrides": {
-    "serialize-javascript": "^7.0.5"
-  },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.10.13",
@@ -572,12 +123,11 @@
     "@vitest/coverage-v8": "^4.1.8",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
-    "copy-webpack-plugin": "^14.0.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "css-loader": "^7.1.2",
     "eslint": "^8.56.0",
-    "eslint-config-prettier": "^10.0.0",
-    "eslint-plugin-prettier": "^5.5.4",
-    "jsdom": "^29.0.1",
+    "jsdom": "^29.1.1",
     "mocha": "^11.7.5",
     "prettier": "^3.7.2",
     "style-loader": "^4.0.0",
@@ -586,5 +136,8 @@
     "vitest": "^4.1.8",
     "webpack": "^5.105.2",
     "webpack-cli": "^6.0.0"
+  },
+  "dependencies": {
+    "node-pty": "^1.2.0-beta.11"
   }
 }

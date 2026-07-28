@@ -1,81 +1,31 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { renderTerminalHtml } from "./html";
 
 describe("renderTerminalHtml", () => {
-  it("assembles the terminal webview HTML with all major sections", () => {
+  it("renders one CSP-protected terminal container", () => {
     const html = renderTerminalHtml({
-      cspSource: "vscode-resource:",
-      nonce: "nonce-123",
-      cssUri: "terminal.css",
+      cspSource: "vscode-webview:",
+      nonce: "nonce",
       scriptUri: "webview.js",
-      fontSize: "14",
-      fontFamily: "monospace",
-      cursorBlink: "true",
-      cursorStyle: "block",
-      scrollback: "10000",
-      autoSwitchKoreanKeyboard: "false",
-      renderer: "auto",
-      showTmuxWindowControls: "true",
     });
 
-    expect(html).toContain('id="tmux-command-surface"');
-    expect(html).toContain('id="tmux-command-dropdown"');
-    expect(html).not.toContain('id="btn-toggle-backend"');
-    expect(html).not.toContain('id="btn-tmux-new-window"');
-    expect(html).not.toContain('id="btn-toggle-editor-attachment"');
-    expect(html).toContain('id="terminal-container"');
-    expect(html).toContain('id="tmux-prompt"');
+    expect(html.match(/id="terminal-container"/g)).toHaveLength(1);
+    expect(html).toContain("script-src 'nonce-nonce'");
+    expect(html).toContain('src="webview.js"');
+    expect(html).not.toMatch(/tmux|zellij|pane|toolbar|dashboard/i);
   });
 
-  it("renders ULW Terminal as the document title", () => {
-    const html = renderTerminalHtml({
-      cspSource: "vscode-resource:",
-      nonce: "nonce-123",
-      cssUri: "terminal.css",
-      scriptUri: "webview.js",
-      fontSize: "14",
-      fontFamily: "monospace",
-      cursorBlink: "true",
-      cursorStyle: "block",
-      scrollback: "10000",
-      autoSwitchKoreanKeyboard: "false",
-      renderer: "auto",
-      showTmuxWindowControls: "true",
-    });
-
-    expect(html).toContain("<title>ULW Terminal</title>");
-  });
-
-  it("injects runtime values into CSP, asset URLs, and terminal data attributes", () => {
-    const html = renderTerminalHtml({
-      cspSource: "vscode-webview-resource:",
-      nonce: "abc123",
-      cssUri: "style-uri",
-      scriptUri: "script-uri",
-      fontSize: "16",
-      fontFamily: "JetBrains Mono",
-      cursorBlink: "false",
-      cursorStyle: "underline",
-      scrollback: "5000",
-      autoSwitchKoreanKeyboard: "true",
-      renderer: "canvas",
-      showTmuxWindowControls: "false",
-    });
-
-    expect(html).toContain(
-      "style-src vscode-webview-resource: 'unsafe-inline'",
+  it("uses VS Code theme variables for the xterm viewport", () => {
+    const css = readFileSync(
+      join(process.cwd(), "src/webview/terminal.css"),
+      "utf8",
     );
-    expect(html).toContain("script-src 'nonce-abc123'");
-    expect(html).toContain('href="style-uri"');
-    expect(html).toContain('src="script-uri"');
-    expect(html).toContain('data-font-size="16"');
-    expect(html).toContain('data-font-family="JetBrains Mono"');
-    expect(html).toContain('data-cursor-blink="false"');
-    expect(html).toContain('data-cursor-style="underline"');
-    expect(html).toContain('data-scrollback="5000"');
-    expect(html).toContain('data-auto-switch-korean-keyboard="true"');
-    expect(html).toContain('data-renderer="canvas"');
-    expect(html).not.toContain("tmux-window-controls");
-    expect(html).not.toContain("{{");
+
+    expect(css).toContain("#terminal-container .xterm-viewport");
+    expect(css).toContain("--vscode-terminal-background");
+    expect(css).toContain("--vscode-panel-background");
+    expect(css).not.toContain("background: #1e1e1e");
   });
 });

@@ -1,21 +1,14 @@
-/**
- * Main entry point for the ULW VS Code extension.
- */
-
 import * as vscode from "vscode";
-import { ExtensionLifecycle } from "./core/ExtensionLifecycle";
-import { OutputChannelService } from "./services/OutputChannelService";
+import { ExtensionLifecycle, type UlwExtensionApi } from "./core/ExtensionLifecycle";
 
-const lifecycle = new ExtensionLifecycle();
+let lifecycle: ExtensionLifecycle | undefined;
 
-export function activate(context: vscode.ExtensionContext): Promise<void> {
-  const logger = OutputChannelService.getInstance();
-  logger.info("ULW extension activating...");
+export function activate(context: vscode.ExtensionContext): UlwExtensionApi {
+  lifecycle = new ExtensionLifecycle();
   return lifecycle.activate(context);
 }
 
-export async function deactivate(): Promise<void> {
-  const logger = OutputChannelService.getInstance();
-  logger.info("ULW extension deactivating...");
-  await lifecycle.deactivate();
+export function deactivate(): void {
+  lifecycle?.dispose();
+  lifecycle = undefined;
 }

@@ -1,5 +1,4 @@
 {
-  "ulw.autoStartOnOpen": false,
-  "ulw.enableAutoSpawn": false,
-  "ulw.enableTmux": false
+  "ulw.shellPath": "/bin/sh",
+  "ulw.shellArgs": []
 }

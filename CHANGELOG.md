@@ -5,6 +5,28 @@ All notable changes to the "ULW" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.4] - 2026-07-28
+
+### Changed
+
+- Reduce the extension to one native shell terminal in the VS Code secondary sidebar.
+- Activate lazily when the contributed ULW view opens.
+- Use a seven-message host/webview contract for ready, input, resize, output, exit, configuration, and focus.
+- Read terminal foreground, background, cursor, selection, and ANSI colors from the active VS Code theme.
+- Reapply xterm colors immediately when the VS Code theme changes.
+
+### Removed
+
+- Terminal multiplexer and alternate backend support.
+- Session, instance, pane, window, dashboard, and editor-panel management.
+- AI, HTTP, context-sharing, file-reference, clipboard-image, drag-and-drop, and code-action integrations.
+- All contributed commands, menus, keybindings, and non-terminal settings.
+
+### Verification
+
+- Add focused PTY, provider, xterm, manifest, lifecycle, and real VS Code E2E coverage for the single-terminal flow.
+- Add theme variable, fallback, and live mutation coverage for dark, light, and same-kind theme changes.
+
 ## [1.12.0] - 2026-06-10
 
 ### Changed

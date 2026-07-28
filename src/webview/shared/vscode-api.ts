@@ -1,30 +1,14 @@
-import { WebviewMessage } from "../../types";
+import type { WebviewMessage } from "../../types";
 
-declare function acquireVsCodeApi(): {
-  postMessage: (message: WebviewMessage) => void;
-  getState: () => any;
-  setState: (state: any) => void;
-};
-
-export interface VsCodeApi {
-  postMessage: (message: WebviewMessage) => void;
-  getState: () => any;
-  setState: (state: any) => void;
+interface VsCodeApi {
+  postMessage(message: WebviewMessage): void;
 }
 
-let vscodeApi: VsCodeApi | null = null;
+declare function acquireVsCodeApi(): VsCodeApi;
 
-export function getVsCodeApi(): VsCodeApi {
-  if (!vscodeApi) {
-    vscodeApi = acquireVsCodeApi();
-  }
-  return vscodeApi;
-}
-
-export function resetVsCodeApi(): void {
-  vscodeApi = null;
-}
+let api: VsCodeApi | undefined;
 
 export function postMessage(message: WebviewMessage): void {
-  getVsCodeApi().postMessage(message);
+  api ??= acquireVsCodeApi();
+  api.postMessage(message);
 }
