@@ -1,21 +1,28 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import * as vscode from "vscode";
 import type { CursorStyle, HostMessage, TerminalConfig, WebviewMessage } from "../types";
 import { TerminalManager } from "../terminals/TerminalManager";
 import { renderTerminalHtml } from "../webview/terminal/html";
 
 const TERMINAL_ID = "sidebar-shell";
+const EDITOR_VIEW_TYPE = "ulw.terminalEditor";
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_SCROLLBACK_CHARS = 500_000;
+
+export type TerminalLocation = "sidebar" | "editor";
 
 export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   public static readonly viewType = "ulw";
 
   private view: vscode.WebviewView | undefined;
   private editorPanel: vscode.WebviewPanel | undefined;
+  private activeLocation: TerminalLocation = "sidebar";
+  private disposing = false;
+  private scrollback = "";
   private readonly disposables: vscode.Disposable[] = [];
 
   public constructor(
@@ -24,14 +31,18 @@ export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disp
   ) {
     this.disposables.push(
       terminalManager.onData(({ id, data }) => {
-        if (id === TERMINAL_ID) {
-          this.postMessage({ type: "output", data });
+        if (id !== TERMINAL_ID) {
+          return;
         }
+        this.appendScrollback(data);
+        this.postMessage({ type: "output", data });
       }),
       terminalManager.onExit(({ id, code, signal }) => {
-        if (id === TERMINAL_ID) {
-          this.postMessage({ type: "exit", code, signal });
+        if (id !== TERMINAL_ID) {
+          return;
         }
+        this.scrollback = "";
+        this.postMessage({ type: "exit", code, signal });
       }),
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration("ulw")) {
@@ -43,24 +54,10 @@ export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   public resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
-    const { webview } = webviewView;
-    webview.options = {
-      enableScripts: true,
-      localResourceRoots: [this.extensionUri],
-    };
-
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "dist", "webview.js"),
-    );
-    webview.html = renderTerminalHtml({
-      cspSource: webview.cspSource,
-      nonce: this.createNonce(),
-      scriptUri: scriptUri.toString(),
-    });
-
+    this.configureWebview(webviewView.webview);
     this.disposables.push(
-      webview.onDidReceiveMessage((message: WebviewMessage) => {
-        this.handleMessage(message);
+      webviewView.webview.onDidReceiveMessage((message: WebviewMessage) => {
+        this.handleMessage(message, "sidebar");
       }),
       webviewView.onDidDispose(() => {
         if (this.view === webviewView) {
@@ -68,27 +65,29 @@ export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
       }),
     );
+    webviewView.webview.html = this.renderHtml(webviewView.webview);
+  }
+
+  public openAtConfiguredLocation(): void {
+    if (this.readDefaultLocation() === "editor") {
+      this.openEditorPanel();
+    }
   }
 
   public toggleEditorLocation(): void {
     if (this.editorPanel) {
-      this.editorPanel.dispose();
-      this.editorPanel = undefined;
-      this.postMessage({ type: "focus" });
+      this.closeEditorPanel();
       return;
     }
+    this.openEditorPanel();
+  }
 
-    const panel = vscode.window.createWebviewPanel(
-      "ulw.terminalEditor",
-      "ULW Terminal",
-      vscode.ViewColumn.Beside,
-      { enableScripts: true, retainContextWhenHidden: true },
-    );
-    this.editorPanel = panel;
-    panel.webview.html = this.view?.webview.html ?? "";
-    panel.onDidDispose(() => {
-      this.editorPanel = undefined;
-    });
+  public isEditorLocation(): boolean {
+    return this.activeLocation === "editor" && this.editorPanel !== undefined;
+  }
+
+  public getDefaultLocation(): TerminalLocation {
+    return this.readDefaultLocation();
   }
 
   public write(data: string): void {
@@ -104,30 +103,102 @@ export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   public dispose(): void {
+    this.disposing = true;
     this.terminalManager.kill(TERMINAL_ID);
-    this.editorPanel?.dispose();
+    const panel = this.editorPanel;
+    this.editorPanel = undefined;
+    panel?.dispose();
     for (const disposable of this.disposables.splice(0)) {
       disposable.dispose();
     }
     this.view = undefined;
-    this.editorPanel = undefined;
+    this.activeLocation = "sidebar";
+    this.scrollback = "";
+    this.disposing = false;
   }
 
-  private handleMessage(message: WebviewMessage): void {
-    switch (message.type) {
-      case "ready":
-        if (!this.terminalManager.hasTerminal(TERMINAL_ID)) {
-          this.terminalManager.createTerminal(TERMINAL_ID, message.cols, message.rows);
-        } else {
-          this.terminalManager.resize(TERMINAL_ID, message.cols, message.rows);
-        }
-        this.postMessage({ type: "config", ...this.readConfig() });
+  private openEditorPanel(): void {
+    if (this.editorPanel) {
+      this.activeLocation = "editor";
+      this.editorPanel.reveal(vscode.ViewColumn.Beside);
+      this.postMessage({ type: "focus" });
+      return;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      EDITOR_VIEW_TYPE,
+      "ULW Terminal",
+      vscode.ViewColumn.Beside,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [this.extensionUri],
+      },
+    );
+    this.editorPanel = panel;
+    this.activeLocation = "editor";
+    this.configureWebview(panel.webview);
+    const messageSubscription = panel.webview.onDidReceiveMessage(
+      (message: WebviewMessage) => {
+        this.handleMessage(message, "editor");
+      },
+    );
+    const disposeSubscription = panel.onDidDispose(() => {
+      messageSubscription.dispose();
+      disposeSubscription.dispose();
+      if (this.editorPanel === panel && !this.disposing) {
+        this.editorPanel = undefined;
+        this.activeLocation = "sidebar";
         this.postMessage({ type: "focus" });
+        void vscode.commands.executeCommand("workbench.view.extension.ulwContainer");
+      }
+    });
+    panel.webview.html = this.renderHtml(panel.webview);
+    void vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar");
+  }
+
+  private closeEditorPanel(): void {
+    const panel = this.editorPanel;
+    if (!panel) {
+      return;
+    }
+    this.editorPanel = undefined;
+    this.activeLocation = "sidebar";
+    panel.dispose();
+    if (!this.disposing) {
+      this.postMessage({ type: "focus" });
+      void vscode.commands.executeCommand("workbench.view.extension.ulwContainer");
+    }
+  }
+
+  private handleMessage(message: WebviewMessage, source: TerminalLocation): void {
+    switch (message.type) {
+      case "ready": {
+        const isActive = source === this.activeLocation;
+        if (isActive) {
+          if (!this.terminalManager.hasTerminal(TERMINAL_ID)) {
+            this.terminalManager.createTerminal(TERMINAL_ID, message.cols, message.rows);
+          } else {
+            this.terminalManager.resize(TERMINAL_ID, message.cols, message.rows);
+          }
+        }
+        this.postToSurface(source, { type: "config", ...this.readConfig() });
+        this.replayScrollback(source);
+        if (isActive) {
+          this.postMessage({ type: "focus" });
+        }
         break;
+      }
       case "input":
+        if (source !== this.activeLocation) {
+          return;
+        }
         this.terminalManager.write(TERMINAL_ID, message.data);
         break;
       case "resize":
+        if (source !== this.activeLocation) {
+          return;
+        }
         this.terminalManager.resize(TERMINAL_ID, message.cols, message.rows);
         break;
       case "copy":
@@ -138,11 +209,66 @@ export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "imagePasted":
         void this.saveImageAndPostPath(message.data);
         break;
+      default: {
+        const _exhaustive: never = message;
+        void _exhaustive;
+      }
     }
   }
 
   private postMessage(message: HostMessage): void {
+    if (message.type === "focus") {
+      if (this.activeLocation === "editor" && this.editorPanel) {
+        void this.editorPanel.webview.postMessage(message);
+        return;
+      }
+      void this.view?.webview.postMessage(message);
+      return;
+    }
+
     void this.view?.webview.postMessage(message);
+    void this.editorPanel?.webview.postMessage(message);
+  }
+
+  private postToSurface(source: TerminalLocation, message: HostMessage): void {
+    if (source === "editor") {
+      void this.editorPanel?.webview.postMessage(message);
+      return;
+    }
+    void this.view?.webview.postMessage(message);
+  }
+
+  private replayScrollback(source: TerminalLocation): void {
+    if (!this.scrollback) {
+      return;
+    }
+    this.postToSurface(source, { type: "output", data: this.scrollback });
+  }
+
+  private appendScrollback(data: string): void {
+    this.scrollback += data;
+    if (this.scrollback.length > MAX_SCROLLBACK_CHARS) {
+      this.scrollback = this.scrollback.slice(this.scrollback.length - MAX_SCROLLBACK_CHARS);
+    }
+  }
+
+  private configureWebview(webview: vscode.Webview): void {
+    webview.options = {
+      enableScripts: true,
+      localResourceRoots: [this.extensionUri],
+    };
+  }
+
+  private renderHtml(webview: vscode.Webview): string {
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "dist", "webview.js"),
+    );
+    return renderTerminalHtml({
+      cspSource: webview.cspSource,
+      nonce: this.createNonce(),
+      scriptUri: scriptUri.toString(),
+      renderer: this.readRendererPreference(),
+    });
   }
 
   private async saveImageAndPostPath(dataUrl: string): Promise<void> {
@@ -180,6 +306,19 @@ export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disp
     return { mimeType: match[1], buffer: Buffer.from(match[2], "base64") };
   }
 
+  private readDefaultLocation(): TerminalLocation {
+    const configuration = vscode.workspace.getConfiguration("ulw");
+    const configured = configuration.get<string>("defaultLocation", "editor");
+    return configured === "sidebar" ? "sidebar" : "editor";
+  }
+
+  private readRendererPreference(): "webgl" | "dom" {
+    const configured = vscode.workspace
+      .getConfiguration("ulw")
+      .get<string>("renderer", "webgl");
+    return configured === "dom" ? "dom" : "webgl";
+  }
+
   private readConfig(): TerminalConfig {
     const configuration = vscode.workspace.getConfiguration("ulw");
     return {
@@ -195,10 +334,6 @@ export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   private createNonce(): string {
-    const alphabet =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    return Array.from({ length: 32 }, () =>
-      alphabet.charAt(Math.floor(Math.random() * alphabet.length)),
-    ).join("");
+    return randomBytes(32).toString("base64");
   }
 }

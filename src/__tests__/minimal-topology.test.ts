@@ -29,10 +29,16 @@ function readManifest(): Manifest {
 }
 
 describe("minimal sidebar terminal topology", () => {
-  it("activates only through the contributed sidebar view", () => {
+  it("keeps the secondary-sidebar view and activation hooks for both locations", () => {
     const manifest = readManifest();
 
-    expect(manifest.activationEvents).toBeUndefined();
+    expect(manifest.activationEvents).toEqual([
+      "onView:ulw",
+      "onCommand:ulw.toggleEditorLocation",
+      "onCommand:ulw.sendSelectionToTerminal",
+      "onCommand:ulw.sendFileToTerminal",
+      "onStartupFinished",
+    ]);
     expect(Object.keys(manifest.contributes.viewsContainers)).toEqual([
       "secondarySidebar",
     ]);
@@ -65,8 +71,10 @@ describe("minimal sidebar terminal topology", () => {
     expect(propertyNames).toEqual([
       "ulw.cursorBlink",
       "ulw.cursorStyle",
+      "ulw.defaultLocation",
       "ulw.fontFamily",
       "ulw.fontSize",
+      "ulw.renderer",
       "ulw.scrollback",
       "ulw.shellArgs",
       "ulw.shellPath",

@@ -7,4 +7,4 @@ ULW runs one native shell terminal in the VS Code secondary sidebar.
 - [日本語](./ja/README.md)
 - [Main README](../README.md)
 
-There are no contributed commands. Open the **ULW** secondary-sidebar view to start the terminal. Terminal appearance and shell selection are controlled by the seven `ulw.*` settings documented in the main README.
+Open the **ULW** view, or rely on the `editor` default — ULW opens in an editor-group tab on activate. Set `ulw.defaultLocation` to `sidebar` to use the secondary sidebar instead. Use **ULW: Toggle Terminal Location** to move the same shell between surfaces. Terminal appearance, default location, and shell selection are controlled by the `ulw.*` settings documented in the main README.

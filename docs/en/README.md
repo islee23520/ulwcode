@@ -6,6 +6,8 @@ ULW opens one native shell terminal in the VS Code secondary sidebar.
 
 Open the secondary sidebar and select **ULW**. The terminal starts in the first workspace folder, or in your home directory when no workspace is open.
 
+Set `ulw.defaultLocation` to `editor` (default) or `sidebar` to choose the initial surface. Use **ULW: Toggle Terminal Location** to move the same shell between surfaces.
+
 ## Configuration
 
 Configure the font, cursor, scrollback, shell executable, and shell arguments with:

@@ -83,7 +83,7 @@ export const ViewColumn = {
   Active: -1,
   Beside: -2,
   One: 1,
-};
+} as const;
 
 export const commands = {
   registerCommand: vi.fn((commandId: string, _handler: (...args: unknown[]) => unknown) => {
@@ -93,27 +93,71 @@ export const commands = {
   executeCommand: vi.fn(async (_command: string, ..._args: unknown[]) => undefined),
 };
 
+export interface MockWebview {
+  html: string;
+  options: unknown;
+  readonly cspSource: string;
+  readonly postMessage: ReturnType<typeof vi.fn>;
+  readonly asWebviewUri: ReturnType<typeof vi.fn>;
+  readonly onDidReceiveMessage: (listener: (message: unknown) => unknown) => Disposable;
+  readonly send: (message: unknown) => void;
+}
+
+export interface MockWebviewPanel {
+  webview: MockWebview;
+  visible: boolean;
+  readonly onDidDispose: (listener: () => unknown) => Disposable;
+  readonly reveal: ReturnType<typeof vi.fn>;
+  readonly dispose: ReturnType<typeof vi.fn>;
+}
+
+function createMockWebview(): MockWebview {
+  const messageEmitter = new EventEmitter<unknown>();
+  return {
+    html: "",
+    options: undefined,
+    cspSource: "vscode-webview:",
+    postMessage: vi.fn(async (_message: unknown) => true),
+    asWebviewUri: vi.fn((uri: Uri) => uri),
+    onDidReceiveMessage: messageEmitter.event,
+    send: (message) => messageEmitter.fire(message),
+  };
+}
+
+function createMockWebviewPanel(): MockWebviewPanel {
+  const disposeEmitter = new EventEmitter<void>();
+  const panel: MockWebviewPanel = {
+    webview: createMockWebview(),
+    visible: true,
+    onDidDispose: disposeEmitter.event,
+    reveal: vi.fn(),
+    dispose: vi.fn(() => {
+      disposeEmitter.fire();
+    }),
+  };
+  return panel;
+}
+
 export const window = {
   registerWebviewViewProvider: vi.fn(() => new Disposable()),
-  createWebviewPanel: vi.fn(() => ({
-    webview: {
-      options: {},
-      html: "",
-      onDidReceiveMessage: vi.fn(),
-      postMessage: vi.fn(),
-      asWebviewUri: vi.fn((uri: unknown) => uri),
-      cspSource: "",
-    },
-    visible: true,
-    onDidDispose: vi.fn(),
-    reveal: vi.fn(),
-    dispose: vi.fn(),
-  })),
+  createWebviewPanel: vi.fn(
+    (
+      _viewType: string,
+      _title: string,
+      _showOptions: unknown,
+      _options?: unknown,
+    ) => createMockWebviewPanel(),
+  ),
   onDidChangeActiveTextEditor: vi.fn((listener: unknown) => {
     void listener;
     return new Disposable();
   }),
-  activeTextEditor: undefined as unknown,
+  activeTextEditor: undefined as
+    | {
+        readonly selection: { readonly isEmpty: boolean };
+        readonly document: { getText(selection?: unknown): string };
+      }
+    | undefined,
 };
 
 export function resetMocks(): void {
@@ -122,7 +166,16 @@ export function resetMocks(): void {
   commands.executeCommand.mockClear();
   window.registerWebviewViewProvider.mockClear();
   window.createWebviewPanel.mockClear();
+  window.createWebviewPanel.mockImplementation(
+    (
+      _viewType: string,
+      _title: string,
+      _showOptions: unknown,
+      _options?: unknown,
+    ) => createMockWebviewPanel(),
+  );
   window.onDidChangeActiveTextEditor.mockClear();
+  window.activeTextEditor = undefined;
   workspace.getConfiguration.mockClear();
   env.shell = "/bin/mock-shell";
   env.clipboard.writeText.mockClear();
@@ -136,4 +189,6 @@ export default {
   workspace,
   env,
   window,
+  ViewColumn,
+  commands,
 };

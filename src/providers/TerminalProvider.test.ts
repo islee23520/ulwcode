@@ -214,4 +214,262 @@ describe("TerminalProvider", () => {
 
     expect(webview.postMessage).toHaveBeenCalledTimes(count);
   });
+
+  it("opens an editor-group terminal surface with its own html and message bridge", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+
+    provider.toggleEditorLocation();
+
+    expect(provider.isEditorLocation()).toBe(true);
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
+      "ulw.terminalEditor",
+      "ULW Terminal",
+      vscode.ViewColumn.Beside,
+      expect.objectContaining({
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [expect.objectContaining({ fsPath: "/extension" })],
+      }),
+    );
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "workbench.action.closeAuxiliaryBar",
+    );
+
+    const panel = vscode.window.createWebviewPanel.mock.results.at(-1)
+      ?.value as vscode.MockWebviewPanel;
+    expect(panel.webview.html).toContain('id="terminal-container"');
+    expect(panel.webview.html).not.toBe(webview.html);
+  });
+
+  it("routes editor ready/input/resize and PTY output through the editor surface", () => {
+    const manager = new TerminalManager();
+    const createSpy = vi.spyOn(manager, "createTerminal");
+    const writeSpy = vi.spyOn(manager, "write");
+    const resizeSpy = vi.spyOn(manager, "resize");
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+
+    provider.toggleEditorLocation();
+    const panel = vscode.window.createWebviewPanel.mock.results.at(-1)
+      ?.value as vscode.MockWebviewPanel;
+
+    panel.webview.send({ type: "ready", cols: 120, rows: 40 });
+    panel.webview.send({ type: "input", data: "ls\r" });
+    panel.webview.send({ type: "resize", cols: 130, rows: 42 });
+
+    expect(createSpy).toHaveBeenCalledWith("sidebar-shell", 120, 40);
+    expect(writeSpy).toHaveBeenCalledWith("sidebar-shell", "ls\r");
+    expect(resizeSpy).toHaveBeenCalledWith("sidebar-shell", 130, 42);
+    expect(panel.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "config", fontSize: 14 }),
+    );
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({ type: "focus" });
+
+    const process = nodePty.spawn.mock.results.at(-1)
+      ?.value as ptyMock.MockPtyProcess;
+    process.emitData("editor-out");
+
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      type: "output",
+      data: "editor-out",
+    });
+    expect(webview.postMessage).toHaveBeenCalledWith({
+      type: "output",
+      data: "editor-out",
+    });
+  });
+
+  it("ignores ready and resize from the inactive sidebar while editor mode is active", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+    const resizeSpy = vi.spyOn(manager, "resize");
+    const createSpy = vi.spyOn(manager, "createTerminal");
+
+    provider.toggleEditorLocation();
+    webview.send({ type: "ready", cols: 10, rows: 10 });
+    webview.send({ type: "resize", cols: 11, rows: 11 });
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(resizeSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns to the sidebar surface when toggled again", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+
+    provider.toggleEditorLocation();
+    const panel = vscode.window.createWebviewPanel.mock.results.at(-1)
+      ?.value as vscode.MockWebviewPanel;
+    expect(provider.isEditorLocation()).toBe(true);
+
+    provider.toggleEditorLocation();
+
+    expect(provider.isEditorLocation()).toBe(false);
+    expect(panel.dispose).toHaveBeenCalledOnce();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "workbench.view.extension.ulwContainer",
+    );
+    expect(webview.postMessage).toHaveBeenCalledWith({ type: "focus" });
+  });
+
+  it("returns to sidebar when the editor panel is closed by the workbench", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+
+    provider.toggleEditorLocation();
+    const panel = vscode.window.createWebviewPanel.mock.results.at(-1)
+      ?.value as vscode.MockWebviewPanel;
+    expect(provider.isEditorLocation()).toBe(true);
+
+    panel.dispose();
+
+    expect(provider.isEditorLocation()).toBe(false);
+    expect(webview.postMessage).toHaveBeenCalledWith({ type: "focus" });
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "workbench.view.extension.ulwContainer",
+    );
+  });
+
+  it("replays scrollback when the editor surface becomes ready", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+    const process = nodePty.spawn.mock.results.at(-1)
+      ?.value as ptyMock.MockPtyProcess;
+    process.emitData("prior output");
+
+    provider.toggleEditorLocation();
+    const panel = vscode.window.createWebviewPanel.mock.results.at(-1)
+      ?.value as vscode.MockWebviewPanel;
+    panel.webview.postMessage.mockClear();
+    panel.webview.send({ type: "ready", cols: 100, rows: 30 });
+
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      type: "output",
+      data: "prior output",
+    });
+  });
+
+  it("ignores input from the inactive sidebar while editor mode is active", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+    const writeSpy = vi.spyOn(manager, "write");
+
+    provider.toggleEditorLocation();
+    writeSpy.mockClear();
+    webview.send({ type: "input", data: "ghost\r" });
+
+    expect(writeSpy).not.toHaveBeenCalled();
+  });
+
+  it("reads ulw.defaultLocation as editor by default and sidebar on request", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+
+    expect(provider.getDefaultLocation()).toBe("editor");
+    vscode.setConfiguration({ "ulw.defaultLocation": "sidebar" });
+    expect(provider.getDefaultLocation()).toBe("sidebar");
+    vscode.setConfiguration({ "ulw.defaultLocation": "weird" });
+    expect(provider.getDefaultLocation()).toBe("editor");
+  });
+
+  it("openAtConfiguredLocation opens the editor by default and only stays sidebar when configured", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+
+    provider.openAtConfiguredLocation();
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledOnce();
+    expect(provider.isEditorLocation()).toBe(true);
+
+    vscode.window.createWebviewPanel.mockClear();
+    vscode.setConfiguration({ "ulw.defaultLocation": "sidebar" });
+    provider.openAtConfiguredLocation();
+    expect(vscode.window.createWebviewPanel).not.toHaveBeenCalled();
+  });
+
+  it("starts the shell from editor ready without a sidebar surface", () => {
+    const manager = new TerminalManager();
+    const createSpy = vi.spyOn(manager, "createTerminal");
+    const writeSpy = vi.spyOn(manager, "write");
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+
+    provider.toggleEditorLocation();
+    const panel = vscode.window.createWebviewPanel.mock.results.at(-1)
+      ?.value as vscode.MockWebviewPanel;
+
+    expect(panel.webview.html).toContain('id="terminal-container"');
+    expect(panel.webview.html).toContain("webview.js");
+
+    panel.webview.send({ type: "ready", cols: 90, rows: 28 });
+    panel.webview.send({ type: "input", data: "echo hi\r" });
+
+    expect(createSpy).toHaveBeenCalledWith("sidebar-shell", 90, 28);
+    expect(writeSpy).toHaveBeenCalledWith("sidebar-shell", "echo hi\r");
+    expect(panel.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "config" }),
+    );
+    expect(provider.isRunning()).toBe(true);
+  });
+
+  it("initializes a newly mounted sidebar even while editor mode is active", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+    const process = nodePty.spawn.mock.results.at(-1)
+      ?.value as ptyMock.MockPtyProcess;
+    process.emitData("history");
+
+    provider.toggleEditorLocation();
+    const panel = vscode.window.createWebviewPanel.mock.results.at(-1)
+      ?.value as vscode.MockWebviewPanel;
+    panel.webview.send({ type: "ready", cols: 100, rows: 30 });
+
+    const secondView = createView();
+    provider.resolveWebviewView(secondView.view as never);
+    secondView.webview.postMessage.mockClear();
+    secondView.webview.send({ type: "ready", cols: 40, rows: 12 });
+
+    expect(secondView.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "config", fontSize: 14 }),
+    );
+    expect(secondView.webview.postMessage).toHaveBeenCalledWith({
+      type: "output",
+      data: "history",
+    });
+  });
+
+  it("dispose suppresses the workbench restore side effect", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    provider.toggleEditorLocation();
+    vscode.commands.executeCommand.mockClear();
+
+    provider.dispose();
+
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      "workbench.view.extension.ulwContainer",
+    );
+  });
 });

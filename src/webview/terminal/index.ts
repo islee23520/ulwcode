@@ -13,6 +13,14 @@ export interface TerminalView {
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
+type RendererPreference = "webgl" | "dom";
+
+function readRendererPreference(): RendererPreference {
+  return (globalThis as { __ulwRenderer?: unknown }).__ulwRenderer === "dom"
+    ? "dom"
+    : "webgl";
+}
+
 export function createTerminalView(container: HTMLElement): TerminalView {
   const terminal = new Terminal({
     allowProposedApi: false,
@@ -29,14 +37,16 @@ export function createTerminalView(container: HTMLElement): TerminalView {
   terminal.loadAddon(fitAddon);
   terminal.open(container);
 
-  try {
-    const webglAddon = new WebglAddon();
-    webglAddon.onContextLoss(() => {
-      webglAddon.dispose();
-    });
-    terminal.loadAddon(webglAddon);
-  } catch (error) {
-    console.warn("WebGL renderer unavailable, using DOM renderer:", error);
+  if (readRendererPreference() !== "dom") {
+    try {
+      const webglAddon = new WebglAddon();
+      webglAddon.onContextLoss(() => {
+        webglAddon.dispose();
+      });
+      terminal.loadAddon(webglAddon);
+    } catch (error) {
+      console.warn("WebGL renderer unavailable, using DOM renderer:", error);
+    }
   }
 
   const inputDisposable = terminal.onData((data) => {
@@ -45,8 +55,26 @@ export function createTerminalView(container: HTMLElement): TerminalView {
   const resizeDisposable = terminal.onResize(({ cols, rows }) => {
     postMessage({ type: "resize", cols, rows });
   });
-  const resizeObserver = new ResizeObserver(() => fitAddon.fit());
+  const repaint = (): void => {
+    terminal.refresh(0, terminal.rows - 1);
+  };
+  const resizeObserver = new ResizeObserver(() => {
+    fitAddon.fit();
+    repaint();
+  });
   resizeObserver.observe(container);
+  const visibilityObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          fitAddon.fit();
+          repaint();
+        }
+      }
+    },
+    { threshold: 0.1 },
+  );
+  visibilityObserver.observe(container);
   const copySelection = () => {
     const text = terminal.getSelection();
     if (text) {
@@ -127,6 +155,7 @@ export function createTerminalView(container: HTMLElement): TerminalView {
       container.removeEventListener("mouseup", copySelection);
       container.removeEventListener("paste", handlePasteEvent);
       resizeObserver.disconnect();
+      visibilityObserver.disconnect();
       disposeThemeWatcher();
       inputDisposable.dispose();
       resizeDisposable.dispose();

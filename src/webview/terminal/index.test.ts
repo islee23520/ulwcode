@@ -7,6 +7,7 @@ const terminalWrite = vi.fn();
 const terminalFocus = vi.fn();
 const terminalDispose = vi.fn();
 const terminalGetSelection = vi.fn(() => "selected output");
+const terminalRefresh = vi.fn();
 const terminalOptions: Record<string, unknown> = {};
 let terminalConstructorOptions: Record<string, unknown> | undefined;
 let dataListener: ((data: string) => void) | undefined;
@@ -39,6 +40,7 @@ vi.mock("@xterm/xterm", () => ({
     public readonly focus = terminalFocus;
     public readonly dispose = terminalDispose;
     public readonly getSelection = terminalGetSelection;
+    public readonly refresh = terminalRefresh;
     private container?: HTMLElement;
     public constructor(options: Record<string, unknown>) {
       terminalConstructorOptions = options;
@@ -99,7 +101,27 @@ vi.mock("./theme", () => ({
   },
 }));
 
+let resizeObserverCallback: (() => void) | undefined;
+let intersectionObserverCallback:
+  | ((entries: ReadonlyArray<{ readonly isIntersecting: boolean }>) => void)
+  | undefined;
+
 class TestResizeObserver {
+  public constructor(callback: () => void) {
+    resizeObserverCallback = callback;
+  }
+  public observe(): void {}
+  public disconnect(): void {}
+}
+
+class TestIntersectionObserver {
+  public constructor(
+    callback: (
+      entries: ReadonlyArray<{ readonly isIntersecting: boolean }>,
+    ) => void,
+  ) {
+    intersectionObserverCallback = callback;
+  }
   public observe(): void {}
   public disconnect(): void {}
 }
@@ -118,6 +140,10 @@ describe("createTerminalView", () => {
       .mockReturnValueOnce(themeMocks.initialTheme)
       .mockReturnValue(themeMocks.updatedTheme);
     globalThis.ResizeObserver = TestResizeObserver as never;
+    globalThis.IntersectionObserver = TestIntersectionObserver as never;
+    resizeObserverCallback = undefined;
+    intersectionObserverCallback = undefined;
+    (globalThis as { __ulwRenderer?: unknown }).__ulwRenderer = undefined;
     globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
       callback(0);
       return 1;
@@ -202,5 +228,22 @@ describe("createTerminalView", () => {
     view.dispose();
     expect(terminalDispose).toHaveBeenCalledOnce();
     expect(themeMocks.disposeThemeWatcher).toHaveBeenCalledOnce();
+  });
+
+  it("uses the DOM renderer when ulw.renderer is dom", () => {
+    (globalThis as { __ulwRenderer?: unknown }).__ulwRenderer = "dom";
+    const container = document.createElement("div");
+    createTerminalView(container);
+    expect(container.querySelector(".xterm-screen canvas")).toBeNull();
+  });
+
+  it("repaints after a resize and when the surface becomes visible", () => {
+    const container = document.createElement("div");
+    createTerminalView(container);
+    terminalRefresh.mockClear();
+    resizeObserverCallback?.();
+    expect(terminalRefresh).toHaveBeenCalledTimes(1);
+    intersectionObserverCallback?.([{ isIntersecting: true }]);
+    expect(terminalRefresh).toHaveBeenCalledTimes(2);
   });
 });

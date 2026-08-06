@@ -5,13 +5,25 @@ All notable changes to the "ULW" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.7] - 2026-08-06
+
+### Fixed
+
+- Fix rendering artifacts (traces of previous frames) reported on some GPUs after 1.12.6, by restoring the terminal repaint safeguards that were dropped in the 1.12.4 rewrite: the terminal now fully repaints after a resize and again whenever its surface becomes visible.
+
+### Added
+
+- `ulw.renderer` (`webgl` default | `dom`): opt out of the WebGL renderer and use the DOM renderer. This is the recommended workaround when a GPU/driver produces WebGL ghosting. Reopen the terminal view (or reload the window) to apply.
+
 ## [1.12.6] - 2026-07-28
 
 ### Added
 
 - Restore WebGL renderer for faster terminal rendering and smoother Korean/English IME input.
 - Restore image paste support with clipboard data URL handling and temp file saving.
-- Add sidebar ↔ editor group toggle command.
+- Add sidebar ↔ editor group toggle command with a real editor webview surface that reuses the same shell.
+- Add `ulw.defaultLocation` (`editor` default | `sidebar`) so ULW opens in an editor-group tab by default, or the secondary sidebar when configured.
+- Replay recent scrollback when switching surfaces so the editor tab is not blank.
 - Add editor/explorer context menu commands to send selection or file to terminal.
 
 ## [1.12.5] - 2026-07-28

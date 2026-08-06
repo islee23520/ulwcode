@@ -2,12 +2,14 @@ export interface TerminalHtmlParams {
   readonly cspSource: string;
   readonly nonce: string;
   readonly scriptUri: string;
+  readonly renderer?: "webgl" | "dom";
 }
 
 export function renderTerminalHtml({
   cspSource,
   nonce,
   scriptUri,
+  renderer = "webgl",
 }: TerminalHtmlParams): string {
   return `<!doctype html>
 <html lang="en">
@@ -19,6 +21,7 @@ export function renderTerminalHtml({
   </head>
   <body>
     <div id="terminal-container" aria-label="ULW terminal"></div>
+    <script nonce="${nonce}">window.__ulwRenderer=${JSON.stringify(renderer)};</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
   </body>
 </html>`;

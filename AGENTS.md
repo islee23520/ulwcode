@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-VS Code extension that runs one native shell terminal in the secondary sidebar. The extension host owns one `node-pty` process; the webview owns one xterm.js instance.
+VS Code extension that runs one native shell terminal in the secondary sidebar or an editor-group tab. The extension host owns one `node-pty` process; each surface owns one xterm.js instance, with one active surface at a time.
 
 ## SOURCE TOPOLOGY
 
@@ -25,27 +25,32 @@ src/
 ## RUNTIME FLOW
 
 ```text
-contributed view `ulw`
-  -> TerminalProvider.resolveWebviewView()
-  -> webview posts `ready`
-  -> TerminalManager creates `sidebar-shell`
-  -> node-pty data/exit events post to xterm
-  -> xterm input/resize events write/resize the PTY
+sidebar: contributed view `ulw` -> resolveWebviewView()
+editor:  ulw.defaultLocation=editor (default) | ulw.toggleEditorLocation -> createWebviewPanel
+  -> active surface posts `ready`
+  -> TerminalManager creates or resizes `sidebar-shell`
+  -> scrollback replay when switching to a fresh xterm
+  -> node-pty data/exit events post to surfaces
+  -> active surface input/resize events write/resize the PTY
 ```
 
 ## CONTRACT
 
-- Webview to host: `ready`, `input`, `resize`.
-- Host to webview: `output`, `exit`, `config`, `focus`.
-- No pane or session identifiers: exactly one terminal exists.
+- Webview to host: `ready`, `input`, `resize`, `copy`, `imagePasted`.
+- Host to webview: `output`, `exit`, `config`, `focus`, `clipboardImage`.
+- No pane or session identifiers: exactly one terminal process exists.
+- One active surface at a time: secondary-sidebar webview or one editor-group webview panel.
+- `ulw.toggleEditorLocation` moves that single shell between surfaces.
 
 ## CONVENTIONS
 
-- Keep activation lazy through the contributed view; do not add startup activation.
-- Keep the manifest free of commands, menus, and keybindings.
+- Activate for the sidebar view, contributed commands, and startup (so `ulw.defaultLocation=editor` can open an editor tab).
+- Keep contributed commands limited to location toggle and send-to-terminal helpers; no keybindings.
 - Keep `node-pty` as the only runtime dependency. xterm and the fit addon are build-time dependencies bundled into `webview.js`.
-- Do not add multiplexer, session, AI, HTTP, dashboard, editor-panel, file-context, or multi-pane features.
-- Use `apply_patch` for edits and project scripts for verification.
+- Do not add multiplexer, session, AI, HTTP, dashboard, file-context, or multi-pane features.
+- One editor panel max for the shared shell; never spawn a second PTY for editor mode.
+- Honor `ulw.defaultLocation` (`editor` default | `sidebar`); toggle always overrides the current surface.
+- Use project scripts for verification.
 
 ## COMMANDS
 

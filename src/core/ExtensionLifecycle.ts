@@ -2,6 +2,10 @@ import * as vscode from "vscode";
 import { TerminalProvider } from "../providers/TerminalProvider";
 import { TerminalManager } from "../terminals/TerminalManager";
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
 export interface UlwExtensionApi {
   readonly onTerminalStart: vscode.Event<number>;
   readonly onTerminalData: vscode.Event<string>;
@@ -39,29 +43,30 @@ export class ExtensionLifecycle implements vscode.Disposable {
       ),
       provider,
       terminalManager,
-    );
-    context.subscriptions.push(this);
-
-    const editor = vscode.window.activeTextEditor;
-    this.disposables.push(
-      vscode.window.onDidChangeActiveTextEditor((e) => {
-        if (e && this.provider) {
-          this.provider["postMessage"]({ type: "focus" });
-        }
-      }),
       vscode.commands.registerCommand("ulw.toggleEditorLocation", () => {
         provider.toggleEditorLocation();
       }),
       vscode.commands.registerCommand("ulw.sendSelectionToTerminal", () => {
         const editor = vscode.window.activeTextEditor;
-        if (!editor || editor.selection.isEmpty) return;
+        if (!editor || editor.selection.isEmpty) {
+          return;
+        }
         const text = editor.document.getText(editor.selection);
-        if (text) provider.write(text);
+        if (text) {
+          provider.write(text);
+        }
       }),
-      vscode.commands.registerCommand("ulw.sendFileToTerminal", (uri: vscode.Uri) => {
-        if (uri?.fsPath) provider.write(`"${uri.fsPath}"`);
-      }),
+      vscode.commands.registerCommand(
+        "ulw.sendFileToTerminal",
+        (uri: vscode.Uri | undefined) => {
+          if (uri?.fsPath) {
+            provider.write(shellQuote(uri.fsPath));
+          }
+        },
+      ),
     );
+    context.subscriptions.push(this);
+    provider.openAtConfiguredLocation();
 
     return {
       onTerminalStart: startEmitter.event,

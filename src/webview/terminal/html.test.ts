@@ -17,6 +17,16 @@ describe("renderTerminalHtml", () => {
     expect(html).not.toMatch(/tmux|zellij|pane|toolbar|dashboard/i);
   });
 
+  it("injects the renderer preference for the webview", () => {
+    const html = renderTerminalHtml({
+      cspSource: "vscode-webview:",
+      nonce: "nonce",
+      scriptUri: "webview.js",
+    });
+
+    expect(html).toContain('window.__ulwRenderer="webgl"');
+  });
+
   it("uses VS Code theme variables for the xterm viewport", () => {
     const css = readFileSync(
       join(process.cwd(), "src/webview/terminal.css"),

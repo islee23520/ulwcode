@@ -2,7 +2,7 @@
   "name": "opencode-sidebar-tui",
   "displayName": "ULW Sidebar Terminal",
   "description": "A fast native shell terminal in the VS Code secondary sidebar.",
-  "version": "1.12.6",
+  "version": "1.12.7",
   "publisher": "islee23520",
   "icon": "icon.png",
   "engines": {
@@ -77,6 +77,19 @@
     "configuration": {
       "title": "ULW Terminal",
       "properties": {
+        "ulw.defaultLocation": {
+          "type": "string",
+          "enum": [
+            "sidebar",
+            "editor"
+          ],
+          "enumDescriptions": [
+            "Open the terminal in the secondary sidebar.",
+            "Open the terminal in an editor-group tab."
+          ],
+          "default": "editor",
+          "description": "Where ULW opens the terminal by default. Use ULW: Toggle Terminal Location to switch at any time."
+        },
         "ulw.fontSize": {
           "type": "number",
           "default": 14,
@@ -93,6 +106,19 @@
           "type": "boolean",
           "default": true,
           "description": "Whether the terminal cursor blinks."
+        },
+        "ulw.renderer": {
+          "type": "string",
+          "enum": [
+            "webgl",
+            "dom"
+          ],
+          "enumDescriptions": [
+            "Use the faster WebGL renderer (default). Switch off if you see rendering artifacts or ghosting.",
+            "Use the DOM renderer. A workaround for GPUs/drivers that glitch under WebGL."
+          ],
+          "default": "webgl",
+          "description": "Terminal renderer. Pick 'dom' to work around WebGL rendering artifacts such as traces of previous frames. Requires reopening the terminal view to apply."
         },
         "ulw.cursorStyle": {
           "type": "string",
@@ -171,5 +197,12 @@
   },
   "dependencies": {
     "node-pty": "^1.2.0-beta.11"
-  }
+  },
+  "activationEvents": [
+    "onView:ulw",
+    "onCommand:ulw.toggleEditorLocation",
+    "onCommand:ulw.sendSelectionToTerminal",
+    "onCommand:ulw.sendFileToTerminal",
+    "onStartupFinished"
+  ]
 }
