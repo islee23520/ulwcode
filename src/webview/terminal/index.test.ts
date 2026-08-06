@@ -14,6 +14,7 @@ let dataListener: ((data: string) => void) | undefined;
 let resizeListener:
   | ((size: { readonly cols: number; readonly rows: number }) => void)
   | undefined;
+let mockTextarea: HTMLTextAreaElement | undefined;
 
 vi.mock("@xterm/addon-fit", () => ({
   FitAddon: class {
@@ -41,6 +42,7 @@ vi.mock("@xterm/xterm", () => ({
     public readonly dispose = terminalDispose;
     public readonly getSelection = terminalGetSelection;
     public readonly refresh = terminalRefresh;
+    public textarea: HTMLTextAreaElement | undefined;
     private container?: HTMLElement;
     public constructor(options: Record<string, unknown>) {
       terminalConstructorOptions = options;
@@ -58,7 +60,14 @@ vi.mock("@xterm/xterm", () => ({
       this.container = container;
       const screen = document.createElement("div");
       screen.className = "xterm-screen";
+      const helpers = document.createElement("div");
+      helpers.className = "xterm-helpers";
+      mockTextarea = document.createElement("textarea");
+      mockTextarea.className = "xterm-helper-textarea";
+      helpers.appendChild(mockTextarea);
+      screen.appendChild(helpers);
       container.appendChild(screen);
+      this.textarea = mockTextarea;
     }
     public onData(listener: (data: string) => void) {
       dataListener = listener;
@@ -126,7 +135,7 @@ class TestIntersectionObserver {
   public disconnect(): void {}
 }
 
-const { createTerminalView } = await import("./index");
+const { createTerminalView, DEFAULT_FONT_FAMILY } = await import("./index");
 
 describe("createTerminalView", () => {
   beforeEach(() => {
@@ -134,6 +143,7 @@ describe("createTerminalView", () => {
     dataListener = undefined;
     resizeListener = undefined;
     terminalConstructorOptions = undefined;
+    mockTextarea = undefined;
     themeMocks.themeChangeListener = undefined;
     themeMocks.readTerminalTheme
       .mockReset()
@@ -246,4 +256,53 @@ describe("createTerminalView", () => {
     intersectionObserverCallback?.([{ isIntersecting: true }]);
     expect(terminalRefresh).toHaveBeenCalledTimes(2);
   });
+
+  it("uses a CJK-capable default font stack and keeps IME textarea focusable", () => {
+    const container = document.createElement("div");
+    createTerminalView(container);
+
+    expect(terminalConstructorOptions).toMatchObject({
+      fontFamily: DEFAULT_FONT_FAMILY,
+    });
+    expect(DEFAULT_FONT_FAMILY).toContain("Apple SD Gothic Neo");
+    expect(DEFAULT_FONT_FAMILY).toContain("Noto Sans CJK KR");
+    expect(mockTextarea?.getAttribute("inputmode")).toBe("text");
+
+    terminalFocus.mockClear();
+    container.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(terminalFocus).toHaveBeenCalled();
+  });
+
+  it("forwards finalized CJK composition text through onData input messages", () => {
+    const container = document.createElement("div");
+    createTerminalView(container);
+
+    dataListener?.("한글");
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "input",
+      data: "한글",
+    });
+  });
+
+  it("skips fit/repaint while an IME composition is active", () => {
+    const container = document.createElement("div");
+    createTerminalView(container);
+    fit.mockClear();
+    terminalRefresh.mockClear();
+
+    mockTextarea?.dispatchEvent(new Event("compositionstart"));
+    resizeObserverCallback?.();
+    intersectionObserverCallback?.([{ isIntersecting: true }]);
+
+    expect(fit).not.toHaveBeenCalled();
+    expect(terminalRefresh).not.toHaveBeenCalled();
+
+    mockTextarea?.dispatchEvent(new Event("compositionend"));
+    resizeObserverCallback?.();
+
+    expect(fit).toHaveBeenCalledTimes(1);
+    expect(terminalRefresh).toHaveBeenCalledTimes(1);
+  });
+
 });

@@ -36,7 +36,11 @@ describe("TerminalManager", () => {
         cols: 120,
         rows: 40,
         cwd: process.cwd(),
-        env: expect.objectContaining({ TERM: "xterm-256color" }),
+        env: expect.objectContaining({
+          TERM: "xterm-256color",
+          LANG: expect.stringMatching(/UTF-8/i),
+          LC_CTYPE: expect.stringMatching(/UTF-8/i),
+        }),
       }),
     );
   });

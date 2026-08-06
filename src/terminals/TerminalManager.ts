@@ -132,6 +132,16 @@ export class TerminalManager implements vscode.Disposable {
     }
     environment.TERM = "xterm-256color";
     environment.COLORTERM = "truecolor";
+    const utf8Locale =
+      environment.LANG && environment.LANG.includes("UTF-8")
+        ? environment.LANG
+        : "en_US.UTF-8";
+    if (!environment.LANG || !environment.LANG.includes("UTF-8")) {
+      environment.LANG = utf8Locale;
+    }
+    if (!environment.LC_CTYPE) {
+      environment.LC_CTYPE = environment.LANG;
+    }
     return environment;
   }
 

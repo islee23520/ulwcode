@@ -15,6 +15,11 @@ body,
   );
 }
 
+#terminal-container {
+  position: relative;
+  touch-action: none;
+}
+
 #terminal-container .xterm {
   height: 100%;
   padding: 4px 0 0 4px;
@@ -26,4 +31,23 @@ body,
     --vscode-terminal-background,
     var(--vscode-panel-background, var(--vscode-editor-background, #1e1e1e))
   ) !important;
+}
+
+#terminal-container .xterm-helpers {
+  z-index: 10;
+  position: absolute;
+}
+
+#terminal-container .composition-view {
+  white-space: nowrap;
+  pointer-events: none;
+  color: var(--vscode-terminal-foreground, var(--vscode-editor-foreground));
+  background: var(
+    --vscode-terminal-background,
+    var(--vscode-panel-background, var(--vscode-editor-background, #1e1e1e))
+  );
+}
+
+#terminal-container .xterm-helper-textarea {
+  resize: none;
 }

@@ -325,7 +325,7 @@ export class TerminalProvider implements vscode.WebviewViewProvider, vscode.Disp
       fontSize: configuration.get<number>("fontSize", 14),
       fontFamily: configuration.get<string>(
         "fontFamily",
-        "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', Menlo, monospace",
+        "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', Menlo, Monaco, 'Apple SD Gothic Neo', 'Malgun Gothic', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans', 'Noto Sans CJK KR', 'Noto Sans CJK JP', 'Noto Sans CJK SC', monospace",
       ),
       cursorBlink: configuration.get<boolean>("cursorBlink", true),
       cursorStyle: configuration.get<CursorStyle>("cursorStyle", "block"),

@@ -10,6 +10,9 @@ export interface TerminalView {
   dispose(): void;
 }
 
+export const DEFAULT_FONT_FAMILY =
+  "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', Menlo, Monaco, 'Apple SD Gothic Neo', 'Malgun Gothic', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans', 'Noto Sans CJK KR', 'Noto Sans CJK JP', 'Noto Sans CJK SC', monospace";
+
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
@@ -27,8 +30,7 @@ export function createTerminalView(container: HTMLElement): TerminalView {
     convertEol: true,
     cursorBlink: true,
     cursorStyle: "block",
-    fontFamily:
-      "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', Menlo, monospace",
+    fontFamily: DEFAULT_FONT_FAMILY,
     fontSize: 14,
     scrollback: 10000,
     theme: readTerminalTheme(),
@@ -49,6 +51,28 @@ export function createTerminalView(container: HTMLElement): TerminalView {
     }
   }
 
+  let imeComposing = false;
+  const textarea = terminal.textarea;
+  const detachImeListeners: Array<() => void> = [];
+  if (textarea) {
+    textarea.setAttribute("inputmode", "text");
+    textarea.setAttribute("enterkeyhint", "enter");
+    const markImeComposing = (): void => {
+      imeComposing = true;
+    };
+    const clearImeComposing = (): void => {
+      imeComposing = false;
+    };
+    textarea.addEventListener("compositionstart", markImeComposing);
+    textarea.addEventListener("compositionupdate", markImeComposing);
+    textarea.addEventListener("compositionend", clearImeComposing);
+    detachImeListeners.push(() => {
+      textarea.removeEventListener("compositionstart", markImeComposing);
+      textarea.removeEventListener("compositionupdate", markImeComposing);
+      textarea.removeEventListener("compositionend", clearImeComposing);
+    });
+  }
+
   const inputDisposable = terminal.onData((data) => {
     postMessage({ type: "input", data });
   });
@@ -58,17 +82,22 @@ export function createTerminalView(container: HTMLElement): TerminalView {
   const repaint = (): void => {
     terminal.refresh(0, terminal.rows - 1);
   };
-  const resizeObserver = new ResizeObserver(() => {
+  const fitAndRepaintUnlessImeComposing = (): void => {
+    if (imeComposing) {
+      return;
+    }
     fitAddon.fit();
     repaint();
+  };
+  const resizeObserver = new ResizeObserver(() => {
+    fitAndRepaintUnlessImeComposing();
   });
   resizeObserver.observe(container);
   const visibilityObserver = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
-          fitAddon.fit();
-          repaint();
+          fitAndRepaintUnlessImeComposing();
         }
       }
     },
@@ -82,6 +111,10 @@ export function createTerminalView(container: HTMLElement): TerminalView {
     }
   };
   container.addEventListener("mouseup", copySelection);
+  const focusTerminal = (): void => {
+    terminal.focus();
+  };
+  container.addEventListener("mousedown", focusTerminal);
   const disposeThemeWatcher = watchTerminalTheme(() => {
     terminal.options.theme = readTerminalTheme();
   });
@@ -130,7 +163,7 @@ export function createTerminalView(container: HTMLElement): TerminalView {
         terminal.options.cursorBlink = message.cursorBlink;
         terminal.options.cursorStyle = message.cursorStyle;
         terminal.options.scrollback = message.scrollback;
-        fitAddon.fit();
+        fitAndRepaintUnlessImeComposing();
         break;
       case "focus":
         terminal.focus();
@@ -143,7 +176,7 @@ export function createTerminalView(container: HTMLElement): TerminalView {
   window.addEventListener("message", messageHandler);
 
   requestAnimationFrame(() => {
-    fitAddon.fit();
+    fitAndRepaintUnlessImeComposing();
     postMessage({ type: "ready", cols: terminal.cols, rows: terminal.rows });
     terminal.focus();
   });
@@ -153,7 +186,11 @@ export function createTerminalView(container: HTMLElement): TerminalView {
     dispose() {
       window.removeEventListener("message", messageHandler);
       container.removeEventListener("mouseup", copySelection);
+      container.removeEventListener("mousedown", focusTerminal);
       container.removeEventListener("paste", handlePasteEvent);
+      for (const detach of detachImeListeners) {
+        detach();
+      }
       resizeObserver.disconnect();
       visibilityObserver.disconnect();
       disposeThemeWatcher();

@@ -52,7 +52,11 @@ describe("minimal sidebar terminal topology", () => {
 
   it("exposes only terminal-related commands", () => {
     const contributes = readManifest().contributes;
-    const commands = (contributes.commands ?? []) as readonly { command: string }[];
+    const commands = (contributes.commands ?? []) as readonly {
+      command: string;
+      icon?: string;
+      shortTitle?: string;
+    }[];
     const commandIds = commands.map((c) => c.command).sort();
 
     expect(commandIds).toEqual([
@@ -61,6 +65,29 @@ describe("minimal sidebar terminal topology", () => {
       "ulw.toggleEditorLocation",
     ]);
     expect(contributes.keybindings).toBeUndefined();
+
+    const toggle = commands.find((c) => c.command === "ulw.toggleEditorLocation");
+    expect(toggle?.icon).toBe("$(layout-sidebar-right)");
+    expect(toggle?.shortTitle).toBe("Toggle Location");
+  });
+
+  it("surfaces the location toggle on sidebar and editor title bars", () => {
+    const menus = readManifest().contributes.menus ?? {};
+
+    expect(menus["view/title"]).toEqual([
+      expect.objectContaining({
+        command: "ulw.toggleEditorLocation",
+        when: "view == ulw",
+        group: "navigation",
+      }),
+    ]);
+    expect(menus["editor/title"]).toEqual([
+      expect.objectContaining({
+        command: "ulw.toggleEditorLocation",
+        when: "activeWebviewPanelId == 'ulw.terminalEditor'",
+        group: "navigation",
+      }),
+    ]);
   });
 
   it("keeps only terminal and shell settings", () => {

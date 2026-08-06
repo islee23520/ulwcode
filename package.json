@@ -2,7 +2,7 @@
   "name": "opencode-sidebar-tui",
   "displayName": "ULW Sidebar Terminal",
   "description": "A fast native shell terminal in the VS Code secondary sidebar.",
-  "version": "1.12.7",
+  "version": "1.12.8",
   "publisher": "islee23520",
   "icon": "icon.png",
   "engines": {
@@ -47,7 +47,9 @@
       {
         "command": "ulw.toggleEditorLocation",
         "title": "ULW: Toggle Terminal Location",
-        "category": "ULW"
+        "category": "ULW",
+        "icon": "$(layout-sidebar-right)",
+        "shortTitle": "Toggle Location"
       },
       {
         "command": "ulw.sendSelectionToTerminal",
@@ -71,6 +73,20 @@
         {
           "command": "ulw.sendFileToTerminal",
           "group": "2_workspace"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "ulw.toggleEditorLocation",
+          "when": "view == ulw",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "ulw.toggleEditorLocation",
+          "when": "activeWebviewPanelId == 'ulw.terminalEditor'",
+          "group": "navigation"
         }
       ]
     },
@@ -99,8 +115,8 @@
         },
         "ulw.fontFamily": {
           "type": "string",
-          "default": "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', Menlo, monospace",
-          "description": "Terminal font family."
+          "default": "'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', Menlo, Monaco, 'Apple SD Gothic Neo', 'Malgun Gothic', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans', 'Noto Sans CJK KR', 'Noto Sans CJK JP', 'Noto Sans CJK SC', monospace",
+          "description": "Terminal font family. Include CJK fallbacks so Hangul/Kanji/Hanzi render under WebGL and during IME composition."
         },
         "ulw.cursorBlink": {
           "type": "boolean",

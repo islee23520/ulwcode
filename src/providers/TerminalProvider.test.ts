@@ -365,6 +365,35 @@ describe("TerminalProvider", () => {
     });
   });
 
+  it("mirrors live PTY output to both surfaces so the inactive one keeps running session text", () => {
+    const manager = new TerminalManager();
+    const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);
+    const { view, webview } = createView();
+    provider.resolveWebviewView(view as never);
+    webview.send({ type: "ready", cols: 80, rows: 24 });
+
+    provider.toggleEditorLocation();
+    const panel = vscode.window.createWebviewPanel.mock.results.at(-1)
+      ?.value as vscode.MockWebviewPanel;
+    panel.webview.send({ type: "ready", cols: 100, rows: 30 });
+
+    webview.postMessage.mockClear();
+    panel.webview.postMessage.mockClear();
+
+    const process = nodePty.spawn.mock.results.at(-1)
+      ?.value as ptyMock.MockPtyProcess;
+    process.emitData("agent still running\r\n");
+
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      type: "output",
+      data: "agent still running\r\n",
+    });
+    expect(webview.postMessage).toHaveBeenCalledWith({
+      type: "output",
+      data: "agent still running\r\n",
+    });
+  });
+
   it("ignores input from the inactive sidebar while editor mode is active", () => {
     const manager = new TerminalManager();
     const provider = new TerminalProvider(vscode.Uri.file("/extension"), manager);

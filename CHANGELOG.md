@@ -5,6 +5,18 @@ All notable changes to the "ULW" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.8] - 2026-08-06
+
+### Fixed
+
+- Fix CJK IME input in the terminal webview: keep composition stable by skipping fit/repaint while composing, focus the xterm textarea on mousedown, raise the IME helper/composition UI above the renderer, and ensure the PTY environment has UTF-8 locale settings.
+- Improve CJK glyph rendering with broader default font fallbacks (Hangul/Kanji/Hanzi-capable system fonts).
+
+### Added
+
+- Add title-bar toggle buttons for `ulw.toggleEditorLocation` on the sidebar view and the editor-group webview panel so the terminal can move between surfaces without the command palette.
+- Keep running session output visible across surfaces by broadcasting live PTY output to both renderers and replaying scrollback when a fresh surface becomes ready.
+
 ## [1.12.7] - 2026-08-06
 
 ### Fixed
